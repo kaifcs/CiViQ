@@ -1,0 +1,12 @@
+/* Global stylesheet: the Inter webfont and the three Tailwind layers.
+   Component styling is done with Tailwind utilities at each call site, so
+   this file deliberately holds almost no rules of its own. */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  font-family: 'Inter', sans-serif;
+}

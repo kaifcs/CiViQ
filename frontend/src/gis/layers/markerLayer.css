@@ -1,0 +1,33 @@
+/* Leaflet builds popup chrome outside React, so it can only be themed here.
+   Scoped to .civiq-popup, which MarkerLayer sets via the popup className. */
+
+.civiq-popup .leaflet-popup-content-wrapper {
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  background: #ffffff;
+  color: inherit;
+}
+
+.civiq-popup .leaflet-popup-content {
+  margin: 12px 14px;
+}
+
+.civiq-popup .leaflet-popup-tip {
+  background: #ffffff;
+}
+
+.dark .civiq-popup .leaflet-popup-content-wrapper,
+.dark .civiq-popup .leaflet-popup-tip {
+  background: #1c1c1f;
+}
+
+.dark .civiq-popup .leaflet-popup-close-button {
+  color: #9ca3af;
+}
+
+/* divIcon defaults to a white background; markers supply their own. */
+.civiq-marker,
+.civiq-cluster {
+  background: transparent;
+  border: 0;
+}

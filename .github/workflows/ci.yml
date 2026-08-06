@@ -1,0 +1,97 @@
+# Quality gates for CIVIQ.
+#
+# Runs the same npm scripts a developer runs locally — no CI-only build path to
+# drift from what is verified on a workstation. Backend and frontend run as
+# separate jobs so a failure names the half that broke.
+#
+# MongoDB is provided as a service so the integration tests actually execute.
+# They skip when no database is reachable, which keeps `npm test` useful
+# locally, so CI must supply one or the suite would pass without running them.
+
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  backend:
+    name: Backend
+    runs-on: ubuntu-latest
+
+    services:
+      mongodb:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ ping: 1 }).ok'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # The integration helper connects here and drops the database afterwards.
+      # Never the configured MONGODB_URI.
+      TEST_MONGODB_URI: mongodb://127.0.0.1:27017/civiq_test_s5
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # node:test, its assertions and its coverage reporter are built in,
+          # which is why this repository needs no test framework dependency.
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm test
+
+      # Reported, not enforced: no threshold is set until a baseline has been
+      # agreed, so this cannot fail the build on an arbitrary number.
+      - name: Coverage
+        run: npm run test:coverage
+
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm test

@@ -1,0 +1,883 @@
+// API regression — authentication, RBAC and ownership over real HTTP.
+//
+// The Express app is mounted on an ephemeral port so the whole middleware chain
+// runs exactly as it does in production: helmet, rate limiting, request
+// correlation, `protect`, `authorize`, the ownership guard and the error
+// handler. Unit tests cannot show that those are wired in the right order.
+//
+// Port 0 lets the OS choose, so this never collides with a running dev server.
+
+const test = require("node:test")
+const assert = require("node:assert/strict")
+const http = require("node:http")
+const mongoose = require("mongoose")
+const { mongoAvailable, dropAndDisconnect, clearCollections, SKIP_REASON } = require("../helpers/db")
+const { projectDoc, userDoc, departmentDoc } = require("../helpers/fixtures")
+
+const PASSWORD = "civiq123"
+
+function listen(app) {
+  return new Promise((resolve) => {
+    const server = http.createServer(app)
+    server.listen(0, "127.0.0.1", () => resolve(server))
+  })
+}
+
+test("API regression", async (t) => {
+  if (!(await mongoAvailable())) return t.skip(SKIP_REASON)
+
+  const app = require("../../src/app")
+  const User = require("../../src/models/User")
+  const Project = require("../../src/models/Project")
+  const Department = require("../../src/models/Department")
+  const Conflict = require("../../src/models/Conflict")
+
+  const server = await listen(app)
+  const base = `http://127.0.0.1:${server.address().port}/api`
+
+  t.after(async () => {
+    await new Promise((resolve) => server.close(resolve))
+    await dropAndDisconnect()
+  })
+
+  await clearCollections()
+
+  const department = await Department.create(departmentDoc())
+  const mk = async (role, email) => {
+    const user = new User(userDoc({ role, email, department: department._id }))
+    await user.save()
+    return user
+  }
+  const admin = await mk("admin", "admin@s5.test")
+  const officerA = await mk("officer", "officer-a@s5.test")
+  const officerB = await mk("officer", "officer-b@s5.test")
+  const supervisor = await mk("supervisor", "supervisor@s5.test")
+  // `citizen` is a real role an administrator can assign; it owns no project
+  // and must therefore see none. See the regression below.
+  const citizenUser = await mk("citizen", "citizen@s5.test")
+
+  const ownedByA = await Project.create(projectDoc({
+    officer: officerA._id, supervisor: supervisor._id,
+    department: department._id, createdBy: officerA._id,
+  }))
+  const ownedByB = await Project.create(projectDoc({
+    officer: officerB._id, department: department._id, createdBy: officerB._id,
+  }))
+
+  const call = async (path, { token, method = "GET", body } = {}) => {
+    const res = await fetch(`${base}${path}`, {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    })
+    return { status: res.status, headers: res.headers, body: await res.json().catch(() => null) }
+  }
+
+  const login = async (email) => {
+    const res = await call("/auth/login", { method: "POST", body: { email, password: PASSWORD } })
+    assert.equal(res.status, 200, `login failed for ${email}: ${JSON.stringify(res.body)}`)
+    return res.body.token
+  }
+
+  const tokens = {
+    admin: await login("admin@s5.test"),
+    officerA: await login("officer-a@s5.test"),
+    officerB: await login("officer-b@s5.test"),
+    supervisor: await login("supervisor@s5.test"),
+    citizen: await login("citizen@s5.test"),
+  }
+
+  // ── Authentication ──────────────────────────────────────────────────
+
+  await t.test("a protected route rejects an absent, malformed or forged token", async () => {
+    const forged = require("jsonwebtoken").sign({ id: String(admin._id) }, "wrong-secret")
+    for (const token of [undefined, "not-a-jwt", forged]) {
+      const res = await call("/projects", { token })
+      assert.equal(res.status, 401, `token ${String(token).slice(0, 12)} was accepted`)
+      assert.equal(res.body.success, false)
+      assert.ok(res.body.error.code)
+    }
+  })
+
+  await t.test("login rejects bad credentials without revealing which part was wrong", async () => {
+    const wrongPassword = await call("/auth/login", {
+      method: "POST", body: { email: "admin@s5.test", password: "nope" },
+    })
+    const unknownUser = await call("/auth/login", {
+      method: "POST", body: { email: "nobody@s5.test", password: PASSWORD },
+    })
+    assert.equal(wrongPassword.status, 401)
+    assert.equal(unknownUser.status, 401)
+    assert.equal(wrongPassword.body.message, unknownUser.body.message,
+      "differing messages let an attacker enumerate accounts")
+  })
+
+  // Regression — Account creation used to be unauthenticated, so anyone
+  // could mint a working `officer` and read every complaint unredacted. The
+  // role enum alone was never the control; authentication on the route is.
+  await t.test("regression: account creation is not self-service (P0-1)", async (st) => {
+    const payload = {
+      fullName: "Mallory", email: "mallory@s5.test",
+      password: PASSWORD, role: "officer",
+    }
+
+    await st.test("an anonymous caller cannot create an account", async () => {
+      const res = await call("/auth/register", { method: "POST", body: payload })
+      assert.equal(res.status, 401, "register must require a session")
+      assert.equal(res.body.success, false)
+      assert.ok(res.body.error.code)
+      assert.equal(await User.countDocuments({ email: payload.email }), 0,
+        "a rejected registration must not leave an account behind")
+    })
+
+    await st.test("a non-admin session cannot create an account either", async () => {
+      for (const role of ["officerA", "supervisor", "citizen"]) {
+        const res = await call("/auth/register", {
+          method: "POST", token: tokens[role], body: payload,
+        })
+        assert.equal(res.status, 403, `${role} was allowed to create an account`)
+      }
+      assert.equal(await User.countDocuments({ email: payload.email }), 0)
+    })
+
+    await st.test("an admin can still create staff", async () => {
+      const res = await call("/auth/register", {
+        method: "POST", token: tokens.admin, body: payload,
+      })
+      assert.equal(res.status, 201)
+      assert.equal(res.body.user.role, "officer")
+      assert.equal(await User.countDocuments({ email: payload.email }), 1)
+    })
+
+    // Creating a principal and granting it unrestricted access must stay two
+    // separate, separately-audited steps.
+    await st.test("even an admin cannot create another admin in one step", async () => {
+      const res = await call("/auth/register", {
+        method: "POST", token: tokens.admin,
+        body: { ...payload, email: "escalate@s5.test", role: "admin" },
+      })
+      assert.equal(res.status, 400)
+      assert.equal(await User.countDocuments({ email: "escalate@s5.test" }), 0)
+    })
+  })
+
+  await t.test("a password hash never appears in any response", async () => {
+    const me = await call("/auth/me", { token: tokens.admin })
+    assert.equal(me.status, 200)
+    assert.doesNotMatch(JSON.stringify(me.body), /\$2[aby]\$/, "a bcrypt hash was serialised")
+    assert.equal(JSON.stringify(me.body).includes('"password"'), false)
+  })
+
+  // ── RBAC and ownership (S2) ─────────────────────────────────────────
+
+  await t.test("officers see only their own projects; admin sees all", async () => {
+    const adminList = await call("/projects", { token: tokens.admin })
+    assert.equal(adminList.status, 200)
+    assert.equal(adminList.body.length, 2)
+
+    const aList = await call("/projects", { token: tokens.officerA })
+    assert.equal(aList.body.length, 1)
+    assert.equal(String(aList.body[0]._id), String(ownedByA._id))
+
+    const bList = await call("/projects", { token: tokens.officerB })
+    assert.equal(bList.body.length, 1)
+    assert.equal(String(bList.body[0]._id), String(ownedByB._id))
+  })
+
+  await t.test("a supervisor sees only the projects they supervise", async () => {
+    const list = await call("/projects", { token: tokens.supervisor })
+    assert.equal(list.body.length, 1)
+    assert.equal(String(list.body[0]._id), String(ownedByA._id))
+  })
+
+  // Regression — S2. This is the escalation path S2 closed: the list was scoped
+  // but a direct id reference was not, so any officer could read any project.
+  await t.test("regression: an officer cannot read another officer's project by id (S2 IDOR)", async () => {
+    const res = await call(`/projects/${ownedByB._id}`, { token: tokens.officerA })
+    assert.equal(res.status, 404, "a foreign project must not be readable")
+    assert.equal(res.body.error.code, "PROJECT_NOT_FOUND")
+  })
+
+  // 404 rather than 403 is deliberate: a 403 confirms the id exists.
+  await t.test("an inaccessible project is indistinguishable from a missing one", async () => {
+    const foreign = await call(`/projects/${ownedByB._id}`, { token: tokens.officerA })
+    const absent = await call(`/projects/${new mongoose.Types.ObjectId()}`, { token: tokens.officerA })
+    assert.equal(foreign.status, absent.status)
+    assert.equal(foreign.body.error.code, absent.body.error.code)
+    assert.equal(foreign.body.message, absent.body.message)
+  })
+
+  await t.test("an officer cannot modify another officer's project", async () => {
+    const res = await call(`/projects/${ownedByB._id}`, {
+      token: tokens.officerA, method: "PUT", body: { title: "hijacked" },
+    })
+    assert.ok([403, 404].includes(res.status), `unexpected status ${res.status}`)
+    const untouched = await Project.findById(ownedByB._id).lean()
+    assert.notEqual(untouched.title, "hijacked", "a foreign project was modified")
+  })
+
+  // Regression. `projectScopeFilter` named officer and supervisor and
+  // fell through to `{}` for everything else. An empty Mongo filter matches
+  // every document, so `citizen` — a role an administrator can assign through
+  // PUT /api/users/:id — received the admin-wide scope on both the list and,
+  // via `requireProjectAccess`, on any project by id. Both halves are pinned
+  // because they read the rule from the same function.
+  await t.test("regression: a citizen sees no project through the list (P1-1)", async () => {
+    const res = await call("/projects", { token: tokens.citizen })
+    assert.equal(res.status, 200, "the endpoint stays available to any authenticated role")
+    assert.deepEqual(res.body, [], "a citizen must not receive any project")
+  })
+
+  await t.test("regression: a citizen cannot read a project by id (P1-1)", async () => {
+    const res = await call(`/projects/${ownedByA._id}`, { token: tokens.citizen })
+    assert.equal(res.status, 404, "an out-of-scope project must not be readable")
+    assert.equal(res.body.error.code, "PROJECT_NOT_FOUND")
+  })
+
+  await t.test("an officer cannot reach an admin-only route", async () => {
+    const res = await call("/users", { token: tokens.officerA })
+    assert.equal(res.status, 403)
+    assert.equal(res.body.success, false)
+  })
+
+  await t.test("an officer may read their own project", async () => {
+    const res = await call(`/projects/${ownedByA._id}`, { token: tokens.officerA })
+    assert.equal(res.status, 200)
+    assert.equal(String(res.body._id), String(ownedByA._id))
+  })
+
+  // Regression — P1-2. PUT /:id can rewrite every input both engines read, but
+  // re-ran neither: a project could be moved onto occupied ground and stay
+  // recorded as clash-free, while its MCDM score kept describing the inputs it
+  // was created with. Both fixtures sit at the same coordinates, in the same
+  // ward, over the same dates, and are both `road` — which the matrix calls
+  // incompatible — so a location update must find the collision.
+  await t.test("regression: updating a project re-runs clash detection (P1-2)", async () => {
+    assert.equal(await Conflict.countDocuments(), 0, "precondition: no conflicts yet")
+    const before = await Project.findById(ownedByA._id).lean()
+    assert.equal(before.hasClash, false, "precondition: fixture starts clash-free")
+
+    const res = await call(`/projects/${ownedByA._id}`, {
+      token: tokens.officerA,
+      method: "PUT",
+      body: { location: { ward: before.location.ward, centerCoords: before.location.centerCoords } },
+    })
+    assert.equal(res.status, 200)
+
+    const after = await Project.findById(ownedByA._id).lean()
+    assert.equal(after.hasClash, true, "the collision with the co-located project was not detected")
+    assert.equal(after.clashes.length, 1)
+
+    const pair = await Conflict.find({
+      $or: [
+        { project1: ownedByA._id, project2: ownedByB._id },
+        { project1: ownedByB._id, project2: ownedByA._id },
+      ],
+    }).lean()
+    assert.equal(pair.length, 1, "exactly one conflict row must exist for the pair")
+
+    // The pair is unordered, so a second update must reuse the row rather than
+    // stack a duplicate for the same collision.
+    await call(`/projects/${ownedByA._id}`, {
+      token: tokens.officerA,
+      method: "PUT",
+      body: { location: { ward: before.location.ward, centerCoords: before.location.centerCoords } },
+    })
+    assert.equal(await Conflict.countDocuments(), 1, "a repeated update duplicated the conflict")
+  })
+
+  await t.test("regression: updating a project re-scores MCDM (P1-2)", async () => {
+    const res = await call(`/projects/${ownedByA._id}`, {
+      token: tokens.officerA,
+      method: "PUT",
+      body: { mcdmInputs: { conditionRating: "critical", tenderStatus: "complete", contractorAssigned: true } },
+    })
+    assert.equal(res.status, 200)
+
+    const after = await Project.findById(ownedByA._id).lean()
+    assert.equal(after.mcdmBreakdown.conditionSeverity, 10, "condition rating was not re-scored")
+    assert.equal(after.mcdmBreakdown.executionReadiness, 10, "execution readiness was not re-scored")
+    assert.equal(typeof after.mcdmScore, "number")
+  })
+
+  // The engines are re-run only for updates that touch what they read, so an
+  // unrelated edit cannot make conflict rows appear or disappear as a side
+  // effect. This is what keeps `an officer cannot modify another officer's
+  // project` above — a title-only PUT — free of engine work.
+  await t.test("an edit touching no engine input leaves clash and score state alone", async () => {
+    const before = await Project.findById(ownedByA._id).lean()
+    const conflictsBefore = await Conflict.countDocuments()
+
+    const res = await call(`/projects/${ownedByA._id}`, {
+      token: tokens.officerA, method: "PUT", body: { title: "Renamed, nothing else" },
+    })
+    assert.equal(res.status, 200)
+
+    const after = await Project.findById(ownedByA._id).lean()
+    assert.equal(after.title, "Renamed, nothing else")
+    assert.equal(after.mcdmScore, before.mcdmScore, "score changed on an unrelated edit")
+    assert.equal(after.hasClash, before.hasClash, "clash state changed on an unrelated edit")
+    assert.equal(await Conflict.countDocuments(), conflictsBefore, "conflict rows changed on an unrelated edit")
+  })
+
+  // Regression — P2-4. approve, reject and progress wrote `status` with no
+  // precondition, so a completed or rejected project could be decided again and
+  // a rejected one could be driven to completed. The rules asserted here are the
+  // ones the repository already implemented: AdminProjectDetail gates approve
+  // and reject on `status === 'pending'` (canTakeAction), and completed/rejected
+  // are the terminal pair analyticsService already excludes from work in flight.
+  // These three create their own projects, so each removes them again: the
+  // pagination assertions below count the fixture set exactly and would
+  // otherwise fail on rows this block left behind.
+  const scratchProjects = []
+  const scratchProject = async (status, overrides = {}) => {
+    const project = await Project.create(projectDoc({
+      status, officer: officerA._id, supervisor: supervisor._id,
+      department: department._id, createdBy: officerA._id,
+      ...overrides,
+    }))
+    scratchProjects.push(project._id)
+    return project
+  }
+  const dropScratchProjects = async () => {
+    if (scratchProjects.length === 0) return
+    await Project.deleteMany({ _id: { $in: scratchProjects.splice(0) } })
+  }
+
+  await t.test("regression: a decided project cannot be decided again (P2-4)", async (st) => {
+    st.after(dropScratchProjects)
+
+    for (const status of ["completed", "rejected"]) {
+      const project = await scratchProject(status)
+      const approve = await call(`/projects/${project._id}/approve`, { token: tokens.admin, method: "PUT", body: {} })
+      assert.equal(approve.status, 409, `${status} project was approvable`)
+      assert.equal(approve.body.error.code, "CONFLICT")
+
+      const reject = await call(`/projects/${project._id}/reject`, { token: tokens.admin, method: "PUT", body: { reason: "x" } })
+      assert.equal(reject.status, 409, `${status} project was rejectable`)
+
+      assert.equal((await Project.findById(project._id).lean()).status, status, "status changed despite the refusal")
+    }
+  })
+
+  await t.test("regression: progress cannot be recorded on finished work (P2-4)", async (st) => {
+    st.after(dropScratchProjects)
+
+    for (const status of ["completed", "rejected"]) {
+      const project = await scratchProject(status)
+      const res = await call(`/projects/${project._id}/progress`, {
+        token: tokens.supervisor, method: "PUT", body: { progress: 100 },
+      })
+      assert.equal(res.status, 409, `progress was accepted on a ${status} project`)
+      assert.equal((await Project.findById(project._id).lean()).status, status)
+    }
+  })
+
+  // Regression — P2-1. approve, reject and progress all guarded `status`, but
+  // the broadest write on the resource guarded nothing, so finished work stayed
+  // freely editable. Moving `startDate` past a stamped `actualEndDate` made the
+  // dashboard's average completion time negative.
+  await t.test("regression: finished work can no longer be edited (P2-1)", async (st) => {
+    st.after(dropScratchProjects)
+
+    for (const status of ["completed", "rejected"]) {
+      const project = await scratchProject(status, {
+        startDate: new Date("2025-01-01"),
+        endDate: new Date("2025-06-01"),
+        actualEndDate: new Date("2025-05-01"),
+      })
+
+      const res = await call(`/projects/${project._id}`, {
+        token: tokens.officerA, method: "PUT",
+        body: { title: "REWRITTEN", startDate: "2027-01-01", endDate: "2027-06-01" },
+      })
+      assert.equal(res.status, 409, `a ${status} project was editable`)
+      assert.equal(res.body.error.code, "CONFLICT")
+
+      const after = await Project.findById(project._id).lean()
+      assert.equal(after.title, project.title, "the title changed despite the refusal")
+      assert.equal(after.startDate.toISOString(), project.startDate.toISOString(),
+        "startDate changed despite the refusal")
+      assert.ok(after.actualEndDate >= after.startDate,
+        "a completion must never predate the start it is measured from")
+    }
+  })
+
+  // The refusal must cover the recompute an edit triggers, not just the field
+  // write — re-scoring finished work is the same corruption by another route.
+  await t.test("a refused edit re-scores nothing (P2-1)", async (st) => {
+    st.after(dropScratchProjects)
+
+    const project = await scratchProject("completed", { mcdmScore: 4.2 })
+    const res = await call(`/projects/${project._id}`, {
+      token: tokens.officerA, method: "PUT",
+      body: { location: { ward: "Ward-99", centerCoords: { lat: 28.7, lng: 77.5 } } },
+    })
+    assert.equal(res.status, 409)
+
+    const after = await Project.findById(project._id).lean()
+    assert.equal(after.mcdmScore, 4.2, "MCDM was recomputed on a refused edit")
+    assert.equal(after.location.ward, project.location.ward, "location changed despite the refusal")
+  })
+
+  // Editing live work — the reason this endpoint exists — must be unaffected.
+  await t.test("live projects are still freely editable (P2-1)", async (st) => {
+    st.after(dropScratchProjects)
+
+    for (const status of ["pending", "approved", "active"]) {
+      const project = await scratchProject(status)
+      const res = await call(`/projects/${project._id}`, {
+        token: tokens.officerA, method: "PUT", body: { title: `Edited ${status}` },
+      })
+      assert.equal(res.status, 200, `a ${status} project was not editable`)
+      assert.equal((await Project.findById(project._id).lean()).title, `Edited ${status}`)
+    }
+  })
+
+  // Regression — P2-2. `active` was declared by the schema, counted by the
+  // dashboard, labelled by the frontend and used by clash detection, but no
+  // code path ever wrote it — so "active projects" was permanently zero and
+  // approved work in flight was invisible.
+  await t.test("regression: recording progress makes a project active (P2-2)", async (st) => {
+    st.after(dropScratchProjects)
+
+    const project = await scratchProject("approved")
+    const half = await call(`/projects/${project._id}/progress`, {
+      token: tokens.supervisor, method: "PUT", body: { progress: 50 },
+    })
+    assert.equal(half.status, 200)
+    assert.equal(half.body.status, "active", "work in flight must report as active")
+
+    // `active` stays progressable, so the lifecycle still reaches completion.
+    const done = await call(`/projects/${project._id}/progress`, {
+      token: tokens.supervisor, method: "PUT", body: { progress: 100 },
+    })
+    assert.equal(done.status, 200)
+    assert.equal(done.body.status, "completed")
+  })
+
+  await t.test("approved work only becomes active once progress is real (P2-2)", async (st) => {
+    st.after(dropScratchProjects)
+
+    const untouched = await scratchProject("approved")
+    const zero = await call(`/projects/${untouched._id}/progress`, {
+      token: tokens.supervisor, method: "PUT", body: { progress: 0 },
+    })
+    assert.equal(zero.body.status, "approved", "0% is not work in flight")
+
+    // Straight to 100 finishes the work; it never passes through active.
+    const straight = await scratchProject("approved")
+    const done = await call(`/projects/${straight._id}/progress`, {
+      token: tokens.supervisor, method: "PUT", body: { progress: 100 },
+    })
+    assert.equal(done.body.status, "completed")
+  })
+
+  // Prevents progress updates on unapproved projects.
+  // This preserves the approval workflow and ensures only authorized work
+  // can reach completion.
+  await t.test("regression: progress cannot be recorded before approval (P1-1)", async (st) => {
+    st.after(dropScratchProjects)
+
+    for (const status of ["pending", "rescheduled"]) {
+      const project = await scratchProject(status)
+      const res = await call(`/projects/${project._id}/progress`, {
+        token: tokens.supervisor, method: "PUT", body: { progress: 100 },
+      })
+      assert.equal(res.status, 409, `progress was accepted on a ${status} project`)
+      assert.equal(res.body.error.code, "CONFLICT")
+
+      const after = await Project.findById(project._id).lean()
+      assert.equal(after.status, status, "status changed despite the refusal")
+      assert.equal(after.progress, 0, "progress was written despite the refusal")
+      assert.equal(after.actualEndDate, undefined, "actualEndDate was stamped despite the refusal")
+    }
+  })
+
+  // The decision path must stay open, which is the whole point of the guard.
+  await t.test("a refused project can still be approved, then completed (P1-1)", async (st) => {
+    st.after(dropScratchProjects)
+
+    const project = await scratchProject("pending")
+    const blocked = await call(`/projects/${project._id}/progress`, {
+      token: tokens.supervisor, method: "PUT", body: { progress: 100 },
+    })
+    assert.equal(blocked.status, 409)
+
+    const approved = await call(`/projects/${project._id}/approve`, { token: tokens.admin, method: "PUT", body: {} })
+    assert.equal(approved.status, 200, "approve must still be reachable after the refusal")
+
+    const done = await call(`/projects/${project._id}/progress`, {
+      token: tokens.supervisor, method: "PUT", body: { progress: 100 },
+    })
+    assert.equal(done.status, 200, "an approved project must accept progress")
+    const finished = await Project.findById(project._id).lean()
+    assert.equal(finished.status, "completed")
+    assert.ok(finished.actualEndDate, "completion must still stamp actualEndDate")
+  })
+
+  await t.test("the decision and progress paths still work on live projects (P2-4)", async (st) => {
+    st.after(dropScratchProjects)
+
+    const pending = await scratchProject("pending")
+    const approved = await call(`/projects/${pending._id}/approve`, { token: tokens.admin, method: "PUT", body: {} })
+    assert.equal(approved.status, 200)
+    assert.equal((await Project.findById(pending._id).lean()).status, "approved")
+
+    // `active` is non-terminal, so progress applies and 100 still completes it.
+    const live = await scratchProject("active")
+    const half = await call(`/projects/${live._id}/progress`, { token: tokens.supervisor, method: "PUT", body: { progress: 50 } })
+    assert.equal(half.status, 200)
+    assert.equal((await Project.findById(live._id).lean()).status, "active", "a partial update must not complete the work")
+
+    const full = await call(`/projects/${live._id}/progress`, { token: tokens.supervisor, method: "PUT", body: { progress: 100 } })
+    assert.equal(full.status, 200)
+    const finished = await Project.findById(live._id).lean()
+    assert.equal(finished.status, "completed")
+    assert.ok(finished.actualEndDate, "completion must still stamp actualEndDate")
+  })
+
+  // Prevents conflict resolution from modifying completed or rejected projects.
+  // Preserves terminal project states and avoids bypassing workflow safeguards.
+  const scratchConflicts = []
+  const conflictFor = async (a, b) => {
+    const conflict = await Conflict.create({
+      project1: a._id, project2: b._id,
+      clashTypes: ["geographic", "timeline", "worktype"],
+      severity: "incompatible", status: "pending",
+    })
+    scratchConflicts.push(conflict._id)
+    return conflict
+  }
+  const dropScratch = async () => {
+    if (scratchConflicts.length > 0) await Conflict.deleteMany({ _id: { $in: scratchConflicts.splice(0) } })
+    await dropScratchProjects()
+  }
+
+  await t.test("regression: resolving a conflict cannot approve finished work (terminal-status guard)", async (st) => {
+    st.after(dropScratch)
+
+    for (const status of ["completed", "rejected"]) {
+      // Both orderings: the pair is unordered (models/Conflict), so the guard
+      // has to cover whichever side happens to be stored first.
+      for (const terminalFirst of [true, false]) {
+        const done = await scratchProject(status)
+        const live = await scratchProject("pending")
+        const conflict = terminalFirst ? await conflictFor(done, live) : await conflictFor(live, done)
+
+        const res = await call(`/conflicts/${conflict._id}/resolve`, {
+          token: tokens.admin, method: "PUT", body: { action: "approve_both" },
+        })
+        assert.equal(res.status, 409, `approve_both accepted a ${status} project`)
+        assert.equal(res.body.error.code, "CONFLICT")
+
+        assert.equal((await Project.findById(done._id).lean()).status, status, "finished work was rewritten")
+        assert.equal((await Project.findById(live._id).lean()).status, "pending", "a refused call still wrote the other project")
+        assert.equal((await Conflict.findById(conflict._id).lean()).status, "pending",
+          "the conflict was actioned despite the refusal")
+      }
+    }
+  })
+
+  await t.test("regression: reject_lower cannot reschedule finished work (terminal-status guard)", async (st) => {
+    st.after(dropScratch)
+
+    const done = await scratchProject("completed", { mcdmScore: 2 })   // the lower score
+    const live = await scratchProject("pending", { mcdmScore: 9 })
+    const conflict = await conflictFor(live, done)
+
+    const res = await call(`/conflicts/${conflict._id}/resolve`, {
+      token: tokens.admin, method: "PUT", body: { action: "reject_lower" },
+    })
+    assert.equal(res.status, 409, "reject_lower rescheduled completed work")
+    assert.equal((await Project.findById(done._id).lean()).status, "completed")
+    assert.equal((await Conflict.findById(conflict._id).lean()).status, "pending")
+  })
+
+  // The guard is scoped to the project each branch actually writes, so it
+  // refuses invalid transitions without blocking valid ones. reject_lower never
+  // rewrites the winner — it only reads its endDate for the suggested date — so
+  // a finished winner must not stop the loser being rescheduled.
+  await t.test("reject_lower still runs when only the winner is finished (terminal-status guard)", async (st) => {
+    st.after(dropScratch)
+
+    const doneWinner = await scratchProject("completed", { mcdmScore: 9 })
+    const liveLoser = await scratchProject("pending", { mcdmScore: 2 })
+    const conflict = await conflictFor(doneWinner, liveLoser)
+
+    const res = await call(`/conflicts/${conflict._id}/resolve`, {
+      token: tokens.admin, method: "PUT", body: { action: "reject_lower" },
+    })
+    assert.equal(res.status, 200, "a finished winner must not block the reschedule")
+    assert.equal((await Project.findById(liveLoser._id).lean()).status, "rescheduled")
+    assert.equal((await Project.findById(doneWinner._id).lean()).status, "completed", "the winner must be untouched")
+    assert.equal((await Conflict.findById(conflict._id).lean()).status, "awaiting_officer")
+  })
+
+  const postedProjects = []
+  const postProject = async (body) => {
+    const res = await call("/projects", { token: tokens.officerA, method: "POST", body })
+    if (res.body?.project?._id) postedProjects.push(res.body.project._id)
+    return res
+  }
+  const dropPostedProjects = async () => {
+    if (postedProjects.length > 0) await Project.deleteMany({ _id: { $in: postedProjects.splice(0) } })
+  }
+  // Far from the fixtures' coordinates and in another ward, so creating these
+  // raises no clash and leaves no Conflict rows behind.
+  const projectBody = (over = {}) => ({
+    title: "Supervisor role fixture",
+    department: String(department._id),
+    projectType: "road",
+    description: "fixture",
+    startDate: "2026-03-01",
+    endDate: "2026-04-01",
+    location: { ward: "Ward-99", centerCoords: { lat: 28.9, lng: 77.9 } },
+    ...over,
+  })
+
+  await t.test("regression: a project supervisor must hold the supervisor role", async (st) => {
+    st.after(dropPostedProjects)
+
+    for (const [label, user] of [["a citizen", citizenUser], ["an officer", officerB], ["an admin", admin]]) {
+      const res = await postProject(projectBody({ supervisor: String(user._id) }))
+      assert.equal(res.status, 400, `${label} was accepted as supervisor`)
+      assert.equal(res.body.error.code, "VALIDATION_ERROR")
+      assert.match(res.body.message, /cannot be the supervisor/,
+        "the refusal must say why, not just that it failed")
+    }
+  })
+
+  // Same root cause, milder consequence. `projectManager` has no reader, so
+  // there is no narrower rule than "must be staff"; `assignedOfficer` is the
+  // one that mattered — a citizen assignee cannot move a complaint's status
+  // (that route is admin/officer/supervisor only) and would be sent the
+  // assignment notification, which quotes the CNR and issue type, despite being
+  // a member of the public.
+  await t.test("regression: a project manager must be staff", async (st) => {
+    st.after(dropPostedProjects)
+
+    const refused = await postProject(projectBody({ projectManager: String(citizenUser._id) }))
+    assert.equal(refused.status, 400, "a citizen was accepted as project manager")
+    assert.match(refused.body.message, /cannot be the project manager/)
+
+    const allowed = await postProject(projectBody({ projectManager: String(officerB._id) }))
+    assert.equal(allowed.status, 201, "an officer must still be assignable as project manager")
+  })
+
+  await t.test("regression: a complaint cannot be assigned to a citizen", async () => {
+    const Complaint = require("../../src/models/Complaint")
+    const created = await call("/complaints", {
+      method: "POST",
+      body: { issueType: "pothole", description: "Assignment fixture", location: { ward: "Ward 12", coords: { lat: 28.67, lng: 77.45 } } },
+    })
+    assert.equal(created.status, 201)
+    const id = created.body._id
+
+    for (const [route, method, body] of [
+      [`/complaints/${id}/assign`, "PATCH", { assignedOfficer: String(citizenUser._id) }],
+      [`/complaints/${id}`, "PUT", { assignedOfficer: String(citizenUser._id) }],
+    ]) {
+      const res = await call(route, { token: tokens.admin, method, body })
+      assert.equal(res.status, 400, `${method} ${route} accepted a citizen`)
+      assert.match(res.body.message, /cannot be the assigned officer/)
+    }
+    // Never assigned, so the field is absent rather than null.
+    assert.ok(!(await Complaint.findById(id).lean()).assignedOfficer,
+      "the assignment was written despite the refusal")
+
+    // Every staff role stays assignable — the guard excludes citizens only.
+    for (const user of [officerA, supervisor, admin]) {
+      const res = await call(`/complaints/${id}/assign`, {
+        token: tokens.admin, method: "PATCH", body: { assignedOfficer: String(user._id) },
+      })
+      assert.equal(res.status, 200, `a ${user.role} must remain assignable`)
+      assert.equal(String((await Complaint.findById(id).lean()).assignedOfficer), String(user._id))
+    }
+
+    await Complaint.deleteMany({ _id: id })
+  })
+
+  await t.test("regression: PUT cannot swap in a non-supervisor", async (st) => {
+    st.after(dropPostedProjects)
+
+    const created = await postProject(projectBody({ supervisor: String(supervisor._id) }))
+    assert.equal(created.status, 201)
+    const id = created.body.project._id
+
+    const bad = await call(`/projects/${id}`, {
+      token: tokens.officerA, method: "PUT", body: { supervisor: String(officerB._id) },
+    })
+    assert.equal(bad.status, 400, "PUT accepted a non-supervisor")
+    assert.equal(String((await Project.findById(id).lean()).supervisor), String(supervisor._id),
+      "the stored supervisor changed despite the refusal")
+  })
+
+  // The guard rejects the wrong role and nothing else: assigning a real
+  // supervisor, and completing the work afterwards, must both still succeed.
+  await t.test("a real supervisor is still assignable and can still complete the work", async (st) => {
+    st.after(dropPostedProjects)
+
+    const created = await postProject(projectBody({ supervisor: String(supervisor._id) }))
+    assert.equal(created.status, 201)
+    const id = created.body.project._id
+    assert.equal(String(created.body.project.supervisor), String(supervisor._id))
+
+    const reassign = await call(`/projects/${id}`, {
+      token: tokens.officerA, method: "PUT", body: { supervisor: String(supervisor._id) },
+    })
+    assert.equal(reassign.status, 200, "reassigning the same supervisor must still work")
+
+    // A new project is `pending`, and progress does not apply until an
+    // administrator has approved it — see the P1-1 regression below.
+    const approved = await call(`/projects/${id}/approve`, { token: tokens.admin, method: "PUT", body: {} })
+    assert.equal(approved.status, 200)
+
+    const done = await call(`/projects/${id}/progress`, {
+      token: tokens.supervisor, method: "PUT", body: { progress: 100 },
+    })
+    assert.equal(done.status, 200, "the supervisor must still be able to complete the work")
+    assert.equal((await Project.findById(id).lean()).status, "completed")
+  })
+
+  await t.test("approve_both still works when both projects are live (terminal-status guard)", async (st) => {
+    st.after(dropScratch)
+
+    const a = await scratchProject("pending")
+    const b = await scratchProject("pending")
+    const conflict = await conflictFor(a, b)
+
+    const res = await call(`/conflicts/${conflict._id}/resolve`, {
+      token: tokens.admin, method: "PUT", body: { action: "approve_both" },
+    })
+    assert.equal(res.status, 200)
+    assert.equal((await Project.findById(a._id).lean()).status, "approved")
+    assert.equal((await Project.findById(b._id).lean()).status, "approved")
+    assert.equal((await Conflict.findById(conflict._id).lean()).status, "resolved_both")
+  })
+
+  // Regression — P2-3. POST /api/complaints is the public intake and carries no
+  // `protect`, but it shared one writable-field list with the role-gated update
+  // path. An unauthenticated caller could therefore file a complaint already
+  // marked resolved and already attributed to a named officer, fabricating the
+  // resolution counts shown on the public citizen page and the admin dashboard.
+  await t.test("regression: an anonymous report cannot set workflow state (P2-3)", async () => {
+    const Complaint = require("../../src/models/Complaint")
+    const report = {
+      issueType: "pothole",
+      description: "Large pothole near the school gate",
+      location: { address: "MG Road", ward: "Ward 12", coords: { lat: 28.67, lng: 77.45 } },
+    }
+
+    const res = await call("/complaints", {
+      method: "POST",
+      body: { ...report, status: "resolved", assignedOfficer: String(admin._id), assignedDepartment: String(department._id) },
+    })
+    assert.equal(res.status, 201, "public intake must keep working")
+
+    const stored = await Complaint.findById(res.body._id).lean()
+    assert.equal(stored.status, "submitted", "status was attacker-controlled")
+    assert.equal(stored.assignedOfficer ?? null, null, "assignedOfficer was attacker-controlled")
+    assert.equal(stored.assignedDepartment ?? null, null, "assignedDepartment was attacker-controlled")
+    assert.match(stored.cnrId, /^CNR-\d{6}$/, "the server still generates the tracking reference")
+  })
+
+  await t.test("staff still own complaint workflow state through their own routes", async () => {
+    const Complaint = require("../../src/models/Complaint")
+    const created = await call("/complaints", {
+      method: "POST",
+      body: { issueType: "garbage", description: "Uncollected waste", location: { ward: "Ward 12", coords: { lat: 28.67, lng: 77.45 } } },
+    })
+    assert.equal(created.status, 201)
+
+    const status = await call(`/complaints/${created.body._id}/status`, {
+      token: tokens.officerA, method: "PATCH", body: { status: "in_progress" },
+    })
+    assert.equal(status.status, 200)
+    assert.equal((await Complaint.findById(created.body._id).lean()).status, "in_progress")
+
+    const assign = await call(`/complaints/${created.body._id}/assign`, {
+      token: tokens.officerA, method: "PATCH", body: { assignedOfficer: String(officerA._id) },
+    })
+    assert.equal(assign.status, 200)
+    assert.equal(String((await Complaint.findById(created.body._id).lean()).assignedOfficer), String(officerA._id))
+
+    const anonymous = await call(`/complaints/${created.body._id}/assign`, {
+      method: "PATCH", body: { assignedOfficer: String(officerA._id) },
+    })
+    assert.equal(anonymous.status, 401, "assignment must stay authenticated")
+  })
+
+  // ── Contract (S1) ───────────────────────────────────────────────────
+
+  await t.test("errors carry the standard envelope with a machine-readable code", async () => {
+    const res = await call("/projects/not-an-object-id", { token: tokens.admin })
+    assert.equal(res.status, 400)
+    assert.equal(res.body.success, false)
+    assert.equal(typeof res.body.error.code, "string")
+    assert.equal(res.body.message, res.body.error.message)
+  })
+
+  await t.test("an unknown route returns the same envelope, not HTML", async () => {
+    const res = await call("/no-such-route", { token: tokens.admin })
+    assert.equal(res.status, 404)
+    assert.equal(res.body.success, false)
+    assert.equal(res.body.error.code, "ROUTE_NOT_FOUND")
+  })
+
+  // List endpoints return a bare array; moving that into an object would be a
+  // breaking change, so the shape is pinned.
+  await t.test("list endpoints still return bare arrays", async () => {
+    for (const path of ["/projects", "/conflicts", "/complaints"]) {
+      const res = await call(path, { token: tokens.admin })
+      assert.equal(res.status, 200, `${path} -> ${res.status}`)
+      assert.ok(Array.isArray(res.body), `${path} must return an array`)
+    }
+  })
+
+  await t.test("pagination is opt-in and reports the documented headers", async () => {
+    const unpaged = await call("/projects", { token: tokens.admin })
+    assert.equal(unpaged.headers.get("x-total-count"), null, "headers must not appear unrequested")
+
+    const paged = await call("/projects?page=1&limit=1", { token: tokens.admin })
+    assert.equal(paged.body.length, 1)
+    assert.equal(paged.headers.get("x-total-count"), "2")
+    assert.equal(paged.headers.get("x-total-pages"), "2")
+    assert.equal(paged.headers.get("x-has-next"), "true")
+    assert.equal(paged.headers.get("x-has-previous"), "false")
+  })
+
+  // Regression — S4. The paginated count now runs alongside the read; the
+  // headers must still describe the caller's own scope, not the whole table.
+  await t.test("regression: paginated totals respect the caller's scope (S4 parallel count)", async () => {
+    const res = await call("/projects?page=1&limit=10", { token: tokens.officerA })
+    assert.equal(res.headers.get("x-total-count"), "1",
+      "the count must be scoped exactly like the rows")
+    assert.equal(res.body.length, 1)
+  })
+
+  // ── Observability (S3) ──────────────────────────────────────────────
+
+  await t.test("every response carries a correlation id", async () => {
+    const res = await call("/projects", { token: tokens.admin })
+    assert.ok(res.headers.get("x-request-id"), "no correlation id returned")
+  })
+
+  await t.test("a supplied correlation id is echoed back", async () => {
+    const res = await fetch(`${base}/projects`, {
+      headers: { Authorization: `Bearer ${tokens.admin}`, "X-Request-Id": "s5-fixed-id" },
+    })
+    assert.equal(res.headers.get("x-request-id"), "s5-fixed-id")
+  })
+
+  await t.test("health reports subsystem state without authentication", async () => {
+    const res = await call("/health")
+    assert.equal(res.status, 200)
+    assert.equal(res.body.status, "ok")
+    assert.equal(res.body.database, "connected")
+    assert.ok(res.body.subsystems, "health must expose subsystem diagnostics")
+  })
+})
