@@ -27,8 +27,6 @@ import CitizenHome from '../pages/citizen/CitizenHome'
 import CitizenNotFound from '../pages/citizen/CitizenNotFound'
 import CitizenProjectDetail from '../pages/citizen/CitizenProjectDetail'
 import CitizenProjects from '../pages/citizen/CitizenProjects'
-import CitizenReport from '../pages/citizen/CitizenReport'
-import CitizenTrack from '../pages/citizen/CitizenTrack'
 import OfficerClashRespond from '../pages/officer/OfficerClashRespond'
 import OfficerComplaintDetail from '../pages/officer/OfficerComplaintDetail'
 import OfficerComplaints from '../pages/officer/OfficerComplaints'
@@ -198,8 +196,6 @@ export default function AppRouter() {
         <Route path="/home" element={<CitizenHome />} />
         <Route path="/projects" element={<CitizenProjects />} />
         <Route path="/projects/:id" element={<CitizenProjectDetail />} />
-        <Route path="/report" element={<CitizenReport />} />
-        <Route path="/track" element={<CitizenTrack />} />
         <Route path="*" element={<CitizenNotFound />} />
       </Routes>
       </Suspense>
