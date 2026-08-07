@@ -12,6 +12,7 @@ record.
 | Email rendering | `services/emailTemplates.js` |
 | Retry sweep | `services/emailRetryWorker.js` |
 | Vocabulary | `config/notificationTypes.js` |
+| Link routing | `config/notificationLinks.js` |
 | Stream credentials | `utils/streamTicket.js` |
 
 `notificationService` is the only module that writes or reads notifications.
@@ -46,7 +47,7 @@ the role they think they have must be told regardless of preferences.
 
 | Event | Source | Recipient |
 |---|---|---|
-| Clash detected | `projectsController.createProject` | The submitting officer, and the officer owning the clashing project when different |
+| Clash detected | `projectsController.createProject`, `projectsController.updateProject` | The submitting officer, and the officer owning the clashing project when different |
 | Project approved | `projectsController.approveProject`, `conflictsController.resolveConflict` | Owning officer |
 | Project rejected | `projectsController.rejectProject`, `conflictsController.resolveConflict` | Owning officer |
 | Project assigned | `projectsController.updateProject` | Newly assigned supervisor |
@@ -57,6 +58,27 @@ the role they think they have must be told regardless of preferences.
 
 Each fires only on an actual transition. Re-saving the same supervisor, the same
 role or a project already at 100% progress produces nothing.
+
+## Links
+
+Client routes are namespaced by role, so the path a notification points at
+depends on who receives it: the same project is `/admin/projects/:id` to an
+administrator, `/officer/projects/:id` to its officer and `/supervisor/tasks/:id`
+to its supervisor. A path built for the wrong role is refused by `RoleRoute`,
+which redirects to that role's own dashboard instead of the record.
+
+Producers therefore name a destination — `linkTo: { kind, id }`, where `kind` is
+`project`, `complaint`, `conflict` or `conflicts` — and `notificationService`
+resolves it to a path once it knows the recipient's role, reading those roles in
+one query per batch. Only `link` is stored; `linkTo` never reaches the document.
+
+`config/notificationLinks.js` holds the mapping and mirrors
+`frontend/src/router/AppRouter.jsx`. A role with no screen for a kind resolves to
+**no link at all** rather than one that would bounce — the supervisor shell has
+no conflicts or complaints screen, and citizens have neither. An absent link is
+already a supported state: `role_changed` has never carried one.
+
+An explicit `link` passed by a caller is honoured as given.
 
 ## Delivery pipeline
 
@@ -256,11 +278,16 @@ capped list returned.
 Sorting is whitelisted to `createdAt`, `priority` and `read`, defaulting to
 newest first. Search input is escaped before being used as a regular expression.
 
-The archived filter is expressed as `archived: { $in: [false, null] }` rather
-than `{ $ne: true }`. Both select the same rows, including records written
-before the field existed, but `$ne` compiles to two open-ended index ranges,
-which breaks the sorted prefix of `{ recipient, archived, createdAt }` and forces
-an in-memory sort of the recipient's entire history to return one page.
+The archived filter is expressed as `archived: false` rather than
+`{ $ne: true }`. `$ne` compiles to two open-ended index ranges, which breaks the
+sorted prefix of `{ recipient, archived, createdAt }` and forces an in-memory
+sort of the recipient's entire history to return one page; a point equality
+keeps the scan sorted.
+
+Being an equality, it does not match a document with no `archived` field. The
+schema defaults it to `false`, so nothing written through the model looks like
+that — only data migrated from before the field existed, which would be missing
+from the feed and the badge alike until backfilled.
 
 ## Frontend integration
 

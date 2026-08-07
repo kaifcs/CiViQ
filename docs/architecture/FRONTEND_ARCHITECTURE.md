@@ -240,7 +240,10 @@ the file extensions Vite resolves implicitly but plain Node ESM does not; that
 hook is the entire test tooling.
 
 Covered: `test/gis.test.js` (coordinate validation, ordering conversions,
-bounds, bounding box, distance) and `test/adapters.test.js` (view-model mapping,
-redacted-reference handling, no-fabrication rule).
+bounds, bounding box, distance), `test/adapters.test.js` (view-model mapping,
+redacted-reference handling, no-fabrication rule) and `test/hookDeps.test.js`,
+which reads the source to enforce that no screen passes an inline object or
+array literal to a data hook, and that every argument-taking hook in
+`useResources.js` is classified.
 
 React component rendering is not tested.

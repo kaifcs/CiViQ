@@ -1,10 +1,14 @@
-// The change replaced `archived: { $ne: true }` with `{ $in: [false, null] }`
-// because $ne compiles to two open-ended index ranges, which breaks the sorted
-// prefix of { recipient, archived, createdAt } and forces the feed to sort a
-// recipient's entire history to return one page.
+// The default feed excludes archived rows with `archived: false`, a point
+// equality, rather than `{ $ne: true }` — $ne compiles to two open-ended index
+// ranges, which breaks the sorted prefix of { recipient, archived, createdAt }
+// and forces the feed to sort a recipient's entire history to return one page.
 //
-// Two things must hold forever, and only a real database can show either: the
-// rows selected are unchanged, and the query plan no longer sorts in memory.
+// Two things must hold forever, and only a real database can show either: which
+// rows the predicate selects, and that the query plan does not sort in memory.
+//
+// Every assertion below goes through `service.listNotifications`, so it binds to
+// buildFilter rather than to a query shape restated here — a predicate written
+// out in the test would keep passing however the implementation changed.
 
 const test = require("node:test")
 const assert = require("node:assert/strict")
@@ -46,9 +50,10 @@ test("notification feed query", async (t) => {
     rows.push(notificationDoc({ recipient: other, title: "Someone else" }))
     await Notification.insertMany(rows)
 
-    // Rows written before `archived` existed have no such field at all. This is
-    // the case `$ne: true` handled and a plain `archived: false` would silently
-    // drop, so the fixture includes them deliberately.
+    // Rows with no `archived` field at all. The schema defaults it to false, so
+    // nothing written through the model can look like this — only data migrated
+    // from before the field existed, or inserted through the raw driver as here.
+    // `archived: false` does not select them; the test below states that.
     await Notification.collection.insertMany([0, 1, 2].map((i) => ({
       recipient, type: "project_approved", title: `Legacy ${i}`, message: "m",
       read: false, category: "project", priority: "normal", deliveryStatus: "skipped",
@@ -68,34 +73,47 @@ test("notification feed query", async (t) => {
     assert.ok(!feed.some((n) => n.title === "Someone else"))
   })
 
-  // Regression — S4. The pre-S4 predicate and the current one must select
-  // exactly the same set, legacy rows included.
-  await t.test("regression: rows selected are identical to the pre-S4 predicate", async () => {
-    const legacyShape = { recipient, archived: { $ne: true } }
-    const currentShape = { recipient, archived: { $in: [false, null] } }
-
-    const before = await Notification.find(legacyShape).select("_id").lean()
-    const after = await Notification.find(currentShape).select("_id").lean()
-
-    const ids = (rows) => new Set(rows.map((r) => String(r._id)))
-    assert.equal(after.length, before.length, "row count changed")
-    assert.deepEqual(ids(after), ids(before), "membership changed")
-
-    const legacyRows = await Notification.countDocuments({ recipient, archived: { $exists: false } })
-    assert.equal(legacyRows, 3, "the fixture must actually contain field-less rows")
-    assert.equal(
-      await Notification.countDocuments(currentShape),
-      await Notification.countDocuments(legacyShape),
-      "legacy rows must survive the new predicate"
+  // The predicate the feed actually applies, asserted through the service so it
+  // cannot drift from buildFilter. This replaces a check that compared two query
+  // shapes written out in the test: it exercised MongoDB rather than the
+  // implementation, and kept passing while the two disagreed.
+  await t.test("the default feed selects exactly the recipient's non-archived rows", async () => {
+    const feed = await service.listNotifications(
+      recipient, {}, { enabled: true, skip: 0, limit: 500 }, prefs
     )
+    const selected = new Set(feed.map((n) => String(n._id)))
+
+    const expected = await Notification.find({ recipient, archived: false }).select("_id").lean()
+    assert.ok(expected.length > 0, "precondition: the fixture must have non-archived rows")
+    assert.deepEqual(selected, new Set(expected.map((r) => String(r._id))),
+      "the feed and `archived: false` must select the same rows")
+
+    // A point equality does not match a missing field. The schema defaults
+    // `archived` to false, so this can only describe data migrated from before
+    // the field existed — stated here so the behaviour is a decision on record
+    // rather than something discovered during a migration.
+    const fieldless = await Notification.find({ recipient, archived: { $exists: false } }).select("_id").lean()
+    assert.equal(fieldless.length, 3, "the fixture must actually contain field-less rows")
+    for (const row of fieldless) {
+      assert.equal(selected.has(String(row._id)), false,
+        "a row with no `archived` field is not in the default feed")
+    }
+
+    // The badge counts the same set, so the two can never disagree.
+    const unread = await service.getUnreadCount(recipient, prefs)
+    assert.equal(unread, feed.filter((n) => !n.read).length,
+      "the badge must count exactly what the feed shows")
   })
 
   // Regression — S4. The performance guarantee, asserted structurally rather
   // than by timing, so it is deterministic on any machine.
   await t.test("regression: the feed is served from the index without a blocking sort", async () => {
+    // The shape buildFilter emits for a default feed. A point equality on
+    // `archived` keeps the { recipient, archived, createdAt } prefix sorted;
+    // `$ne` would open two index ranges and force an in-memory sort.
     const plan = await Notification.find({
       recipient,
-      archived: { $in: [false, null] },
+      archived: false,
     })
       .sort({ createdAt: -1 })
       .hint({ recipient: 1, archived: 1, createdAt: -1 })

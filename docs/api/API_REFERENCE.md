@@ -256,12 +256,18 @@ negative `averages.completionDays`.
 Body `{ note }`. Sets `status` to `approved`, stores `adminNote`, notifies the
 owning officer and records `project_approved`.
 
+Applies only to a project still `pending`. One already approved, rejected,
+completed or rescheduled returns 409 — the decision has already been made.
+
 ### PUT /api/projects/:id/reject
 **admin**
 
 Body `{ reason, suggestedDate }`. Sets `status` to `rejected`, stores
 `rejectionReason` and `suggestedDate`, notifies the owning officer and records
 `project_rejected`.
+
+Applies only to a project still `pending`, exactly as `approve` does; anything
+else returns 409.
 
 ### PUT /api/projects/:id/progress
 **supervisor**, owner

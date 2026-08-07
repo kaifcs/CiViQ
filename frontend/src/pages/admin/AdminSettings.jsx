@@ -50,7 +50,7 @@ const Toggle = ({ checked, onChange }) => (
 )
 
 export default function AdminSettings() {
-  const { user, deptMap } = useAuth()
+  const { user, deptMap, applyUserUpdate } = useAuth()
   const { preferences, savePreferences } = useNotificationCenter()
 
   const [name,        setName]        = useState(user?.name || '')
@@ -68,7 +68,11 @@ export default function AdminSettings() {
     if (!name.trim() || !user?.id) return
     setNameError('')
     try {
-      await usersApi.update(user.id, { fullName: name.trim() }, deptMap)
+      // The response is the updated record, already adapted — handing it
+      // straight to the session updates the navbar on this render rather than
+      // on the next reload, and costs no second request.
+      const saved = await usersApi.update(user.id, { fullName: name.trim() }, deptMap)
+      applyUserUpdate(saved)
       setNameSaved(true)
       setTimeout(() => setNameSaved(false), 2500)
     } catch (err) {

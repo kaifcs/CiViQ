@@ -920,6 +920,56 @@ test("API regression", async (t) => {
 
   // The guard rejects the wrong role and nothing else: assigning a real
   // supervisor, and completing the work afterwards, must both still succeed.
+  // Regression — F-8. The mapping itself is unit-tested; what needs a database
+  // is the step before it — resolving the RECIPIENT's role. Assigning a
+  // supervisor and completing the work raises notifications to two different
+  // roles from the same request path, so one exercise covers both.
+  await t.test("regression: a notification links to the recipient's own screen (F-8)", async (st) => {
+    const Notification = require("../../src/models/Notification")
+    st.after(async () => {
+      await Notification.deleteMany({ recipient: { $in: [supervisor._id, officerA._id] } })
+      await dropPostedProjects()
+    })
+    await Notification.deleteMany({ recipient: { $in: [supervisor._id, officerA._id] } })
+
+    const created = await postProject(projectBody())
+    assert.equal(created.status, 201)
+    const id = created.body.project._id
+
+    // Supervisor assignment → project_assigned, addressed to the supervisor.
+    assert.equal((await call(`/projects/${id}`, {
+      token: tokens.officerA, method: "PUT", body: { supervisor: String(supervisor._id) },
+    })).status, 200)
+
+    const assigned = await Notification.findOne({
+      recipient: supervisor._id, type: "project_assigned",
+    }).lean()
+    assert.ok(assigned, "precondition: assigning a supervisor must notify them")
+    assert.equal(assigned.link, `/supervisor/tasks/${id}`,
+      "a supervisor was linked somewhere other than the screen where they act on it")
+
+    // Completion → project_completed, addressed to the owning officer. Same
+    // destination kind, different recipient role, so it must resolve differently.
+    assert.equal((await call(`/projects/${id}/approve`, { token: tokens.admin, method: "PUT", body: {} })).status, 200)
+    assert.equal((await call(`/projects/${id}/progress`, {
+      token: tokens.supervisor, method: "PUT", body: { progress: 100 },
+    })).status, 200)
+
+    const completed = await Notification.findOne({
+      recipient: officerA._id, type: "project_completed",
+    }).lean()
+    assert.ok(completed, "precondition: completion must notify the owning officer")
+    assert.equal(completed.link, `/officer/projects/${id}`,
+      "the same project resolved to the same path for two different roles")
+
+    // The stored shape is unchanged — `linkTo` is a producer-side instruction,
+    // not a field, so nothing downstream sees a new key.
+    assert.equal("linkTo" in assigned, false, "linkTo leaked into the stored document")
+    // `data.projectId` is stored as the ObjectId it was given, so compare by value.
+    assert.deepEqual(Object.keys(assigned.data), ["projectId"], "the data payload changed shape")
+    assert.equal(String(assigned.data.projectId), id)
+  })
+
   await t.test("a real supervisor is still assignable and can still complete the work", async (st) => {
     st.after(dropPostedProjects)
 

@@ -20,6 +20,18 @@
 // All IDs referenced below (department, officer, supervisor, project,
 // conflict, user) are the live ObjectIds returned from the earlier inserts —
 // nothing is fabricated or hardcoded, so there are no dangling references.
+//
+// Fixture values must stay on the same scale and vocabulary the runtime uses,
+// because seeded and API-created records are compared against each other:
+//
+//   mcdmScore    0-10, one decimal — what services/mcdmEngine returns as
+//                `score`. NOT the 0-100 figure it reports as `outOf100`, which
+//                is what the frontend adapter derives for display. Mixing the
+//                two makes a seeded project outrank every real one, since
+//                conflictsController.resolveConflict compares the raw numbers.
+//   tenderStatus "complete" | "in_process" | "planning" — the keys
+//                mcdmEngine's tenderMap reads. Anything else silently scores
+//                the neutral default.
 
 const mongoose = require("mongoose")
 const dotenv = require("dotenv")
@@ -98,7 +110,7 @@ function buildProjectDefs(deptByCode, admin) {
       location: { roadName: "GT Road", neighbourhood: "Sahibabad", ward: "Ward 12", zone: "Zone 2", address: "GT Road, near Vijay Chowk", centerCoords: { lat: 28.6692, lng: 77.4538 }, shape: "corridor", length: 2200, width: 24, buffer: 15 },
       status: "active", priority: "High", progress: 55,
       officerEmail: "amit.sharma@civiq.in", supervisorEmail: "suresh.singh@civiq.in",
-      mcdmScore: 78.4, mcdmInputs: { conditionRating: "poor", incidents: ["pothole","waterlogging"], lastWorkYear: 2019, tenderStatus: "awarded", contractorAssigned: true, roadClosure: "partial", utilityDisruption: ["water"], disruptionDays: 30 },
+      mcdmScore: 7.8, mcdmInputs: { conditionRating: "poor", incidents: ["pothole","waterlogging"], lastWorkYear: 2019, tenderStatus: "complete", contractorAssigned: true, roadClosure: "partial", utilityDisruption: ["water"], disruptionDays: 30 },
     },
     {
       title: "Vaishali Water Pipeline Replacement",
@@ -110,7 +122,7 @@ function buildProjectDefs(deptByCode, admin) {
       location: { roadName: "Vaishali Sector 5 Main Road", neighbourhood: "Vaishali", ward: "Ward 8", zone: "Zone 1", address: "Sector 5, Vaishali", centerCoords: { lat: 28.6450, lng: 77.3600 }, shape: "corridor", length: 1500, width: 6, buffer: 8 },
       status: "approved", priority: "Critical", progress: 10,
       officerEmail: "mohan.kumar@civiq.in", supervisorEmail: "suresh.singh@civiq.in",
-      mcdmScore: 88.1, mcdmInputs: { conditionRating: "critical", incidents: ["pipeline_burst","low_pressure"], lastWorkYear: 2012, tenderStatus: "awarded", contractorAssigned: true, roadClosure: "none", utilityDisruption: [], disruptionDays: 0 },
+      mcdmScore: 8.8, mcdmInputs: { conditionRating: "critical", incidents: ["pipeline_burst","low_pressure"], lastWorkYear: 2012, tenderStatus: "complete", contractorAssigned: true, roadClosure: "none", utilityDisruption: [], disruptionDays: 0 },
     },
     {
       title: "Raj Nagar Streetlight Upgrade",
@@ -122,7 +134,7 @@ function buildProjectDefs(deptByCode, admin) {
       location: { roadName: "Raj Nagar Main Road", neighbourhood: "Raj Nagar", ward: "Ward 5", zone: "Zone 1", address: "Raj Nagar, Ghaziabad", centerCoords: { lat: 28.6500, lng: 77.4200 }, shape: "corridor", length: 3000, width: 10, buffer: 5 },
       status: "completed", priority: "Medium", progress: 100, actualEndDate: daysFromNow(-18),
       officerEmail: "vinay.pandey@civiq.in", supervisorEmail: "anjali.verma@civiq.in",
-      mcdmScore: 62.0, mcdmInputs: { conditionRating: "fair", incidents: ["streetlight_outage"], lastWorkYear: 2010, tenderStatus: "closed", contractorAssigned: true, roadClosure: "none", utilityDisruption: [], disruptionDays: 0 },
+      mcdmScore: 6.2, mcdmInputs: { conditionRating: "fair", incidents: ["streetlight_outage"], lastWorkYear: 2010, tenderStatus: "complete", contractorAssigned: true, roadClosure: "none", utilityDisruption: [], disruptionDays: 0 },
     },
     {
       title: "Smart Traffic Signals, Kavi Nagar",
@@ -134,7 +146,7 @@ function buildProjectDefs(deptByCode, admin) {
       location: { roadName: "Kavi Nagar Crossing", neighbourhood: "Kavi Nagar", ward: "Ward 9", zone: "Zone 2", address: "Kavi Nagar Main Crossing", centerCoords: { lat: 28.6602, lng: 77.4331 }, shape: "circle", area: 900, buffer: 20 },
       status: "active", priority: "High", progress: 30,
       officerEmail: "priya.singh@civiq.in", supervisorEmail: "anjali.verma@civiq.in",
-      mcdmScore: 70.6, mcdmInputs: { conditionRating: "fair", incidents: ["traffic_congestion"], lastWorkYear: 2021, tenderStatus: "awarded", contractorAssigned: true, roadClosure: "partial", utilityDisruption: ["electricity"], disruptionDays: 10 },
+      mcdmScore: 7.1, mcdmInputs: { conditionRating: "fair", incidents: ["traffic_congestion"], lastWorkYear: 2021, tenderStatus: "complete", contractorAssigned: true, roadClosure: "partial", utilityDisruption: ["electricity"], disruptionDays: 10 },
     },
     {
       title: "Lohia Nagar Drainage Improvement",
@@ -146,7 +158,7 @@ function buildProjectDefs(deptByCode, admin) {
       location: { roadName: "Lohia Nagar Main Drain", neighbourhood: "Lohia Nagar", ward: "Ward 14", zone: "Zone 3", address: "Lohia Nagar, Ghaziabad", centerCoords: { lat: 28.6600, lng: 77.4400 }, shape: "corridor", length: 1800, width: 4, buffer: 6 },
       status: "pending", priority: "High", progress: 0,
       officerEmail: "ravi.chauhan@civiq.in", supervisorEmail: "suresh.singh@civiq.in",
-      mcdmScore: 74.2, mcdmInputs: { conditionRating: "poor", incidents: ["waterlogging","drain_blockage"], lastWorkYear: 2017, tenderStatus: "in_progress", contractorAssigned: false, roadClosure: "none", utilityDisruption: [], disruptionDays: 0 },
+      mcdmScore: 7.4, mcdmInputs: { conditionRating: "poor", incidents: ["waterlogging","drain_blockage"], lastWorkYear: 2017, tenderStatus: "in_process", contractorAssigned: false, roadClosure: "none", utilityDisruption: [], disruptionDays: 0 },
     },
     {
       title: "Indirapuram Park Redevelopment",
@@ -158,7 +170,7 @@ function buildProjectDefs(deptByCode, admin) {
       location: { roadName: "Nyay Khand Road", neighbourhood: "Indirapuram", ward: "Ward 21", zone: "Zone 4", address: "Nyay Khand II, Indirapuram", centerCoords: { lat: 28.6461, lng: 77.3720 }, shape: "polygon", area: 12000, buffer: 0 },
       status: "approved", priority: "Low", progress: 0,
       officerEmail: "deepak.yadav@civiq.in", supervisorEmail: "anjali.verma@civiq.in",
-      mcdmScore: 48.9, mcdmInputs: { conditionRating: "fair", incidents: [], lastWorkYear: 2015, tenderStatus: "awarded", contractorAssigned: true, roadClosure: "none", utilityDisruption: [], disruptionDays: 0 },
+      mcdmScore: 4.9, mcdmInputs: { conditionRating: "fair", incidents: [], lastWorkYear: 2015, tenderStatus: "complete", contractorAssigned: true, roadClosure: "none", utilityDisruption: [], disruptionDays: 0 },
     },
     {
       title: "Vasundhara Footpath Construction",
@@ -170,7 +182,7 @@ function buildProjectDefs(deptByCode, admin) {
       location: { roadName: "Sector 4-5 Link Road", neighbourhood: "Vasundhara", ward: "Ward 18", zone: "Zone 3", address: "Sector 4, Vasundhara", centerCoords: { lat: 28.6664, lng: 77.3931 }, shape: "corridor", length: 2600, width: 3, buffer: 2 },
       status: "pending", priority: "Medium", progress: 0,
       officerEmail: "neha.gupta@civiq.in", supervisorEmail: "suresh.singh@civiq.in",
-      mcdmScore: 40.3, mcdmInputs: { conditionRating: "fair", incidents: ["garbage_accumulation"], lastWorkYear: 2016, tenderStatus: "in_progress", contractorAssigned: false, roadClosure: "none", utilityDisruption: [], disruptionDays: 0 },
+      mcdmScore: 4.0, mcdmInputs: { conditionRating: "fair", incidents: ["garbage_accumulation"], lastWorkYear: 2016, tenderStatus: "in_process", contractorAssigned: false, roadClosure: "none", utilityDisruption: [], disruptionDays: 0 },
     },
     {
       title: "Hapur Road Flyover Maintenance",
@@ -183,7 +195,7 @@ function buildProjectDefs(deptByCode, admin) {
       status: "rescheduled", priority: "Critical", progress: 20, suggestedDate: daysFromNow(55),
       officerEmail: "amit.sharma@civiq.in", supervisorEmail: "suresh.singh@civiq.in",
       adminNote: "Rescheduled to avoid clash with the festival season traffic diversion plan.",
-      mcdmScore: 81.7, mcdmInputs: { conditionRating: "critical", incidents: ["structural_crack"], lastWorkYear: 2014, tenderStatus: "awarded", contractorAssigned: true, roadClosure: "full", utilityDisruption: [], disruptionDays: 45 },
+      mcdmScore: 8.2, mcdmInputs: { conditionRating: "critical", incidents: ["structural_crack"], lastWorkYear: 2014, tenderStatus: "complete", contractorAssigned: true, roadClosure: "full", utilityDisruption: [], disruptionDays: 45 },
     },
     {
       title: "Shastri Nagar Sewer Line Upgrade",
@@ -195,7 +207,7 @@ function buildProjectDefs(deptByCode, admin) {
       location: { roadName: "Shastri Nagar Main Road", neighbourhood: "Shastri Nagar", ward: "Ward 6", zone: "Zone 1", address: "Shastri Nagar, Ghaziabad", centerCoords: { lat: 28.6787, lng: 77.4290 }, shape: "corridor", length: 1300, width: 5, buffer: 6 },
       status: "active", priority: "High", progress: 40,
       officerEmail: "ravi.chauhan@civiq.in", supervisorEmail: "suresh.singh@civiq.in",
-      mcdmScore: 75.5, mcdmInputs: { conditionRating: "poor", incidents: ["sewer_overflow"], lastWorkYear: 2013, tenderStatus: "awarded", contractorAssigned: true, roadClosure: "partial", utilityDisruption: ["water"], disruptionDays: 20 },
+      mcdmScore: 7.6, mcdmInputs: { conditionRating: "poor", incidents: ["sewer_overflow"], lastWorkYear: 2013, tenderStatus: "complete", contractorAssigned: true, roadClosure: "partial", utilityDisruption: ["water"], disruptionDays: 20 },
     },
     {
       title: "Sector 4 Vasundhara Utility Duct Installation",
@@ -208,7 +220,7 @@ function buildProjectDefs(deptByCode, admin) {
       status: "rejected", priority: "Medium", progress: 0,
       officerEmail: "deepak.yadav@civiq.in", supervisorEmail: "anjali.verma@civiq.in",
       rejectionReason: "Duplicate scope with the already-approved Vasundhara footpath project; resubmit as a combined proposal.",
-      mcdmScore: 33.1, mcdmInputs: { conditionRating: "fair", incidents: [], lastWorkYear: 2018, tenderStatus: "draft", contractorAssigned: false, roadClosure: "none", utilityDisruption: [], disruptionDays: 0 },
+      mcdmScore: 3.3, mcdmInputs: { conditionRating: "fair", incidents: [], lastWorkYear: 2018, tenderStatus: "planning", contractorAssigned: false, roadClosure: "none", utilityDisruption: [], disruptionDays: 0 },
     },
   ].map((def) => ({
     ...def,

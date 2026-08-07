@@ -104,9 +104,15 @@ npm start                 # production
 npm run dev               # nodemon
 ```
 
-`npm run seed` loads development fixtures. It **deletes every user and complaint**
-in the database named by `MONGODB_URI` before inserting. Never run it against a
-production database.
+`npm run seed` loads development fixtures. Before inserting anything it
+**empties all seven collections** in the database named by `MONGODB_URI` —
+`notifications`, `auditlogs`, `conflicts`, `complaints`, `projects`, `users` and
+`departments` — in dependency order, so nothing is left referencing a document
+that no longer exists. The audit trail is included: it is append-only through
+the API, but the seeder clears it like everything else.
+
+Never run it against a production database, or any database whose contents
+matter. It takes no confirmation prompt and has no dry-run mode.
 
 ### Frontend
 

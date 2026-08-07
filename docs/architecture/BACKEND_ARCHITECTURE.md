@@ -38,6 +38,7 @@ waits for every connection to end and SSE connections are long-lived by design.
 | `db.js` | `connectDB` / `disconnectDB`; connection events routed through the logger |
 | `redis.js` | Publisher/subscriber pair; bounded retry, then disabled for the process lifetime |
 | `notificationTypes.js` | Notification vocabulary and the type → category/priority mapping |
+| `notificationLinks.js` | Where a notification points, per recipient role |
 | `staticConfig.js` | Domain constants for clash detection and MCDM |
 
 `redis.js` uses a `reconnectStrategy` that returns an `Error` after two attempts.
@@ -164,6 +165,7 @@ responses are permanent, because retrying would resend the same rejected payload
 | `token.js` | `generateToken`, `verifyToken` |
 | `validators.js` | `validateRegisterInput`, `validateLoginInput`, `EMAIL_REGEX`, `CREATABLE_ROLES` |
 | `refValidators.js` | `validateDepartmentRef`, `validateUserRef`, `STAFF_ROLES` |
+| `writableFields.js` | `pickWritable` — the shared write whitelist |
 | `asyncHandler.js` | Forwards a rejected promise to the error middleware |
 
 The 409 helper is named `conflictError`, not `conflict`, because
@@ -220,9 +222,13 @@ under `Promise.all`, so pagination costs one round trip rather than two.
 | Integration | `test/integration/` | MongoDB |
 
 Unit suites cover `apiResponse`, `errorMiddleware`, `logger`,
-`notificationPreferences`, `notificationStream`, `ownership`, `pagination`,
-`serializers` and `streamTicket`. Integration suites cover the HTTP API,
-the notification feed query and clash detection.
+`notificationLinks`, `notificationPreferences`, `notificationStream`,
+`ownership`, `pagination`, `seedAuditActions`, `seedCredentials`, `serializers`
+and `streamTicket`. Integration suites cover the HTTP API, the notification feed
+query and clash detection.
+
+`seedAuditActions` and `seedCredentials` read `src/seed/index.js` as TEXT rather
+than importing it — the seeder runs on load and empties the database.
 
 Integration tests skip with a stated reason when no database is reachable.
 `test/helpers/db.js` derives a database name per test file, because the runner

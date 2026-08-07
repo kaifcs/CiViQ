@@ -324,7 +324,7 @@ module.exports = {
             ],
           },
           title: { type: "string" }, message: { type: "string" },
-          link: { type: "string", nullable: true },
+          link: { type: "string", nullable: true, description: "Client path, built for the RECIPIENT's role — the same project is `/admin/projects/{id}`, `/officer/projects/{id}` or `/supervisor/tasks/{id}` depending on who receives it. Null when that role has no screen for the destination." },
           read: { type: "boolean", default: false },
           readAt: { type: "string", format: "date-time", nullable: true, description: "Set when read flips to true." },
           archived: { type: "boolean", default: false, description: "Soft-deleted: kept in history, hidden from the default feed." },

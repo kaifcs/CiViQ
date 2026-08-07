@@ -7,6 +7,7 @@ const User = require("../models/User")
 const {
   NOTIFICATION_TYPES, NOTIFICATION_CATEGORY_VALUES, metadataForType,
 } = require("../config/notificationTypes")
+const { NOTIFICATION_LINK_KINDS, linkFor } = require("../config/notificationLinks")
 const { sendEmail, isEnabled: emailEnabled } = require("./emailService")
 const { renderNotificationEmail } = require("./emailTemplates")
 const stream = require("./notificationStream")
@@ -21,6 +22,38 @@ const {
 function withDerivedMetadata(payload) {
   const { category, priority } = metadataForType(payload.type)
   return { category, priority, ...payload }
+}
+
+// ── Link resolution ───────────────────────────────────────────────────
+// Producers name a destination (`linkTo: { kind, id }`) instead of a path,
+// because the path depends on the RECIPIENT's role — see config/notificationLinks.
+// Resolution happens here, the one place that knows both the destination and who
+// is receiving it. An explicit `link` is honoured as given, so a caller that
+// already has a path keeps working.
+
+/**
+ * Turns `linkTo` into `link` for a batch of payloads.
+ *
+ * The recipients' roles are read in ONE query for the whole batch rather than
+ * one per payload, and only when something actually needs resolving.
+ */
+async function resolveLinks(payloads) {
+  const needing = payloads.filter((p) => p.link === undefined && p.linkTo)
+
+  let roleById = new Map()
+  if (needing.length > 0) {
+    const ids = [...new Set(needing.map((p) => String(p.recipient)))]
+    const users = await User.find({ _id: { $in: ids } }).select("role").lean()
+    roleById = new Map(users.map((u) => [String(u._id), u.role]))
+  }
+
+  return payloads.map(({ linkTo, ...payload }) => {
+    if (payload.link !== undefined || !linkTo) return payload
+    const link = linkFor(roleById.get(String(payload.recipient)), linkTo)
+    // Left absent rather than set to a path the recipient's router would
+    // refuse; the client already renders an unlinked notification.
+    return link === undefined ? payload : { ...payload, link }
+  })
 }
 
 // ── Delivery ──────────────────────────────────────────────────────────
@@ -177,17 +210,17 @@ function publish(recipientId, event, payload, id) {
   }
 }
 
-async function createNotification({ recipient, type, title, message, link, data }) {
-  const notification = await Notification.create(
-    withDerivedMetadata({ recipient, type, title, message, link, data })
-  )
+async function createNotification({ recipient, type, title, message, link, data, linkTo }) {
+  const [resolved] = await resolveLinks([{ recipient, type, title, message, link, data, linkTo }])
+  const notification = await Notification.create(withDerivedMetadata(resolved))
   queueDelivery(notification)
   return notification
 }
 
 async function createNotifications(payloads) {
   if (!Array.isArray(payloads) || payloads.length === 0) return []
-  const created = await Notification.insertMany(payloads.map(withDerivedMetadata))
+  const resolved = await resolveLinks(payloads)
+  const created = await Notification.insertMany(resolved.map(withDerivedMetadata))
   for (const notification of created) queueDelivery(notification)
   return created
 }
@@ -198,7 +231,7 @@ function buildClashDetectedPayload(officer, project, clashWith) {
     type: "clash_detected",
     title: "Clash Detected",
     message: `Your project "${project.title}" has a clash with "${clashWith.title}". Admin will review.`,
-    link: `/officer/conflicts`,
+    linkTo: { kind: NOTIFICATION_LINK_KINDS.CONFLICTS },
     data: { projectId: project._id }
   }
 }
@@ -213,7 +246,7 @@ async function notifyProjectApproved(officer, project) {
     type: "project_approved",
     title: "Project Approved",
     message: `Your project "${project.title}" has been approved and is now active.`,
-    link: `/officer/projects/${project._id}`,
+    linkTo: { kind: NOTIFICATION_LINK_KINDS.PROJECT, id: project._id },
     data: { projectId: project._id }
   })
 }
@@ -224,7 +257,7 @@ async function notifyProjectRejected(officer, project, suggestedDate) {
     type: "project_rejected",
     title: "Project Rescheduled",
     message: `Your project "${project.title}" has been rescheduled. Suggested start: ${new Date(suggestedDate).toLocaleDateString()}.`,
-    link: `/officer/projects/${project._id}`,
+    linkTo: { kind: NOTIFICATION_LINK_KINDS.PROJECT, id: project._id },
     data: { projectId: project._id, suggestedDate }
   })
 }
@@ -245,7 +278,7 @@ async function notifyComplaintAssigned(officer, complaint) {
     type: "complaint_assigned",
     title: "Complaint Assigned",
     message: `Complaint ${complaint.cnrId} (${complaint.issueType}) has been assigned to you.`,
-    link: `/officer/complaints/${complaint._id}`,
+    linkTo: { kind: NOTIFICATION_LINK_KINDS.COMPLAINT, id: complaint._id },
     data: { complaintId: complaint._id, cnrId: complaint.cnrId },
   })
 }
@@ -256,9 +289,7 @@ async function notifyProjectAssigned(supervisor, project) {
     type: NOTIFICATION_TYPES.PROJECT_ASSIGNED,
     title: "Project Assigned",
     message: `You have been assigned to supervise "${project.title}".`,
-    // The supervisor dashboard lists assigned projects; /supervisor/tasks is
-    // still a placeholder screen.
-    link: `/supervisor/dashboard`,
+    linkTo: { kind: NOTIFICATION_LINK_KINDS.PROJECT, id: project._id },
     data: { projectId: project._id },
   })
 }
@@ -269,7 +300,7 @@ async function notifyProjectCompleted(recipient, project) {
     type: NOTIFICATION_TYPES.PROJECT_COMPLETED,
     title: "Project Completed",
     message: `"${project.title}" has reached 100% progress and is marked completed.`,
-    link: `/officer/projects/${project._id}`,
+    linkTo: { kind: NOTIFICATION_LINK_KINDS.PROJECT, id: project._id },
     data: { projectId: project._id },
   })
 }
@@ -290,7 +321,7 @@ async function notifyComplaintStatusChanged(officer, complaint) {
     type: "complaint_status_changed",
     title: "Complaint Status Updated",
     message: `Complaint ${complaint.cnrId} is now "${complaint.status}".`,
-    link: `/officer/complaints/${complaint._id}`,
+    linkTo: { kind: NOTIFICATION_LINK_KINDS.COMPLAINT, id: complaint._id },
     data: { complaintId: complaint._id, cnrId: complaint.cnrId, status: complaint.status },
   })
 }

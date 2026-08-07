@@ -17,6 +17,27 @@ export function AuthProvider({ children }) {
     setUser(null)
   }, [])
 
+  /**
+   * Adopts an already-adapted user record into the live session.
+   *
+   * A profile save returns the updated record, so applying it here is what makes
+   * the navbar follow immediately. Re-reading `GET /auth/me` instead would be a
+   * second request for data the caller is already holding.
+   *
+   * Guarded on identity: administrators edit other accounts through the same
+   * `usersApi.update`, and one of those must never overwrite the signed-in
+   * session. The persisted copy is rewritten alongside the state so the two
+   * cannot disagree — Login reads it back to route on the stored role.
+   */
+  const applyUserUpdate = useCallback((updated) => {
+    if (!updated?.id) return
+    setUser((current) => {
+      if (!current || current.id !== updated.id) return current
+      localStorage.setItem(USER_KEY, JSON.stringify(updated))
+      return updated
+    })
+  }, [])
+
   // apiClient dispatches this when any request comes back 401.
   useEffect(() => {
     const onExpired = () => setUser(null)
@@ -107,6 +128,7 @@ export function AuthProvider({ children }) {
         user,
         loading,
         deptMap,
+        applyUserUpdate,
         refreshDepartments: loadDepartments,
         login,
         logout,

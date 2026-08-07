@@ -12,9 +12,14 @@ Prevents clashes between departments before ground work begins.
 ```
 cd backend && npm install
 cp .env.example .env      # then fill in MONGODB_URI and JWT_SECRET
-npm run seed              # optional: demo users and complaints
+npm run seed              # optional demo data — DESTRUCTIVE, see below
 npm run dev               # http://localhost:5000
 ```
+
+`npm run seed` **deletes every notification, audit log, conflict, complaint,
+project, user and department** in the database named by `MONGODB_URI` before
+inserting its fixtures — all seven collections, not just the demo accounts.
+Never point it at a database whose contents matter.
 
 ### Frontend
 ```
@@ -31,7 +36,7 @@ Both halves expose the same four scripts, and `check` is what CI runs.
 |---|---|---|
 | `npm run lint` | ESLint | ESLint |
 | `npm run build` | syntax check | Vite production build |
-| `npm test` | 187 tests | 40 tests |
+| `npm test` | 204 tests | 40 tests |
 | `npm run check` | lint + build + test | lint + build + test |
 | `npm run test:coverage` | with coverage report | with coverage report |
 

@@ -232,11 +232,16 @@ exists.
 | `{ recipient: 1, archived: 1, read: 1 }` | Unread count and the unread filter |
 | `{ deliveryStatus: 1, nextAttemptAt: 1 }` | The retry sweep |
 
-The feed filter uses `archived: { $in: [false, null] }` rather than
-`{ $ne: true }`. Both select the same rows, including records written before the
-field existed, but `$ne` compiles to two open-ended index ranges, which breaks
-the sorted prefix and forces a blocking in-memory sort of the recipient's entire
-history to return one page. Two point intervals keep the scan sorted.
+The feed filter uses `archived: false` rather than `{ $ne: true }`. `$ne`
+compiles to two open-ended index ranges, which breaks the sorted prefix and
+forces a blocking in-memory sort of the recipient's entire history to return one
+page; a point equality keeps the scan sorted.
+
+Because it is an equality, it does not match a document with no `archived` field
+at all. The schema defaults the field to `false`, so nothing written through the
+model can look like that — only data migrated from before the field existed
+would, and it would be absent from both the feed and the unread count until
+backfilled.
 
 ## AuditLog
 
