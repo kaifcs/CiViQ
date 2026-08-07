@@ -157,6 +157,8 @@ export default function AdminUsers() {
   const [filterRole,   setFilterRole]   = useState('')
   const [filterStatus, setFilterStatus] = useState('')
   const [showModal,    setShowModal]    = useState(false)
+  const [actionError,  setActionError]  = useState('')
+  const [pendingId,    setPendingId]    = useState(null)
 
   const filtered = useMemo(() => {
     return userList.filter(u => {
@@ -177,25 +179,36 @@ export default function AdminUsers() {
   async function handleCreate(payload) {
     const { department, ...registration } = payload
     const created = await authApi.register(registration)
-    if (department && created?._id) {
-      await usersApi.update(created._id, { department }, deptMap)
+    try {
+      if (department && created?._id) {
+        await usersApi.update(created._id, { department }, deptMap)
+      }
+    } finally {
+      reload()
     }
-    reload()
   }
 
   // Persists to PATCH /api/users/:id/status, then reflects the server result.
+  // A rejection — self-deactivation, or removing the last active administrator —
+  // reverts the row and surfaces the backend's own message, so the list always
+  // shows what the database holds and says why.
   async function handleToggleStatus(e, id) {
     e.stopPropagation()
     const current = userList.find(u => u.id === id)
-    if (!current) return
+    if (!current || pendingId) return
     const nextActive = current.status !== 'active'
+    setActionError('')
+    setPendingId(id)
     setUserList(prev => prev.map(u => u.id === id ? { ...u, status: nextActive ? 'active' : 'inactive' } : u))
     try {
       const saved = await usersApi.setStatus(id, nextActive, deptMap)
       setUserList(prev => prev.map(u => u.id === id ? saved : u))
-    } catch {
+    } catch (err) {
       // Revert on failure so the UI never diverges from the server.
       setUserList(prev => prev.map(u => u.id === id ? current : u))
+      setActionError(normaliseError(err).message)
+    } finally {
+      setPendingId(null)
     }
   }
 
@@ -240,6 +253,10 @@ export default function AdminUsers() {
           </button>
         </div>
       </div>
+
+      {actionError && (
+        <p className="text-[13px] text-[#DC2626] dark:text-[#F87171] flex-shrink-0">{actionError}</p>
+      )}
 
       <div className="flex flex-col gap-2 flex-1 overflow-y-auto">
         {filtered.length === 0 ? (
@@ -307,7 +324,8 @@ export default function AdminUsers() {
               <div className="flex-shrink-0" onClick={e => e.stopPropagation()}>
                 <button
                   onClick={e => handleToggleStatus(e, u.id)}
-                  className={`h-8 px-3 text-[12px] font-medium rounded-[6px] border transition-colors ${
+                  disabled={pendingId !== null}
+                  className={`h-8 px-3 text-[12px] font-medium rounded-[6px] border transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
                     u.status === 'active'
                       ? 'text-[#15803D] dark:text-[#4ADE80] border-[#BBF7D0] dark:border-[#166534] bg-[#F0FDF4] dark:bg-[#0D1F14] hover:bg-[#DCFCE7] dark:hover:bg-[#14532D]/30'
                       : 'text-[#6B7280] dark:text-[#9CA3AF] border-[#E2E8F0] dark:border-[#27272A] hover:border-[#5E6AD2]/50'

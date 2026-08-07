@@ -9,6 +9,43 @@ const { notifyRoleChanged } = require("../services/notificationService")
 const { ERROR_CODES, badRequest, fail, notFound } = require("../utils/apiResponse")
 const { logger } = require("../utils/logger")
 const ALLOWED_ROLES = User.schema.path("role").enumValues
+const ADMIN_ROLE = "admin"
+
+// Administrative lockout guards. An administrator who removes their own access,
+// or the last remaining one, would leave the deployment with no principal able
+// to restore it — there is no self-service path back in. Every guard therefore
+// runs before the write, so a rejected request leaves the database untouched
+// and produces no successful audit entry.
+
+const isSelf = (req, id) => String(req.user?._id) === String(id)
+
+// Excludes the target, so the answer is "would any administrator survive this
+// operation", not "is one present now". `exists` stops at the first match
+// rather than counting the whole set, which is all the question needs.
+const otherActiveAdminsExist = async (targetId) =>
+  (await User.exists({
+    role: ADMIN_ROLE,
+    isActive: true,
+    _id: { $ne: targetId },
+  })) !== null
+
+// Returns a message when the operation would remove the final active
+// administrator, or null when it is safe. `nextRole` and `nextActive` describe
+// the state the request is asking for; an operation that leaves the account an
+// active administrator, or that touches an account which is not currently one,
+// can never be the cause of a lockout.
+async function lastAdminBlocker(user, { nextRole, nextActive }) {
+  const wasActiveAdmin = user.role === ADMIN_ROLE && user.isActive
+  if (!wasActiveAdmin) return null
+
+  const stillActiveAdmin =
+    (nextRole === undefined ? user.role : nextRole) === ADMIN_ROLE &&
+    (nextActive === undefined ? user.isActive : nextActive)
+  if (stillActiveAdmin) return null
+
+  if (await otherActiveAdminsExist(user._id)) return null
+  return "The system must always have at least one active administrator"
+}
 
 exports.getUsers = async (req, res) => {
   try {
@@ -66,6 +103,13 @@ exports.updateUser = async (req, res) => {
       if (!ALLOWED_ROLES.includes(role)) {
         return badRequest(res, `Role must be one of: ${ALLOWED_ROLES.join(", ")}`)
       }
+      // Self-demotion is refused even when other administrators remain: an
+      // administrator cannot drop their own privileges by accident.
+      if (isSelf(req, user._id) && user.role === ADMIN_ROLE && role !== ADMIN_ROLE) {
+        return badRequest(res, "You cannot change your own administrator role")
+      }
+      const blocker = await lastAdminBlocker(user, { nextRole: role })
+      if (blocker) return badRequest(res, blocker)
       updates.role = role
     }
 
@@ -117,15 +161,26 @@ exports.updateUserStatus = async (req, res) => {
       return badRequest(res, "Please provide a valid boolean isActive status")
     }
 
+    // Read before write: the guards below need the account's current role and
+    // status, and a rejected request must not have touched the document.
+    const existing = await User.findById(req.params.id)
+    if (!existing) {
+      return notFound(res, "User not found", ERROR_CODES.USER_NOT_FOUND)
+    }
+
+    if (isActive === false) {
+      if (isSelf(req, existing._id)) {
+        return badRequest(res, "You cannot deactivate your own account")
+      }
+      const blocker = await lastAdminBlocker(existing, { nextActive: false })
+      if (blocker) return badRequest(res, blocker)
+    }
+
     const user = await User.findByIdAndUpdate(
       req.params.id,
       { isActive },
       { new: true, runValidators: true }
     ).select("-password")
-
-    if (!user) {
-      return notFound(res, "User not found", ERROR_CODES.USER_NOT_FOUND)
-    }
 
     res.status(200).json({ success: true, user })
   } catch (err) {

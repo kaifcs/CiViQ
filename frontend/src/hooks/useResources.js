@@ -124,6 +124,10 @@ export function useDepartments() {
   return useApi(useCallback(() => departmentsApi.list(), []), [], { initialData: [] })
 }
 
+export function useDepartment(id) {
+  return useApi(useCallback(() => departmentsApi.get(id), [id]), [id], { skip: !id })
+}
+
 export function useDashboardSummary(params) {
   return useApi(
     useCallback(() => dashboardApi.summary(params), [params]),

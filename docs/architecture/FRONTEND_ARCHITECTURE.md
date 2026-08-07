@@ -141,7 +141,6 @@ arrive as no-ops.
 | `useAuth` | Session accessor; throws outside `AuthProvider` |
 | `useResources` | Per-resource hooks built on `useApi` |
 | `useNotificationCenter` | Notification state accessor |
-| `useSupervisorNav` | Supervisor navigation callback |
 | `useAccountSettings` | `useProfileForm`/`usePasswordForm` — the self-service profile and password forms shared by every role's Settings page |
 
 `useApi` guards state updates twice: a `cancelled` flag discards a superseded
@@ -194,7 +193,6 @@ stays off the critical path for every other route.
 | `Avatar` | Photo or initials, fixed size token set |
 | `Card` | Project summary card |
 | `AsyncState` | `LoadingState`, `ErrorState` and empty states |
-| `PlaceholderPage` | Fallback for registered but unbuilt routes |
 | `uiStyles.js` | Shared Tailwind class dictionaries |
 
 Two sub-modules have their own barrels: `components/dashboard/` (charts,
@@ -220,8 +218,7 @@ import from there rather than reaching into individual files.
 | `auth/` | Login |
 | `notifications/` | Notification Center |
 
-Every registered route renders a built screen. `PlaceholderPage` remains
-available as a fallback for a route registered ahead of its screen.
+Every registered route renders a built screen.
 
 ## Build
 

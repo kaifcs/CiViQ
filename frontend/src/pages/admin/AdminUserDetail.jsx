@@ -61,6 +61,7 @@ export default function AdminUserDetail() {
   const [showConfirm,  setShowConfirm]  = useState(false)
   const [actionDone,   setActionDone]   = useState(null)
   const [actionError,  setActionError]  = useState('')
+  const [deactivating, setDeactivating] = useState(false)
 
   if (user && user.id !== seededFor) {
     setSeededFor(user.id)
@@ -98,9 +99,13 @@ export default function AdminUserDetail() {
   const completedProjects = userProjects.filter(p => p.status === 'approved' || p.progress === 100).length
   const completionRate    = userProjects.length > 0 ? Math.round((completedProjects / userProjects.length) * 100) : 0
 
-  // PATCH /api/users/:id/status
+  // PATCH /api/users/:id/status. A rejection — deactivating oneself, or the last
+  // active administrator — leaves the account untouched on the server, so the
+  // displayed status is left as it was and the backend's reason is shown.
   async function handleDeactivate() {
+    if (deactivating) return
     setActionError('')
+    setDeactivating(true)
     try {
       const saved = await usersApi.setStatus(id, false, deptMap)
       setUserStatus(saved.status)
@@ -108,6 +113,7 @@ export default function AdminUserDetail() {
     } catch (err) {
       setActionError(normaliseError(err).message)
     } finally {
+      setDeactivating(false)
       setShowConfirm(false)
     }
   }
@@ -152,9 +158,6 @@ export default function AdminUserDetail() {
           {actionDone === 'deactivated' && (
             <span className="text-[13px] text-[#6B7280] dark:text-[#9CA3AF]">Account deactivated</span>
           )}
-          {actionError && (
-            <span className="text-[13px] text-[#DC2626] dark:text-[#F87171]">{actionError}</span>
-          )}
           {/* The backend exposes no password-reset endpoint, so this control
               reports that rather than confirming a message it never sent. */}
           <button
@@ -173,14 +176,20 @@ export default function AdminUserDetail() {
         </div>
       </div>
 
+      {actionError && (
+        <p className="text-[13px] text-[#DC2626] dark:text-[#F87171]">{actionError}</p>
+      )}
+
       {showConfirm && (
         <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-[8px] bg-[#FEF2F2] dark:bg-[#1F0A0A] border border-[#FECACA] dark:border-[#7F1D1D]">
           <p className="text-[13px] text-[#B91C1C] dark:text-[#F87171] font-medium">
             Deactivate {user.name}? They will lose access immediately.
           </p>
           <div className="flex items-center gap-2">
-            <button onClick={() => setShowConfirm(false)} className="px-3 py-1.5 text-[12px] font-medium text-[#6B7280] border border-[#E2E8F0] dark:border-[#27272A] rounded-[6px] hover:bg-white dark:hover:bg-[#18181B] transition-colors">Cancel</button>
-            <button onClick={handleDeactivate} className="px-3 py-1.5 text-[12px] font-medium text-white bg-[#DC2626] rounded-[6px] hover:bg-[#B91C1C] transition-colors">Confirm</button>
+            <button onClick={() => setShowConfirm(false)} disabled={deactivating} className="px-3 py-1.5 text-[12px] font-medium text-[#6B7280] border border-[#E2E8F0] dark:border-[#27272A] rounded-[6px] hover:bg-white dark:hover:bg-[#18181B] disabled:opacity-60 disabled:cursor-not-allowed transition-colors">Cancel</button>
+            <button onClick={handleDeactivate} disabled={deactivating} className="px-3 py-1.5 text-[12px] font-medium text-white bg-[#DC2626] rounded-[6px] hover:bg-[#B91C1C] disabled:opacity-60 disabled:cursor-not-allowed transition-colors">
+              {deactivating ? 'Deactivating...' : 'Confirm'}
+            </button>
           </div>
         </div>
       )}

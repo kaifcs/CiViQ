@@ -16,7 +16,7 @@ const GUARDED = [
   "useProjects", "useProject", "usePublicProjects", "usePublicProject",
   "useConflicts", "useConflict",
   "useComplaints", "useComplaint",
-  "useUser", "useAuditLogs",
+  "useUser", "useDepartment", "useAuditLogs",
   "useDashboardSummary", "useDashboardProjects", "useDashboardConflicts",
   "useDashboardComplaints", "useDashboardDepartments", "useDashboardActivity",
 ]

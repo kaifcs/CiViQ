@@ -14,6 +14,8 @@ import AdminComplaints from '../pages/admin/AdminComplaints'
 import AdminConflictDetail from '../pages/admin/AdminConflictDetail'
 import AdminConflicts from '../pages/admin/AdminConflicts'
 import AdminDashboard from '../pages/admin/AdminDashboard'
+import AdminDepartmentDetail from '../pages/admin/AdminDepartmentDetail'
+import AdminDepartments from '../pages/admin/AdminDepartments'
 // Map screens are the only consumers of Leaflet, so they load on demand and
 // keep the GIS bundle off the critical path for every other route.
 const AdminMap = lazy(() => import('../pages/admin/AdminMap'))
@@ -53,6 +55,7 @@ const PAGE_TITLES = {
   analytics: 'Analytics',
   audit: 'Audit Log',
   users: 'User Management',
+  departments: 'Department Management',
   settings: 'Settings',
   tasks: 'Tasks',
   notifications: 'Notifications',
@@ -92,6 +95,7 @@ function AdminLayout({ children, activeItem }) {
         if (item === 'analytics') navigate('/admin/analytics')
         if (item === 'audit') navigate('/admin/audit')
         if (item === 'users') navigate('/admin/users')
+        if (item === 'departments') navigate('/admin/departments')
         if (item === 'settings') navigate('/admin/settings')
       }}
     >
@@ -171,6 +175,8 @@ export default function AppRouter() {
         <Route path="/admin/audit" element={<RoleRoute role="admin"><AdminLayout activeItem="audit"><AdminAudit /></AdminLayout></RoleRoute>} />
         <Route path="/admin/users" element={<RoleRoute role="admin"><AdminLayout activeItem="users"><AdminUsers /></AdminLayout></RoleRoute>} />
         <Route path="/admin/users/:id" element={<RoleRoute role="admin"><AdminLayout activeItem="users"><AdminUserDetail /></AdminLayout></RoleRoute>} />
+        <Route path="/admin/departments" element={<RoleRoute role="admin"><AdminLayout activeItem="departments"><AdminDepartments /></AdminLayout></RoleRoute>} />
+        <Route path="/admin/departments/:id" element={<RoleRoute role="admin"><AdminLayout activeItem="departments"><AdminDepartmentDetail /></AdminLayout></RoleRoute>} />
         <Route path="/admin/notifications" element={<RoleRoute role="admin"><AdminLayout activeItem="notifications"><NotificationCenter /></AdminLayout></RoleRoute>} />
         <Route path="/admin/settings" element={<RoleRoute role="admin"><AdminLayout activeItem="settings"><AdminSettings /></AdminLayout></RoleRoute>} />
 

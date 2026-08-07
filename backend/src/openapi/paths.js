@@ -252,7 +252,9 @@ module.exports = {
     },
     put: {
       tags: ["Users"], summary: "Update a user (admin)",
-      description: "Only the listed fields are read from the body. `password`, `email`, `_id`, `isActive` and timestamps are ignored if supplied. `department` must be an ObjectId of an existing, active Department.",
+      description:
+        "Only the listed fields are read from the body. `password`, `email`, `_id`, `isActive` and timestamps are ignored if supplied. `department` must be an ObjectId of an existing, active Department. " +
+        "Two lockout guards apply to `role` and are checked before any write, so a rejected request leaves the account unchanged: an administrator cannot demote themselves (400), and no `role` change may leave the system with zero active administrators (400).",
       parameters: [param$("IdParam")],
       requestBody: body({
         type: "object",
@@ -268,6 +270,8 @@ module.exports = {
   "/api/users/{id}/status": {
     patch: {
       tags: ["Users"], summary: "Activate / deactivate a user (admin)",
+      description:
+        "Deactivation is guarded against administrative lockout, checked before any write so a rejected request leaves the account unchanged: an administrator cannot deactivate their own account (400), and the last active administrator cannot be deactivated (400). Activation is never blocked.",
       parameters: [param$("IdParam")],
       requestBody: body({ type: "object", required: ["isActive"], properties: { isActive: { type: "boolean" } } }),
       responses: { 200: { description: "Updated.", ...json(envelope("user", ref("User"))) }, 400: res$("EnvValidation"), 404: res$("EnvNotFound"), ...ENV_GUARDS },
