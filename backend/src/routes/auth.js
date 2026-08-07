@@ -1,10 +1,6 @@
-// Authentication routes.
-//
-// login is public.
-//
-// register is admin-only. Staff accounts must be created by an administrator;
-// self-registration would allow unauthenticated users to obtain staff
-// privileges and access protected complaint data.
+// Authentication routes. Login is public; register is admin-only, because
+// self-registration would let anyone grant themselves staff privileges and the
+// access to complaint data that comes with them.
 
 const router = require("express").Router()
 const { register, login, logout, getMe } = require("../controllers/authController")

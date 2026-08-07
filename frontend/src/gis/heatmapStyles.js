@@ -1,14 +1,6 @@
-// Configuration and weighting for the density layer.
-//
-// WEIGHTING: only fields the backend actually stores contribute. Projects carry
-// Project.priority, which maps to a real intensity. Complaints have no
-// severity, priority or urgency field, so every complaint counts as one — the
-// heatmap shows where complaints are dense, not how bad they are.
-//
-// RENDER ORDER: leaflet.heat pins its canvas to Leaflet's overlayPane (z-index
-// 400), which sits below every civiq-* pane in config.js (410-450). The density
-// surface therefore always draws beneath markers and vectors, with no pane
-// wiring of its own.
+// Configuration and weighting for the density layer. Projects weight by
+// Project.priority; complaints carry no equivalent field, so each counts as one
+// and the surface shows where they are dense, not how severe they are.
 
 export const HEATMAP_SOURCES = {
   complaints: "Complaints",
@@ -57,21 +49,18 @@ export const PRIORITY_WEIGHTS = {
 
 export const DEFAULT_WEIGHT = 0.6
 
-/**
- * Intensity for one record. Uses Project.priority when present; anything else —
- * including every complaint — contributes a uniform weight rather than an
- * invented one.
- */
+// Intensity for one record. Uses Project.priority when present; anything else,
+// including every complaint, contributes a uniform weight.
 export function densityWeight(record) {
   const priority = record?.priority
   if (priority && PRIORITY_WEIGHTS[priority] !== undefined) return PRIORITY_WEIGHTS[priority]
   return DEFAULT_WEIGHT
 }
 
-/** Colour at a gradient stop; used by the legend. */
+// Colour at a gradient stop; used by the legend.
 export const densityColor = (stop) => HEATMAP_GRADIENT[stop] || HEATMAP_GRADIENT[1.0]
 
-/** CSS gradient string mirroring HEATMAP_GRADIENT, for the legend ramp. */
+// CSS gradient string mirroring HEATMAP_GRADIENT, for the legend ramp.
 export const gradientCss = () =>
   `linear-gradient(90deg, ${Object.entries(HEATMAP_GRADIENT)
     .sort((a, b) => Number(a[0]) - Number(b[0]))

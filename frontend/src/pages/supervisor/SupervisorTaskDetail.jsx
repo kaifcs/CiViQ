@@ -1,13 +1,6 @@
-// One supervised project, and the screen where its progress is recorded.
-//
-// This is the only caller of PUT /api/projects/:id/progress — the single
-// authoritative completion workflow. The endpoint is supervisor-only and
-// ownership-scoped by `requireProjectAccess`, so a project this supervisor does
-// not supervise 404s on load and never reaches the control below.
-//
-// Reaching 100% is what makes the backend set `status: "completed"`, stamp
-// `actualEndDate` and notify the owning officer. Nothing here decides that; the
-// server does, and the response is what this screen renders back.
+// One supervised project, and the only caller of PUT /api/projects/:id/progress.
+// The endpoint is supervisor-only and ownership-scoped, and reaching 100% is what
+// makes the backend complete the project and notify the owning officer.
 
 import { useCallback, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
@@ -48,8 +41,7 @@ export default function SupervisorTaskDetail() {
   const { data: project, loading, error, reload, setData } = useProject(id)
 
   // Re-seeded during render when a different project loads, rather than from an
-  // effect that would commit an extra render each time — the convention the
-  // other detail screens in this app already use.
+  // effect that would commit an extra render each time.
   const [value, setValue] = useState(0)
   const [seededFor, setSeededFor] = useState(null)
   if (project && project.id !== seededFor) {
@@ -65,8 +57,8 @@ export default function SupervisorTaskDetail() {
     const result = await save.run(next)
     if (!result.ok) return
 
-  // Merge only the updated fields to preserve populated relationships
-  // that are omitted from the progress update response.
+    // Merge only the updated fields, to preserve populated relationships the
+    // progress response omits.
     setData((current) => ({
       ...current,
       progress: result.data.progress,
@@ -122,7 +114,7 @@ export default function SupervisorTaskDetail() {
         </span>
       </div>
 
-      {/* ── Progress ── the only write on this screen ── */}
+      {/* The only write on this screen. */}
       <Card>
         <SectionLabel>Progress</SectionLabel>
 
@@ -224,14 +216,12 @@ export default function SupervisorTaskDetail() {
               stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
             </svg>
-            {/* The backend's own message, so a validation rejection reads exactly
-                as the API stated it. */}
+            {/* The backend's own message, so a rejection reads as the API stated it. */}
             <p className="text-[12px] text-[#DC2626] dark:text-[#F87171]">{save.error.message}</p>
           </div>
         )}
       </Card>
 
-      {/* ── Reference detail ── */}
       <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
         <Card>
           <SectionLabel>Assignment</SectionLabel>

@@ -1,8 +1,5 @@
-// Citizen "City Explorer" — NOT YET BUILT.
-//
-// A deliberate stub: the route is registered so the navigation is complete and
-// the URL is stable, but no data is fetched and nothing here is wired to the
-// backend. Replace the placeholder body when the screen is implemented.
+// Citizen "City Explorer" — not yet built. The route is registered so the
+// navigation is complete and the URL stays stable; nothing here fetches data.
 
 import CitizenLayout from "./CitizenLayout"
 

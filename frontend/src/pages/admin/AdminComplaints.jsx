@@ -1,7 +1,6 @@
-// Complaint queue across the whole municipality.
-//
-// Complaints carry no ownership filter — any staff member may see any complaint
-// — so this list is unscoped and assignment is a routing decision.
+// Complaint queue across the whole municipality. Complaints carry no ownership
+// filter — any staff member may see any complaint — so this list is unscoped
+// and assignment is a routing decision.
 
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -10,7 +9,6 @@ import AsyncState from '../../components/AsyncState'
 import { COMPLAINT_STATUS_CONFIG, DEPT_STYLES } from '../../components/uiStyles'
 import { formatDateLong, daysSince } from '../../components/dashboard'
 
-// ─── Helpers ───────────────────────────────────
 
 function isResolvedThisMonth(c) {
   if (!c.resolvedAt) return false
@@ -18,7 +16,6 @@ function isResolvedThisMonth(c) {
   return d.getMonth() === 0 && d.getFullYear() === 2025
 }
 
-// ─── Filter Select ─────────────────────────────
 function FilterSelect({ label, value, onChange, options }) {
   return (
     <select
@@ -41,12 +38,10 @@ const SearchIcon = () => (
   </svg>
 )
 
-// ─── Divider ───────────────────────────────────
 const VDivider = () => (
   <div className="w-px h-8 bg-[#E5E5E5] dark:bg-[#27272A] flex-shrink-0" />
 )
 
-// ─── Admin Complaints List ─────────────────────
 export default function AdminComplaints() {
   const navigate = useNavigate()
   const { data: complaints, loading, error, reload } = useComplaints()
@@ -57,13 +52,11 @@ export default function AdminComplaints() {
   const [filterStatus, setFilterStatus] = useState('')
   const [remindSent,   setRemindSent]   = useState({})
 
-  // ── Stats ──
   const totalCount        = complaints.length
   const unresolvedCount   = complaints.filter(c => c.status !== 'resolved').length
   const overdueCount      = complaints.filter(c => c.overdue).length
   const resolvedThisMonth = complaints.filter(isResolvedThisMonth).length
 
-  // ── Filter ──
   const filtered = useMemo(() => {
     return complaints.filter(c => {
       if (search     &&
@@ -93,7 +86,6 @@ export default function AdminComplaints() {
     <AsyncState loading={loading} error={error} onRetry={reload} label="Loading complaints...">
     <div className="flex flex-col gap-5 h-full" style={{ fontFamily: "'Inter', sans-serif" }}>
 
-      {/* ── Stat cards ── */}
       <div className="flex gap-3 flex-shrink-0">
         {[
           { label: 'Total',               sub: 'All time',     value: totalCount,         danger: false },
@@ -115,7 +107,6 @@ export default function AdminComplaints() {
         ))}
       </div>
 
-      {/* ── Search + Filters ── */}
       <div className="flex flex-col gap-3 flex-shrink-0">
         <div className="relative flex items-center">
           <span className="absolute left-3 text-[#9CA3AF] pointer-events-none flex items-center">
@@ -155,7 +146,6 @@ export default function AdminComplaints() {
         </div>
       </div>
 
-      {/* ── Complaints list ── */}
       <div className="flex flex-col gap-2 flex-1 overflow-y-auto">
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
@@ -182,7 +172,6 @@ export default function AdminComplaints() {
                 }`}
                 style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}
               >
-                {/* COL 1 — CNR ID */}
                 <div className="flex-shrink-0 w-[108px]">
                   <span className="text-[12px] font-bold text-[#5E6AD2] dark:text-[#818CF8] font-mono">
                     {c.cnrId}
@@ -191,7 +180,6 @@ export default function AdminComplaints() {
 
                 <VDivider />
 
-                {/* COL 2 — Issue type + address */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="text-[14px] font-semibold text-[#0F172A] dark:text-[#F8FAFC] leading-snug">
@@ -210,7 +198,6 @@ export default function AdminComplaints() {
 
                 <VDivider />
 
-                {/* COL 3 — Department badge */}
                 <div className="flex-shrink-0 w-[80px] flex justify-center">
                   <span className={`inline-flex items-center text-[12px] font-medium px-2.5 py-1 rounded-full ${DEPT_STYLES[c.department] || DEPT_STYLES.Other}`}>
                     {c.department}
@@ -219,7 +206,6 @@ export default function AdminComplaints() {
 
                 <VDivider />
 
-                {/* COL 4 — Days + filed date */}
                 <div className="flex-shrink-0 w-[80px] flex flex-col items-end gap-0.5">
                   <span className={`text-[11px] font-semibold text-[#9CA3AF] dark:text-[#6B7280] uppercase tracking-wide`}>Filed</span>
                   <span className={`text-[14px] font-bold leading-none ${isOverdue ? 'text-[#DC2626] dark:text-[#FCA5A5]' : 'text-[#0F172A] dark:text-[#F8FAFC]'}`}>
@@ -230,7 +216,6 @@ export default function AdminComplaints() {
 
                 <VDivider />
 
-                {/* COL 5 — Status badge */}
                 <div className="flex-shrink-0 w-[130px] flex justify-center">
                   <span className={`inline-flex items-center gap-1.5 text-[12px] font-semibold px-2.5 py-1 rounded-full ${status.bg} ${status.color}`}>
                     <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: status.dot }} />
@@ -240,7 +225,6 @@ export default function AdminComplaints() {
 
                 <VDivider />
 
-                {/* COL 6 — Remind button */}
                 <div className="flex-shrink-0">
                   <button
                     onClick={e => handleRemind(e, c.id)}
@@ -257,7 +241,6 @@ export default function AdminComplaints() {
                   </button>
                 </div>
 
-                {/* Chevron */}
                 <svg width="14" height="14" fill="none" viewBox="0 0 24 24" className="text-[#D1D5DB] dark:text-[#374151] flex-shrink-0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="9 18 15 12 9 6"/>
                 </svg>

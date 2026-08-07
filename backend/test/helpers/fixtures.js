@@ -1,15 +1,12 @@
-// The single fixture strategy.
-//
-// Every builder returns a plain object with only the fields the schema requires
-// plus whatever the caller overrides, so a test states exactly the thing it
-// cares about and nothing else. Values are deterministic — no randomness, no
-// Date.now() in identifiers — so a failure reproduces exactly.
+// Every builder returns only the fields the schema requires plus the caller's
+// overrides, so a test states exactly what it cares about. Values are
+// deterministic, so a failure reproduces exactly.
 
 const mongoose = require("mongoose")
 
 const oid = () => new mongoose.Types.ObjectId()
 
-// Ghaziabad, matching the coordinates the application actually works with.
+// Ghaziabad, matching the coordinates the application works with.
 const BASE_LAT = 28.6692
 const BASE_LNG = 77.4538
 
@@ -33,13 +30,9 @@ function userDoc(overrides = {}) {
   }
 }
 
-/**
- * A project that satisfies every required path.
- *
- * `metres` offsets the location north of the base point, which is how the clash
- * tests place two projects a known distance apart. `ward` is lifted out of
- * `location` so a test can vary it without having to restate the coordinates.
- */
+// `metres` offsets the location north of the base point, so clash tests can
+// place two projects a known distance apart. `ward` is lifted out of `location`
+// so it can be varied without restating the coordinates.
 function projectDoc(overrides = {}) {
   const n = nextSeq()
   const { metres = 0, ward = "Ward-1", location, ...rest } = overrides
@@ -80,7 +73,7 @@ function notificationDoc(overrides = {}) {
   }
 }
 
-/** A user object shaped as `protect` attaches it, for pure authorization tests. */
+// Shaped as `protect` attaches it, for pure authorization tests.
 const asUser = (role, id = oid()) => ({ _id: id, role })
 
 module.exports = {

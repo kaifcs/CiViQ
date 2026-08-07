@@ -1,5 +1,5 @@
 // Serves the OpenAPI spec: Swagger UI at /api/docs, raw document at
-// /api/docs.json. Left unauthenticated, like /api/health, so the contract is
+// /api/docs.json. Unauthenticated, like /api/health, so the contract is
 // readable without a token.
 
 const router = require("express").Router()

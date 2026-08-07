@@ -1,4 +1,5 @@
-// Clash Detection — 4 step process
+// Clash detection: a project collides with another when they overlap
+// geographically, in time, and in incompatible work types. All three must hold.
 const config = require("../config/staticConfig")
 const Project = require("../models/Project")
 
@@ -10,8 +11,8 @@ function getGeoBuffer(projectType, area) {
   return base + extra
 }
 
-// Widest buffer any two projects could combine to; used to size the candidate
-// bounding box so the cheap pre-filter can never exclude a real clash.
+// The widest buffer any two projects could combine to, so the cheap pre-filter
+// can never exclude a real clash.
 const MAX_PAIR_BUFFER_M =
   (Math.max(...Object.values(config.geoBuffer)) +
     Math.max(...config.sizeBuffer.map((s) => s.extra))) * 2
@@ -48,8 +49,8 @@ function getWorkTypeConflict(type1, type2) {
 async function detectClashes(newProject) {
   const clashes = []
 
-  // Step 1 — Candidate selection. Ward OR bounding box, so the set is a strict
-  // superset of possible clashes; exact distance is checked per candidate below.
+  // Candidate selection: ward OR bounding box, a strict superset of possible
+  // clashes. Exact distance is measured per candidate below.
   const coords = newProject.location?.centerCoords
   const orClauses = []
 
@@ -67,17 +68,14 @@ async function detectClashes(newProject) {
   }
   if (orClauses.length > 0) candidateFilter.$or = orClauses
 
-  // Only the fields the three checks below read. Candidates are compared and
-  // discarded, never saved, so hydrating whole documents buys nothing.
+  // Only the fields the checks below read; candidates are never saved.
   const candidates = await Project.find(candidateFilter)
     .select("location projectType startDate endDate")
     .lean()
 
   for (const candidate of candidates) {
-    // Step 2 — Geographic check. A candidate without coordinates cannot be
-    // distance-tested; skip it rather than throwing on the Haversine call.
-    // All projects created through the API have centerCoords (schema required),
-    // so this only guards against directly-inserted legacy documents.
+    // centerCoords is schema-required, so this only guards directly-inserted
+    // documents that would otherwise throw in the distance call.
     if (!candidate.location?.centerCoords?.lat || !candidate.location?.centerCoords?.lng) continue
     const dist = haversineDistance(
       newProject.location.centerCoords.lat,
@@ -89,17 +87,15 @@ async function detectClashes(newProject) {
     const buffer2 = getGeoBuffer(candidate.projectType, candidate.location.area || 0)
     if (dist > buffer1 + buffer2) continue
 
-    // Step 3 — Time overlap check
     if (!hasTimeOverlap(newProject.startDate, newProject.endDate, candidate.startDate, candidate.endDate)) continue
 
-    // Step 4 — Work type conflict
     const conflict = getWorkTypeConflict(newProject.projectType, candidate.projectType)
     if (conflict === "compatible") continue
 
     clashes.push({
       projectId:  candidate._id,
       severity:   conflict,
-      // Constant by construction: reaching here means all three checks matched.
+      // Constant by construction: reaching here means all three matched.
       clashTypes: ["geographic","timeline","worktype"],
       distance:   Math.round(dist),
     })

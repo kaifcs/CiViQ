@@ -1,8 +1,6 @@
-// Pagination — the one strategy every list endpoint shares.
-//
-// Pagination travels in headers because several list endpoints return a bare
-// array; moving it into the body would be a breaking API change. These tests
-// pin both halves: how a query is parsed, and the exact header set emitted.
+// The one pagination strategy every list endpoint shares. It travels in headers
+// because several endpoints return a bare array. Both halves are pinned: how a
+// query is parsed, and the exact header set emitted.
 
 const test = require("node:test")
 const assert = require("node:assert/strict")
@@ -11,8 +9,7 @@ const {
   parsePagination, setPaginationHeaders, DEFAULT_LIMIT, MAX_LIMIT,
 } = require("../../src/utils/pagination")
 
-// Opt-in is the contract: a caller that asks for no page gets the whole list,
-// exactly as before pagination existed.
+// Opt-in is the contract: a caller that asks for no page gets the whole list.
 test("pagination stays off unless asked for", () => {
   assert.deepEqual(parsePagination({}), { enabled: false })
   assert.deepEqual(parsePagination({ page: "" }), { enabled: false })

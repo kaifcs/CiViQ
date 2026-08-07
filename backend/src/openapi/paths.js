@@ -1,9 +1,6 @@
-// OpenAPI path definitions. Mirrors src/routes/*.js exactly.
-//
-// Guard notation used in each summary reflects the real middleware chain:
-//   public                    -> no protect
-//   auth                      -> protect only (any authenticated role)
-//   admin / officer / ...     -> protect + authorize(<roles>)
+// OpenAPI path definitions, mirroring src/routes/*.js. The guard notation in
+// each summary reflects the real middleware chain: `public` is no protect,
+// `auth` is protect alone, and a role name adds authorize().
 
 const ref = (s) => ({ $ref: `#/components/schemas/${s}` })
 const res$ = (r) => ({ $ref: `#/components/responses/${r}` })
@@ -27,14 +24,11 @@ const envelope = (key, schema) => ({
   properties: { success: { type: "boolean", example: true }, [key]: schema },
 })
 
-// Standard guard-failure responses, by response-shape family.
-// 429 is included in both families because the shared limiter in app.js
-// covers every /api route, so any operation can return it.
+// 429 appears in both families: the shared limiter covers every /api route.
 const ENV_GUARDS = { 401: res$("EnvUnauthorized"), 403: res$("EnvForbidden"), 429: res$("EnvRateLimited"), 500: res$("EnvServerError") }
 const PLAIN_GUARDS = { 401: res$("Unauthorized"), 403: res$("Forbidden"), 429: res$("RateLimited"), 500: res$("ServerError") }
 
 module.exports = {
-  // ── Health ──────────────────────────────────────────────────────────
   "/api/health": {
     get: {
       tags: ["Health"], summary: "Service and database health (public)",
@@ -75,7 +69,6 @@ module.exports = {
     },
   },
 
-  // ── Auth ────────────────────────────────────────────────────────────
   "/api/auth/register": {
     post: {
       tags: ["Auth"], summary: "Create a staff account (admin)",
@@ -155,7 +148,6 @@ module.exports = {
     },
   },
 
-  // ── Departments (admin) ─────────────────────────────────────────────
   "/api/departments": {
     get: {
       tags: ["Departments"], summary: "List departments (auth)",
@@ -202,7 +194,6 @@ module.exports = {
     },
   },
 
-  // ── Users (admin) ───────────────────────────────────────────────────
   "/api/users": {
     get: {
       tags: ["Users"], summary: "List users (admin)",
@@ -243,7 +234,6 @@ module.exports = {
     },
   },
 
-  // ── Projects ────────────────────────────────────────────────────────
   "/api/projects": {
     get: {
       tags: ["Projects"], summary: "List projects (auth)",
@@ -371,7 +361,6 @@ module.exports = {
     },
   },
 
-  // ── Conflicts ───────────────────────────────────────────────────────
   "/api/conflicts": {
     get: {
       tags: ["Conflicts"], summary: "List conflicts (auth)",
@@ -432,7 +421,6 @@ module.exports = {
     },
   },
 
-  // ── Complaints ──────────────────────────────────────────────────────
   "/api/complaints": {
     get: {
       tags: ["Complaints"], summary: "List / search complaints (PUBLIC — no authentication)",
@@ -554,7 +542,6 @@ module.exports = {
     },
   },
 
-  // ── Notifications ───────────────────────────────────────────────────
   "/api/notifications": {
     get: {
       tags: ["Notifications"], summary: "List my notifications (auth)",
@@ -701,7 +688,6 @@ module.exports = {
     },
   },
 
-  // ── Audit (admin) ───────────────────────────────────────────────────
   "/api/audit": {
     get: {
       tags: ["Audit"], summary: "List audit events (admin)",
@@ -727,11 +713,9 @@ module.exports = {
     },
   },
 
-  // ── Dashboard (admin) ───────────────────────────────────────────────
   ...dashboardPaths(),
 }
 
-// ── helpers ───────────────────────────────────────────────────────────
 
 function errEx(message) {
   return { description: message, content: { "application/json": { schema: { $ref: "#/components/schemas/EnvelopeError" }, example: { success: false, message } } } }

@@ -1,5 +1,5 @@
-// The fourth parameter is what marks this as an error handler: Express selects
-// error middleware by arity, so it must stay even though it is never called.
+// Express selects error middleware by arity, so the unused fourth parameter
+// below is required.
 const { ERROR_CODES } = require("../utils/apiResponse")
 const { logger } = require("../utils/logger")
 
@@ -8,8 +8,7 @@ module.exports = (err, req, res, _next) => {
   const message = err.message || "Server error"
 
   // Anything reaching here was thrown rather than returned through the shared
-  // response helpers, so it is unexpected by definition. A 4xx that arrives
-  // this way is a rejected request; a 5xx is an infrastructure fault.
+  // helpers, so it is unexpected by definition.
   logger.error("Unhandled error", {
     kind: status >= 500 ? "infrastructure" : "business",
     status,

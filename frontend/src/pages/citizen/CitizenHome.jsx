@@ -1,6 +1,5 @@
-// Public landing page for residents.
-//
-// Unauthenticated: no session is assumed and no staff data is shown.
+// Public landing page for residents. Unauthenticated: no session is assumed and
+// no staff data is shown.
 
 import { useCallback, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
@@ -13,8 +12,6 @@ import {
   DashboardSection, BarChart, TrendChart, DashboardTable, QuickActions, StatGrid,
   ActionIcon, formatDateLong, COMPLAINT_STATUS_LABELS,
 } from "../../components/dashboard"
-
-// ─── Helpers ───────────────────────────────────
 
 // A { period, count } series from the API, in the { label, value } shape the
 // charts read. The series is already grouped and sorted by the database.
@@ -42,7 +39,6 @@ const StatusPill = ({ status }) => (
   </span>
 )
 
-// ─── Citizen Dashboard ─────────────────────────
 export default function CitizenHome() {
   const navigate = useNavigate()
   const { cnrs, add, remove } = useCnrWatchlist()
@@ -50,12 +46,9 @@ export default function CitizenHome() {
   const [entryError, setEntryError] = useState("")
   const [checking, setChecking] = useState(false)
 
-  // Two public reads, each answering the question it is actually suited to.
-  //
-  // City-wide figures are COUNTED in the database rather than derived from a
+  // City-wide figures are counted in the database rather than derived from a
   // downloaded table: GET /api/complaints is capped at 200 records, so counting
-  // it would report that cap as the city total once the collection grows past
-  // it — and every average and chart with it.
+  // it would report that cap as the city total.
   const { data: city, loading, error, reload } = useComplaintStats()
 
   // The citizen's own reports are resolved by CNR, so they are found whatever
@@ -88,7 +81,7 @@ export default function CitizenHome() {
     { label: "Resolved City-wide", value: city?.closed ?? 0, sub: "Completed" },
   ], [mine, myOpen, myResolved, avgResolutionDays, city, cnrs])
 
-  // ── Charts ── city-wide, grouped and sorted by the aggregation pipeline
+  // City-wide series, already grouped and sorted by the aggregation pipeline.
   const complaintHistory = useMemo(() => toSeries(city?.monthly), [city])
   const resolutionTrend = useMemo(() => toSeries(city?.resolvedMonthly), [city])
   const byIssueType = useMemo(() => toBars(city?.byIssueType), [city])
@@ -104,10 +97,8 @@ export default function CitizenHome() {
       icon: <ActionIcon d={<><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></>} /> },
   ], [])
 
-  // Confirms the reference against the API rather than against a downloaded
-  // list. GET /api/complaints/:cnr accepts a CNR directly, so a real complaint
-  // is found however old it is; searching the capped list told a resident their
-  // own report did not exist as soon as 200 newer ones had been filed.
+  // Confirmed against GET /api/complaints/:cnr rather than the capped public
+  // list, so a real complaint is found however old it is.
   async function handleAdd(e) {
     e.preventDefault()
     const cnr = normalise(entry)
@@ -158,10 +149,8 @@ export default function CitizenHome() {
         <AsyncState loading={loading} error={error} onRetry={reload} label="Loading your dashboard...">
           <div className="flex flex-col gap-4">
 
-            {/* ── Stat cards ── */}
             <StatGrid stats={stats} columns={7} />
 
-            {/* ── My complaints ── */}
             <DashboardSection
               title="My complaints"
               action={
@@ -222,7 +211,6 @@ export default function CitizenHome() {
               />
             </DashboardSection>
 
-            {/* ── Charts ── */}
             <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
               <DashboardSection title="Complaint history">
                 <TrendChart data={complaintHistory} emptyHint="No complaints have been filed yet." />

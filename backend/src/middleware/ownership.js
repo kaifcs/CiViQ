@@ -1,23 +1,16 @@
-// Shared project ownership helpers.
-// Extends existing auth middleware with resource-level authorization.
+// Resource-level authorization for projects, layered on the auth middleware.
+// The visibility rule lives here alone, exposed three ways so the list and the
+// single-resource routes cannot drift apart.
 
 const mongoose = require("mongoose")
 const Project = require("../models/Project")
 const { invalidId, notFound, ERROR_CODES } = require("../utils/apiResponse")
 const asyncHandler = require("../utils/asyncHandler")
 
-// Filter that matches no projects (fail-closed).
-// Uses $nor so it cannot be overridden by a later _id spread.
+// Fail-closed. $nor so it cannot be cancelled out by a later _id spread.
 const DENY_ALL_PROJECTS = { $nor: [{}] }
 
-/**
- * Returns the project visibility scope for a user.
- *
- * admin       -> all projects
- * officer     -> owned projects
- * supervisor  -> supervised projects
- * everyone else -> no projects
- */
+// Any role beyond the three named sees nothing, rather than everything.
 function projectScopeFilter(user) {
   if (user?.role === "admin") return {}
   if (user?.role === "officer") return { officer: user._id }
@@ -25,10 +18,9 @@ function projectScopeFilter(user) {
   return DENY_ALL_PROJECTS
 }
 
-// Excludes soft-deleted projects from normal access.
 const NOT_SOFT_DELETED = { isActive: { $ne: false } }
 
-// Checks access for an already-loaded project.
+// Compared by string value, so a lean ObjectId and a JSON string both match.
 function canAccessProject(user, project) {
   if (!project) return false
   if (user?.role === "admin") return true
@@ -37,10 +29,7 @@ function canAccessProject(user, project) {
   return false
 }
 
-/**
- * Ensures the current user can access the requested project.
- * Returns 404 for inaccessible projects to avoid resource enumeration.
- */
+// An inaccessible project returns 404, not 403, so ids cannot be probed.
 const requireProjectAccess = asyncHandler(async function requireProjectAccess(req, res, next) {
   const { id } = req.params
 

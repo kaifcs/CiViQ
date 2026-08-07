@@ -1,9 +1,7 @@
 import { DENSITY_LEVELS, gradientCss } from "../heatmapStyles"
 
-/**
- * Density ramp legend. Presentation only — it reads the same gradient the
- * renderer uses, so the two cannot drift apart.
- */
+// Density ramp legend. Reads the same gradient the renderer uses, so the two
+// cannot drift apart.
 export default function HeatmapLegend({ className = "" }) {
   return (
     <div className={`flex items-center gap-2 ${className}`}>

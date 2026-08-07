@@ -78,10 +78,9 @@ export default function OfficerComplaintDetail() {
   const navigate = useNavigate()
 
   const { data: complaint, loading, error, reload } = useComplaint(id)
-  // Both are edited before saving — the status by the workflow buttons, the note
-  // by its textarea — so they stay as state. They are re-seeded during render
-  // when a different complaint loads rather than from an effect, which would
-  // commit an extra render every time.
+  // Both are edited before saving, so they stay as state. Re-seeded during
+  // render when a different complaint loads, rather than from an effect that
+  // would commit an extra render each time.
   const [currentStatus, setCurrentStatus] = useState('submitted')
   const [resolutionNote, setResolutionNote] = useState('')
   const [seededFor, setSeededFor] = useState(null)

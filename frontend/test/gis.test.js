@@ -1,12 +1,6 @@
-// GIS primitives — coordinate validation, ordering and spatial maths.
-//
-// These are the functions that decide whether a project appears on the map and
-// where. A silent regression here does not throw; it puts municipal works in
-// the wrong place, so validation and the [lng,lat] / [lat,lng] boundary are
-// covered closely.
-//
-// Rendering itself is not tested here — that needs a DOM and a Leaflet
-// instance. See the frontend testing note in the S5 summary.
+// GIS primitives — coordinate validation, ordering and spatial maths. A silent
+// regression here does not throw; it puts municipal works in the wrong place, so
+// validation and the [lng,lat] / [lat,lng] boundary are covered closely.
 
 import test from "node:test"
 import assert from "node:assert/strict"

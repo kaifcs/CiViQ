@@ -1,7 +1,6 @@
-// Single complaint: status progression and officer assignment.
-//
-// Status advances one step at a time through the backend's enum; the screen
-// offers only the next valid state rather than a free choice.
+// Single complaint: status progression and officer assignment. Status advances
+// one step at a time through the backend's enum, so the screen offers only the
+// next valid state rather than a free choice.
 
 import { useCallback, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
@@ -13,7 +12,6 @@ import AsyncState from '../../components/AsyncState'
 import { COMPLAINT_STATUS_CONFIG, DEPT_STYLES, inputCls, labelCls } from '../../components/uiStyles'
 import { formatDateLong } from '../../components/dashboard'
 
-// ─── Helpers ───────────────────────────────────
 function formatDateTime(dateStr) {
   if (!dateStr) return null
   const d = new Date(dateStr)
@@ -21,8 +19,6 @@ function formatDateTime(dateStr) {
     ' · ' + d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
 }
 
-// ─── Status config ─────────────────────────────
-// ─── Small components ──────────────────────────
 function Card({ children, className = '' }) {
   return (
     <div className={`bg-[#FFFFFF] dark:bg-[#1C1C1F] border border-[#E5E5E5] dark:border-[#27272A] rounded-[8px] p-5 ${className}`}
@@ -45,7 +41,6 @@ function InfoRow({ label, value }) {
   )
 }
 
-// ─── Status Timeline ───────────────────────────
 const TIMELINE_STEPS = [
   { key: 'submitted',    label: 'Submitted',    dateKey: 'filedAt' },
   { key: 'acknowledged', label: 'Acknowledged', dateKey: 'acknowledgedAt' },
@@ -68,9 +63,7 @@ function StatusTimeline({ complaint }) {
         return (
           <div key={step.key} className="flex-1 flex flex-col items-center">
             <div className="flex items-center w-full">
-              {/* Left line */}
               <div className={`flex-1 h-[2px] ${i === 0 ? 'invisible' : isDone ? 'bg-[#5E6AD2]' : 'bg-[#E5E5E5] dark:bg-[#27272A]'}`} />
-              {/* Dot */}
               <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 border-2 transition-all ${
                 isDone
                   ? 'border-[#5E6AD2] bg-[#5E6AD2]'
@@ -84,11 +77,9 @@ function StatusTimeline({ complaint }) {
                   <div className="w-2 h-2 rounded-full bg-[#E5E5E5] dark:bg-[#374151]" />
                 )}
               </div>
-              {/* Right line */}
               <div className={`flex-1 h-[2px] ${isLast ? 'invisible' : isDone && i < currentIdx ? 'bg-[#5E6AD2]' : 'bg-[#E5E5E5] dark:bg-[#27272A]'}`} />
             </div>
 
-            {/* Label + date */}
             <div className="mt-2 text-center px-1">
               <p className={`text-[12px] font-semibold ${isDone ? 'text-[#0F172A] dark:text-[#F8FAFC]' : 'text-[#9CA3AF] dark:text-[#6B7280]'}`}>
                 {step.label}
@@ -108,7 +99,6 @@ function StatusTimeline({ complaint }) {
   )
 }
 
-// ─── Admin Complaint Detail ────────────────────
 export default function AdminComplaintDetail() {
   const { id }   = useParams()
   const navigate = useNavigate()
@@ -124,8 +114,8 @@ export default function AdminComplaintDetail() {
   const [escalated,   setEscalated]   = useState(false)
   const [showNoteBox, setShowNoteBox] = useState(false)
 
-  // Assignment. Re-seeded during render when a different complaint loads, the
-  // convention the other detail screens use, rather than from an effect.
+  // Re-seeded during render when a different complaint loads, rather than from
+  // an effect that would commit an extra render each time.
   const [officerId,   setOfficerId]   = useState('')
   const [deptId,      setDeptId]      = useState('')
   const [seededFor,   setSeededFor]   = useState(null)
@@ -143,9 +133,8 @@ export default function AdminComplaintDetail() {
   )
 
   const submitAssignment = useCallback(async () => {
-    // PATCH /api/complaints/:id/assign — the one writer of these two fields.
-    // It answers with the updated complaint, and adaptComplaint reads both from
-    // bare ids, so the response can be applied directly.
+    // PATCH /api/complaints/:id/assign answers with the updated complaint, and
+    // adaptComplaint reads both fields from bare ids, so it applies directly.
     const result = await assign.run({
       assignedDepartment: deptId || null,
       assignedOfficer: officerId || null,
@@ -173,7 +162,6 @@ export default function AdminComplaintDetail() {
   return (
     <div className="flex flex-col gap-5" style={{ fontFamily: "'Inter', sans-serif" }}>
 
-      {/* ── Back ── */}
       <button
         onClick={() => navigate('/admin/complaints')}
         className="flex items-center gap-1.5 text-[13px] text-[#6B7280] dark:text-[#9CA3AF] hover:text-[#0F172A] dark:hover:text-[#F8FAFC] transition-colors w-fit"
@@ -184,7 +172,6 @@ export default function AdminComplaintDetail() {
         Back to Complaints
       </button>
 
-      {/* ── Header ── */}
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 flex-wrap mb-2">
@@ -208,7 +195,6 @@ export default function AdminComplaintDetail() {
           <p className="text-[13px] text-[#6B7280] dark:text-[#9CA3AF] mt-1">{complaint.address}</p>
         </div>
 
-        {/* Admin actions */}
         <div className="flex items-center gap-2 flex-shrink-0">
           {escalated ? (
             <span className="text-[13px] font-medium text-[#DC2626] dark:text-[#F87171] flex items-center gap-1.5">
@@ -245,7 +231,6 @@ export default function AdminComplaintDetail() {
         </div>
       </div>
 
-      {/* Add note box */}
       {showNoteBox && (
         <Card>
           <SectionLabel>Internal note</SectionLabel>
@@ -271,10 +256,8 @@ export default function AdminComplaintDetail() {
         </Card>
       )}
 
-      {/* ══ ROW 1: Info + Map ══ */}
       <div className="grid grid-cols-2 gap-4">
 
-        {/* Complaint information */}
         <Card>
           <SectionLabel>Complaint information</SectionLabel>
           <div className="mb-4 pb-4 border-b border-[#F3F4F6] dark:border-[#27272A]">
@@ -302,7 +285,6 @@ export default function AdminComplaintDetail() {
           )}
         </Card>
 
-        {/* Map placeholder */}
         <Card className="flex flex-col">
           <SectionLabel>Complaint location</SectionLabel>
           <div
@@ -320,11 +302,9 @@ export default function AdminComplaintDetail() {
 
       </div>
 
-      {/* ══ ROW 2: Assignment ══
-          PATCH /api/complaints/:id/assign. Both selects are optional and the
-          endpoint accepts either or both; clearing one sends null, which is how
-          it unassigns. Assigning an officer is what raises the
-          `complaint_assigned` notification. */}
+      {/* PATCH /api/complaints/:id/assign: either select is optional, clearing
+          one sends null to unassign, and assigning an officer is what raises
+          the `complaint_assigned` notification. */}
       <Card>
         <SectionLabel>Assignment</SectionLabel>
         <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-3 items-end">
@@ -385,7 +365,6 @@ export default function AdminComplaintDetail() {
         )}
       </Card>
 
-      {/* ══ ROW 3: Status timeline ══ */}
       <Card>
         <SectionLabel>Status timeline</SectionLabel>
         <StatusTimeline complaint={complaint} />

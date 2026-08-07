@@ -1,37 +1,12 @@
-// Full development fixture loader — DESTRUCTIVE.
-//
-// Run with `npm run seed`. It DELETES every Notification, AuditLog, Conflict,
-// Complaint, Project, User and Department in the database named by
-// MONGODB_URI before inserting the fixtures below (deletion runs in
-// dependency order so nothing is ever left pointing at a document that no
-// longer exists). Override MONGODB_URI explicitly when targeting anything
-// other than a local development database — this must never be pointed at
-// production.
-//
-// Documents are created one at a time with Model.create() rather than
-// insertMany(), so every pre-save hook still runs: Project and Complaint need
-// their count-derived projectId/cnrId generated, and User needs its password
-// hashed. Project and Complaint are seeded strictly sequentially for this
-// reason — their id generator reads countDocuments() at save time, so
-// creating them concurrently could hand two documents the same sequence
-// number and trip the unique index. The remaining collections have no such
-// hook dependency, so Promise.all is used for those where it is safe.
-//
-// All IDs referenced below (department, officer, supervisor, project,
-// conflict, user) are the live ObjectIds returned from the earlier inserts —
-// nothing is fabricated or hardcoded, so there are no dangling references.
-//
-// Fixture values must stay on the same scale and vocabulary the runtime uses,
-// because seeded and API-created records are compared against each other:
-//
-//   mcdmScore    0-10, one decimal — what services/mcdmEngine returns as
-//                `score`. NOT the 0-100 figure it reports as `outOf100`, which
-//                is what the frontend adapter derives for display. Mixing the
-//                two makes a seeded project outrank every real one, since
-//                conflictsController.resolveConflict compares the raw numbers.
-//   tenderStatus "complete" | "in_process" | "planning" — the keys
-//                mcdmEngine's tenderMap reads. Anything else silently scores
-//                the neutral default.
+// Development fixture loader — DESTRUCTIVE. Empties all seven collections in
+// the database MONGODB_URI names, in dependency order, before inserting. Never
+// point it at production.
+
+// Documents go through Model.create() so the pre-save hooks run, and Project and
+// Complaint strictly sequentially because their ids derive from a document count.
+
+// Fixture values must match the runtime scale and vocabulary: `mcdmScore` is the
+// engine's 0-10 `score`, and `tenderStatus` uses the keys its tenderMap reads.
 
 const mongoose = require("mongoose")
 const dotenv = require("dotenv")
@@ -51,23 +26,13 @@ const { NOTIFICATION_TYPES, metadataForType } = require("../config/notificationT
 
 const SEED_PASSWORD = "civiq123"
 
-// --------------------------------------------------------------------------
-// Small helpers — no equivalent already exists in the project utilities, so
-// they live here rather than in a new shared file.
-// --------------------------------------------------------------------------
-
-// Days relative to "today", used throughout so the seeded timelines stay
-// sensible (past/ongoing/future) no matter when the seed is run.
+// Relative to today, so the seeded timelines stay sensible whenever it is run.
 function daysFromNow(days) {
   const d = new Date()
   d.setHours(0, 0, 0, 0)
   d.setDate(d.getDate() + days)
   return d
 }
-
-// --------------------------------------------------------------------------
-// Fixture definitions
-// --------------------------------------------------------------------------
 
 const departmentDefs = [
   { name: "Public Works Department", code: "PWD", description: "Roads, footpaths, flyovers and general municipal civil works.", color: "#E63946" },
@@ -96,8 +61,7 @@ const userDefs = [
   { fullName: "Ravi Chauhan",    email: "ravi.chauhan@civiq.in",    role: "officer",    deptCode: "DS",   phone: "9876500010" },
 ]
 
-// Projects reference departments/officers/supervisors by index into the
-// arrays built after those collections are seeded (see buildProjectDefs).
+// References are the live ObjectIds returned by the earlier inserts.
 function buildProjectDefs(deptByCode, admin) {
   return [
     {
@@ -247,10 +211,6 @@ function buildComplaintDefs(deptByCode) {
   }))
 }
 
-// --------------------------------------------------------------------------
-// Seed steps
-// --------------------------------------------------------------------------
-
 async function clearCollections() {
   await Notification.deleteMany()
   await AuditLog.deleteMany()
@@ -295,9 +255,7 @@ async function seedUsers(deptByCode) {
   return { users, userByEmail, admin }
 }
 
-// Sequential: Project.pre("save") derives projectId from countDocuments(),
-// so concurrent creation could race two projects onto the same sequence
-// number.
+// Sequential: projectId derives from countDocuments() at save time.
 async function seedProjects(deptByCode, userByEmail, admin) {
   const defs = buildProjectDefs(deptByCode, admin)
   const projects = []
@@ -315,8 +273,7 @@ async function seedProjects(deptByCode, userByEmail, admin) {
   return projects
 }
 
-// Sequential for the same reason as seedProjects: Complaint.pre("save")
-// derives cnrId from countDocuments().
+// Sequential for the same reason as seedProjects.
 async function seedComplaints(deptByCode) {
   const defs = buildComplaintDefs(deptByCode)
   const complaints = []
@@ -366,12 +323,8 @@ async function seedConflicts(projects, userByEmail, admin) {
 
 async function seedNotifications(userByEmail, projects, complaints, conflicts) {
   const defs = [
-    // Links must be routes the frontend actually registers, namespaced by the
-    // RECIPIENT's role — exactly as notificationService writes them at runtime.
-    // These were bare `/projects/:id`, `/conflicts/:id` and `/complaints/:id`:
-    // the first resolves to the public citizen stub and the other two match no
-    // route at all, so every seeded notification landed on a stub or Not Found.
-    // A supervisor's project screen is /supervisor/tasks/:id, not /projects/:id.
+    // Links are namespaced by the recipient's role, exactly as
+    // notificationService resolves them at runtime.
     { type: NOTIFICATION_TYPES.CLASH_DETECTED, title: "Project clash detected", message: `A scheduling clash was detected between "${projects[0].title}" and "${projects[7].title}".`, recipient: "suresh.singh@civiq.in", read: false, link: `/supervisor/tasks/${projects[0]._id}`, data: { conflictId: conflicts[0]._id } },
     { type: NOTIFICATION_TYPES.PROJECT_APPROVED, title: "Project approved", message: `Your project "${projects[1].title}" has been approved.`, recipient: "mohan.kumar@civiq.in", read: true, link: `/officer/projects/${projects[1]._id}`, data: { projectId: projects[1]._id } },
     { type: NOTIFICATION_TYPES.PROJECT_REJECTED, title: "Project rejected", message: `Your project "${projects[9].title}" was rejected. See the admin note for details.`, recipient: "deepak.yadav@civiq.in", read: false, link: `/officer/projects/${projects[9]._id}`, data: { projectId: projects[9]._id } },
@@ -413,13 +366,8 @@ async function seedNotifications(userByEmail, projects, complaints, conflicts) {
 
 async function seedAuditLogs(userByEmail, projects, complaints, conflicts) {
   const defs = [
-    // Actions must come from the vocabulary services/auditService is actually
-    // called with — the lowercase snake_case strings in the controllers. These
-    // were UPPERCASE, and three of them (LOGIN, USER_CREATED, ROLE_CHANGED) had
-    // no emitter at all, so seeded rows rendered as raw uppercase and the audit
-    // screen's action filter could never match them. Those three are now real
-    // actions on the targets they belong to; there is no User-targeted audit
-    // action, because nothing in the API writes one.
+    // Only actions a controller actually emits, so the audit screen's filter
+    // can match them.
     { action: "project_status_updated", performedBy: "rajesh.kumar@civiq.in", targetType: "Project", targetId: projects[9]._id, details: { isActive: false }, ipAddress: "10.20.30.1" },
     { action: "project_created", performedBy: "amit.sharma@civiq.in", targetType: "Project", targetId: projects[0]._id, details: { title: projects[0].title }, ipAddress: "10.20.30.4" },
     { action: "project_updated", performedBy: "amit.sharma@civiq.in", targetType: "Project", targetId: projects[0]._id, details: { field: "progress", from: 40, to: 55 }, ipAddress: "10.20.30.4" },
@@ -445,10 +393,6 @@ async function seedAuditLogs(userByEmail, projects, complaints, conflicts) {
   logger.info(`Seeded ${auditLogs.length} audit logs`)
   return auditLogs
 }
-
-// --------------------------------------------------------------------------
-// Entry point
-// --------------------------------------------------------------------------
 
 async function seed() {
   await mongoose.connect(process.env.MONGODB_URI)

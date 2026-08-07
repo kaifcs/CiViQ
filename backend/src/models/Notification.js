@@ -16,26 +16,18 @@ const notificationSchema = new mongoose.Schema({
   read:       { type: Boolean, default: false },
   data:       { type: Object },
 
-  // Derived from `type` when the notification is created, so the list can be
-  // filtered and sorted without every caller having to supply them.
+  // Derived from `type` at creation, so callers cannot classify inconsistently.
   category:   { type: String, enum: NOTIFICATION_CATEGORY_VALUES, default: NOTIFICATION_CATEGORIES.SYSTEM },
   priority:   { type: String, enum: NOTIFICATION_PRIORITY_VALUES, default: NOTIFICATION_PRIORITIES.NORMAL },
 
-  // Stamped when `read` flips to true; stays null while unread.
   readAt:     { type: Date, default: null },
 
-  // Archive is the soft-delete for notifications: the record stays in history
-  // but leaves the default feed. Explicit deletion removes the row outright.
+  // Archive is the soft-delete: the record leaves the feed but stays in history.
   archived:   { type: Boolean, default: false },
   archivedAt: { type: Date, default: null },
 
-  // Email delivery state. The notification row doubles as the retry queue, so
-  // no second collection or broker is involved.
-  //   pending   — not yet attempted
-  //   sending   — claimed by a worker; the claim is what prevents double sends
-  //   delivered — accepted by the provider
-  //   failed    — permanently rejected, or out of retries
-  //   skipped   — email disabled, or suppressed by the user's preferences
+  // The row doubles as the email retry queue, so no broker is involved. The
+  // `sending` claim is what prevents a double send across instances.
   deliveryStatus: {
     type: String,
     enum: ["pending", "sending", "delivered", "failed", "skipped"],
@@ -47,11 +39,9 @@ const notificationSchema = new mongoose.Schema({
   lastError:     { type: String, default: null },
 }, { timestamps: true })
 
-// The feed: one recipient's notifications, newest first, archived excluded.
+// The feed, the unread count, and the retry sweep respectively.
 notificationSchema.index({ recipient: 1, archived: 1, createdAt: -1 })
-// The unread count and the unread filter.
 notificationSchema.index({ recipient: 1, archived: 1, read: 1 })
-// The retry sweep: rows due for another delivery attempt.
 notificationSchema.index({ deliveryStatus: 1, nextAttemptAt: 1 })
 
 module.exports = mongoose.model("Notification", notificationSchema)

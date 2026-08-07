@@ -1,8 +1,5 @@
-// Municipality-wide analytics.
-//
-// Every figure comes from /api/dashboard/*; nothing is computed from a project
-// list here. One memoised filter object drives all five endpoints, so changing a
-// filter costs one request per endpoint rather than one per widget.
+// Municipality-wide analytics. Every figure comes from /api/dashboard/*;
+// nothing is computed from a project list here.
 
 import { useCallback, useMemo, useState } from 'react'
 import {
@@ -19,10 +16,9 @@ import {
   CONFLICT_RAW_STATUS_LABELS, CONFLICT_SEVERITY_LABELS,
 } from '../../components/dashboard'
 
-// ─── Helpers ───────────────────────────────────
 const LABEL = STATUS_LABELS
 
-/** Turns a { key: count } bucket map into sorted chart rows, dropping zeroes. */
+// Turns a { key: count } bucket map into sorted chart rows, dropping zeroes.
 const bucketsToRows = (buckets = {}, labels = LABEL) =>
   Object.entries(buckets)
     .filter(([, v]) => v > 0)
@@ -31,7 +27,7 @@ const bucketsToRows = (buckets = {}, labels = LABEL) =>
 
 const EMPTY = {}
 
-/** Declared at module scope so it is not re-created on every render. */
+// Declared at module scope so it is not re-created on every render.
 function ExportButton({ onExport, disabled }) {
   return (
     <button
@@ -44,7 +40,6 @@ function ExportButton({ onExport, disabled }) {
   )
 }
 
-// ─── Analytics Dashboard ───────────────────────
 export default function AdminAnalytics() {
   const [filters, setFilters] = useState(EMPTY)
 
@@ -101,7 +96,7 @@ export default function AdminAnalytics() {
       options: COMPLAINT_STATUSES.map((s) => ({ value: s, label: LABEL[s] })) },
   ], [departmentList, wardOptions])
 
-  // ── KPI cards — every value is computed by the backend ──
+  // Every KPI value is computed by the backend.
   const conflictResolutionRate = useMemo(() => {
     const total = summary?.conflicts?.total ?? 0
     if (total === 0) return null
@@ -122,7 +117,7 @@ export default function AdminAnalytics() {
       sub: `${complaints?.averages?.resolvedCount ?? 0} resolved` },
   ], [summary, projects, complaints, conflictResolutionRate])
 
-  // ── Chart datasets — all from backend aggregations ──
+  // Chart datasets, all from backend aggregations.
   const projectsByDept = useMemo(
     () => (projects?.byDepartment || []).map((d) => ({ label: d.code || d.name, value: d.count })),
     [projects]
@@ -160,7 +155,6 @@ export default function AdminAnalytics() {
   const complaintTrend = useMemo(() => toTrendSeries(complaints?.monthly), [complaints])
   const conflictTrend  = useMemo(() => toTrendSeries(conflicts?.monthly), [conflicts])
 
-  // ── Tables ──
   const deptRows = useMemo(() => departments?.departments || [], [departments])
 
   const conflictRows = useMemo(() => {
@@ -188,7 +182,7 @@ export default function AdminAnalytics() {
     [departments]
   )
 
-  // ── Export — CSV only; the backend exposes no export endpoint ──
+  // CSV only; the backend exposes no export endpoint.
   const exportCsv = useCallback((name, columns, rows) => {
     downloadCsv(`civiq_${name}${filterSuffix(filters)}.csv`, toCsv(columns, rows))
   }, [filters])
@@ -209,10 +203,8 @@ export default function AdminAnalytics() {
         />
       </DashboardSection>
 
-      {/* ── KPI cards ── */}
       <StatGrid stats={kpis} columns={5} />
 
-      {/* ── Trends ── */}
       <div className="grid gap-4 grid-cols-1 lg:grid-cols-3">
         <DashboardSection title="Monthly project trend">
           <AsyncState loading={projectsQ.loading} error={projectsQ.error} label="Loading...">
@@ -231,7 +223,6 @@ export default function AdminAnalytics() {
         </DashboardSection>
       </div>
 
-      {/* ── Distributions ── */}
       <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
         <DashboardSection title="Projects by department">
           <BarChart data={projectsByDept} emptyHint="No projects in this range." />
@@ -259,7 +250,6 @@ export default function AdminAnalytics() {
         </DashboardSection>
       </div>
 
-      {/* ── Tables ── */}
       <DashboardSection
         title="Department performance summary"
         action={<ExportButton disabled={deptRows.length === 0} onExport={() => exportCsv('departments', [

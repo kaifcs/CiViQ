@@ -1,8 +1,5 @@
-// Officer landing screen.
-//
-// Every list is already scoped by the backend to this officer's own projects,
-// so nothing here filters by ownership — doing so client-side would imply the
-// data was ever unscoped.
+// Officer landing screen. Every list is already scoped by the backend to this
+// officer's own projects, so nothing here filters by ownership.
 
 import { useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -16,11 +13,10 @@ import {
   PROJECT_STATUS_LABELS, PROJECT_TERMINAL_STATUSES, COMPLAINT_STATUS_LABELS,
 } from '../../components/dashboard'
 
-// ─── Helpers ───────────────────────────────────
 const DEADLINE_WINDOW_DAYS = 30
 
 
-/** Share of a project's scheduled window that has elapsed, clamped to 0–100. */
+// Share of a project's scheduled window that has elapsed, clamped to 0–100.
 function scheduleElapsed(project) {
   const start = new Date(project.startDate).getTime()
   const end = new Date(project.endDate).getTime()
@@ -29,7 +25,6 @@ function scheduleElapsed(project) {
 }
 
 
-// ─── Officer Dashboard ─────────────────────────
 export default function OfficerDashboard() {
   const navigate = useNavigate()
   const { user } = useAuth()
@@ -70,7 +65,6 @@ export default function OfficerDashboard() {
     [myProjects]
   )
 
-  // ── Stats ──
   const stats = useMemo(() => {
     const byStatus = myProjects.reduce((m, p) => (m[p.status] = (m[p.status] || 0) + 1, m), {})
     const inProgress = myProjects.filter((p) => p.progress > 0 && p.progress < 100).length
@@ -85,7 +79,6 @@ export default function OfficerDashboard() {
     ]
   }, [myProjects, myComplaints, openConflicts, upcomingDeadlines])
 
-  // ── Charts ──
   const timelineData = useMemo(
     () => myProjects
       .filter((p) => !PROJECT_TERMINAL_STATUSES.includes(p.status))
@@ -142,7 +135,6 @@ export default function OfficerDashboard() {
     <AsyncState loading={loading} error={error} onRetry={reload} label="Loading dashboard...">
     <div className="flex flex-col gap-4" style={{ fontFamily: "'Inter', sans-serif" }}>
 
-      {/* ── Deadline warning ── */}
       {upcomingDeadlines.length > 0 && (
         <div className="flex items-start gap-3 px-4 py-3 rounded-[8px] flex-shrink-0 bg-[#FFFBEB] dark:bg-[#181305] border border-[#FCD34D] dark:border-[#854F0B]">
           <svg width="15" height="15" fill="none" viewBox="0 0 24 24" className="text-[#D97706] dark:text-[#FACC15] flex-shrink-0 mt-0.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -159,10 +151,8 @@ export default function OfficerDashboard() {
 
       <QuickActions actions={quickActions} onNavigate={go} />
 
-      {/* ── Stat cards ── */}
       <StatGrid stats={stats} columns={7} />
 
-      {/* ── Charts ── */}
       <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
         <DashboardSection title="My project timeline">
           <BarChart
@@ -191,7 +181,6 @@ export default function OfficerDashboard() {
         </DashboardSection>
       </div>
 
-      {/* ── Tables ── */}
       <div className="grid gap-4 grid-cols-1 xl:grid-cols-2">
         <DashboardSection title="Assigned projects">
           <DashboardTable
@@ -241,7 +230,6 @@ export default function OfficerDashboard() {
         </DashboardSection>
       </div>
 
-      {/* ── Conflicts + activity ── */}
       <div className="grid gap-4 grid-cols-1 xl:grid-cols-3">
         <DashboardSection title="My conflict alerts" className="xl:col-span-2">
           <DashboardTable

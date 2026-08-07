@@ -1,9 +1,7 @@
 import { useNavigate } from "react-router-dom"
 
-/**
- * Sidebar navigation for the supervisor shell. DashboardLayout reports the id
- * of the item that was activated; anything unrecognised is ignored.
- */
+// Sidebar navigation for the supervisor shell. DashboardLayout reports the id
+// of the item that was activated; anything unrecognised is ignored.
 export function useSupervisorNav() {
   const navigate = useNavigate()
   return (id) => {

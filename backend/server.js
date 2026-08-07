@@ -1,8 +1,6 @@
 // Process lifecycle: environment validation, connections, listening, shutdown.
-//
-// The request pipeline itself lives in src/app.js. Splitting the two lets the
-// assembled app be exercised without starting a listener or touching the
-// configured database; nothing about the pipeline changed in the move.
+// The request pipeline lives in src/app.js, so it can be exercised without
+// starting a listener or touching the configured database.
 
 const dotenv = require("dotenv")
 dotenv.config()
@@ -25,8 +23,8 @@ async function startServer() {
   try {
     await connectDB()
 
-    // Both are optional: without Redis the stream stays process-local, and
-    // without Brevo credentials the retry sweep has nothing to do.
+    // Both optional: no Redis keeps the stream process-local, no Brevo
+    // credentials leave the sweep inert.
     await connectRedis()
     await notificationStream.subscribeToRedis()
     emailRetryWorker.start()
@@ -43,13 +41,11 @@ async function startServer() {
 async function shutdown(signal) {
   logger.info("Shutdown signal received", { signal })
 
-  // Let an in-flight retry sweep finish so a send in progress is recorded
-  // rather than abandoned mid-flight.
+  // Let an in-flight sweep finish so a send in progress is recorded.
   await emailRetryWorker.stop()
 
-  // Open notification streams are long-lived by design; server.close() waits
-  // for every connection to end, so they have to be released first or shutdown
-  // never completes.
+  // server.close() waits for every connection to end, and streams are
+  // long-lived by design — release them first or shutdown never completes.
   notificationStream.closeAll()
 
   if (server) {

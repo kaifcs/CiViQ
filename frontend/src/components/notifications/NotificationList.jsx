@@ -1,12 +1,9 @@
 import AsyncState, { EmptyState } from '../AsyncState'
 import NotificationItem from './NotificationItem'
 
-/**
- * Loading / error / empty / list rendering for a set of notifications.
- *
- * Both the dropdown and the Notification Center render through this, so the
- * three async states stay identical between them.
- */
+// Loading / error / empty / list rendering for a set of notifications. Both the
+// dropdown and the Notification Center render through this, so their async
+// states stay identical.
 export default function NotificationList({
   notifications = [],
   loading,

@@ -2,12 +2,7 @@ import PopupCard from "./PopupCard"
 import { formatMapDate } from "../format"
 import { projectStatusColor, projectStatusLabel } from "../projectStyles"
 
-/**
- * Read-only project summary shown inside a map popup.
- *
- * Presentation only: every value arrives through `project`, it issues no
- * requests, holds no state and exposes no actions.
- */
+// Read-only project summary shown inside a map popup.
 export default function ProjectPopup({ project }) {
   if (!project) return null
 

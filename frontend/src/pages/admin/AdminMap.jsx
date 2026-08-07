@@ -25,8 +25,7 @@ const TYPE_CONFIG = {
   Other:      { dot: PROJECT_TYPE_COLORS.Other,      label: 'Other' },
 }
 
-// Covers all six backend statuses; completed and rescheduled previously had no
-// entry, so selecting such a project left the drawer badge unstyled.
+// Covers all six backend statuses, so no selection leaves the badge unstyled.
 const TYPE_BADGE = {
   Road:       'bg-[#FFF7ED] text-[#C2410C] dark:bg-[#1A0E05] dark:text-[#FB923C]',
   Water:      'bg-[#EFF6FF] text-[#1D4ED8] dark:bg-[#0A1220] dark:text-[#60A5FA]',
@@ -36,7 +35,6 @@ const TYPE_BADGE = {
   Other:      'bg-[#F8FAFC] text-[#475569] dark:bg-[#1A1F2B] dark:text-[#64748B]',
 }
 
-// ─── Filter Select ─────────────────────────────
 function FilterSelect({ label, value, onChange, options }) {
   return (
     <select
@@ -53,7 +51,6 @@ function FilterSelect({ label, value, onChange, options }) {
   )
 }
 
-// ─── Density Slider ────────────────────────────
 function DensitySlider({ label, value, onChange, limits, decimals = 0 }) {
   return (
     <label className="flex items-center gap-2">
@@ -74,7 +71,6 @@ function DensitySlider({ label, value, onChange, limits, decimals = 0 }) {
   )
 }
 
-// ─── Layer Toggle ──────────────────────────────
 function LayerToggle({ label, count, color, active, onClick, loading = false, failed = false }) {
   return (
     <button
@@ -99,7 +95,6 @@ function LayerToggle({ label, count, color, active, onClick, loading = false, fa
   )
 }
 
-// ─── Admin Map ─────────────────────────────────
 export default function AdminMap() {
   const navigate = useNavigate()
   const { data: projects, loading, error, reload } = useProjects()
@@ -245,10 +240,9 @@ export default function AdminMap() {
     ? (complaints || []).find(c => c.id === selectedComplaint)
     : null
 
-  // Auto fit spans whichever layers are switched on. The union is computed
-  // through the shared GIS service rather than by either layer, so neither one
-  // has to know the other exists.
-  // A conflict contributes both of its endpoints to the extent.
+  // Auto fit spans whichever layers are switched on, with a conflict
+  // contributing both endpoints. The union is computed through the shared GIS
+  // service, so neither layer has to know the other exists.
   const conflictPoints = useMemo(
     () => drawableConflicts.flatMap(c => [c.projectACoords, c.projectBCoords]),
     [drawableConflicts]
@@ -328,7 +322,6 @@ export default function AdminMap() {
     <AsyncState loading={loading} error={error} onRetry={reload} label="Loading map data...">
     <div className="flex flex-col gap-4 h-full" style={{ fontFamily: "'Inter', sans-serif" }}>
 
-      {/* ── Layer toggles + filters ── */}
       <div className="flex items-center gap-3 flex-shrink-0 flex-wrap">
         {/* Toggles are listed in render order: utilities underneath, complaints
             on top. See LAYER_PANES in gis/config.js. */}
@@ -525,12 +518,10 @@ export default function AdminMap() {
         </div>
       </div>
 
-      {/* ── Main: Map + Drawer ── */}
-      {/* Below lg the fixed 300px drawer column squeezed the map to zero width,
-          so narrow viewports stack instead. */}
+      {/* Narrow viewports stack: below lg the fixed 300px drawer column would
+          squeeze the map to zero width. */}
       <div className="flex-1 min-h-0 grid gap-4 grid-cols-1 lg:grid-cols-[1fr_300px]">
 
-        {/* ── Map ── */}
         <div
           className="rounded-[8px] bg-[#F8FAFC] dark:bg-[#18181B] border border-[#E5E5E5] dark:border-[#27272A] flex flex-col overflow-hidden"
           style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}
@@ -621,9 +612,6 @@ export default function AdminMap() {
               </div>
             )}
 
-            {/* The utility layer draws stored geometry only. When utility works
-                exist but none carry geometry there is nothing to draw, and
-                saying so is clearer than an apparently broken layer. */}
             {/* Density needs coordinates; a source with none renders an empty
                 surface, which is indistinguishable from a broken layer. */}
             {showHeatmap && heatRecords.length > 0 && heatPlottable.length === 0 && (
@@ -644,6 +632,8 @@ export default function AdminMap() {
               </div>
             )}
 
+            {/* Utility works that carry no stored geometry cannot be drawn;
+                saying so beats an apparently broken layer. */}
             {showUtilities && utilityAssets.length > 0 && renderableUtilities.length === 0 && (
               <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[500]">
                 <span className="text-[11px] text-[#92400E] dark:text-[#FACC15] bg-[#FFFBEB] dark:bg-[#181305] px-3 py-1 rounded-full border border-[#FDE68A] dark:border-[#3F2D05]">
@@ -653,7 +643,6 @@ export default function AdminMap() {
             )}
           </div>
 
-          {/* Legend bar */}
           <div className="flex-shrink-0 border-t border-[#E5E5E5] dark:border-[#27272A] px-5 py-3 flex items-center gap-5 flex-wrap bg-[#FFFFFF] dark:bg-[#1C1C1F]">
             <span className="text-[11px] font-semibold text-[#9CA3AF] dark:text-[#6B7280] uppercase tracking-wide">Legend</span>
             {showUtilities && Object.entries(utilityStyles.UTILITY_TYPES).map(([type, cfg]) => (
@@ -708,13 +697,11 @@ export default function AdminMap() {
           </div>
         </div>
 
-        {/* ── Right drawer panel ── */}
         <div
           className="rounded-[8px] bg-[#FFFFFF] dark:bg-[#1C1C1F] border border-[#E5E5E5] dark:border-[#27272A] flex flex-col overflow-hidden"
           style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}
         >
           {!selected ? (
-            /* ── Empty state — no marker selected ── */
             <div className="flex-1 flex flex-col items-center justify-center px-6 text-center gap-3">
               <div className="w-12 h-12 rounded-full bg-[#F8FAFC] dark:bg-[#18181B] border border-[#E5E5E5] dark:border-[#27272A] flex items-center justify-center">
                 <svg width="20" height="20" fill="none" viewBox="0 0 24 24" className="text-[#D1D5DB] dark:text-[#374151]" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -732,9 +719,7 @@ export default function AdminMap() {
               </p>
             </div>
           ) : (
-            /* ── Selected project info ── */
             <div className="flex flex-col h-full">
-              {/* Header */}
               <div className="flex-shrink-0 px-4 py-3 border-b border-[#E5E5E5] dark:border-[#27272A] flex items-center justify-between">
                 <p className="text-[11px] font-semibold text-[#6B7280] dark:text-[#9CA3AF] uppercase tracking-[0.06em]">
                   Project details
@@ -749,9 +734,7 @@ export default function AdminMap() {
                 </button>
               </div>
 
-              {/* Content */}
               <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
-                {/* Type dot + title */}
                 <div className="flex items-start gap-2.5">
                   <div className="w-3 h-3 rounded-full flex-shrink-0 mt-1" style={{ backgroundColor: selectedType?.dot || '#6B7280' }} />
                   <h3 className="text-[14px] font-semibold text-[#0F172A] dark:text-[#F8FAFC] leading-snug">
@@ -759,7 +742,6 @@ export default function AdminMap() {
                   </h3>
                 </div>
 
-                {/* Badges */}
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className={`inline-flex items-center text-[11px] font-medium px-2 py-0.5 rounded-full ${DEPT_STYLES[selected.department] || DEPT_STYLES.PWD}`}>
                     {selected.department}
@@ -773,7 +755,6 @@ export default function AdminMap() {
                   </span>
                 </div>
 
-                {/* Info rows */}
                 <div className="flex flex-col">
                   {[
                     { label: 'Ward',        value: selected.ward },
@@ -789,7 +770,6 @@ export default function AdminMap() {
                   ))}
                 </div>
 
-                {/* Clash warning */}
                 {selected.hasClash && (
                   <div className="flex items-center gap-2 px-3 py-2 rounded-[6px] bg-[#FEF2F2] dark:bg-[#1F0A0A] border border-[#FECACA] dark:border-[#7F1D1D]">
                     <div className="w-1.5 h-1.5 rounded-full bg-[#DC2626] flex-shrink-0" style={{ animation: 'civiq-pulse 1.5s ease-in-out infinite' }} />
@@ -798,7 +778,6 @@ export default function AdminMap() {
                 )}
               </div>
 
-              {/* Footer — link to detail */}
               <div className="flex-shrink-0 p-4 border-t border-[#E5E5E5] dark:border-[#27272A]">
                 <button
                   onClick={() => navigate(`/admin/projects/${selected.id}`)}

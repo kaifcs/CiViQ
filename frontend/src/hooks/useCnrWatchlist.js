@@ -2,15 +2,9 @@ import { useCallback, useState } from "react"
 
 const KEY = "civiq_cnr_watchlist"
 
-/**
- * Device-local list of CNR ids a citizen has filed or is following.
- *
- * Complaints carry no reporter reference on the backend and POST /complaints is
- * anonymous, so there is no server-side way to answer "my complaints". The CNR
- * is the receipt the citizen is given, and this keeps that receipt on their
- * device. Nothing here is authoritative — resolution always goes through the
- * real complaint API.
- */
+// Device-local list of CNR ids a citizen has filed or is following. Complaints
+// carry no reporter reference and POST /complaints is anonymous, so the CNR
+// receipt held on the device is the only way to answer "my complaints".
 export function useCnrWatchlist() {
   const [cnrs, setCnrs] = useState(() => read())
 
@@ -37,7 +31,7 @@ export function useCnrWatchlist() {
   return { cnrs, add, remove }
 }
 
-/** CNR ids are issued as CNR-100001; accept a bare number too. */
+// CNR ids are issued as CNR-100001; accept a bare number too.
 export function normalise(raw) {
   const value = String(raw || "").trim().toUpperCase()
   if (!value) return null

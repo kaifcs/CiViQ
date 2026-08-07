@@ -1,7 +1,5 @@
-// Project register across all departments.
-//
-// Unscoped: an administrator sees every project. Officers see the same screen
-// shape through OfficerProjects, but the backend narrows the list to their own.
+// Project register across all departments. Unscoped: an administrator sees every
+// project, where OfficerProjects shows the same shape narrowed by the backend.
 
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -10,8 +8,6 @@ import AsyncState from '../../components/AsyncState'
 import { DEPT_STYLES, PROJECT_STATUS_CONFIG, TYPE_STYLES } from '../../components/uiStyles'
 import { formatDate } from '../../components/dashboard'
 
-// ─── Helpers ───────────────────────────────────
-// Measured against the real clock. The status exclusions below are unchanged.
 function isThisMonth(dateStr) {
   const d = new Date(dateStr)
   const now = new Date()
@@ -31,7 +27,6 @@ function isOverdue(project) {
   return end < new Date() && project.status !== 'rejected' && project.status !== 'approved'
 }
 
-// ─── Small components ──────────────────────────
 function Badge({ label, className }) {
   return (
     <span className={`inline-flex items-center text-[12px] font-medium px-2.5 py-1 rounded-full ${className}`}>
@@ -66,7 +61,6 @@ const SearchIcon = () => (
   </svg>
 )
 
-// ─── Filter Select — fixed min-width ───────────
 function FilterSelect({ label, value, onChange, options }) {
   return (
     <select
@@ -83,7 +77,6 @@ function FilterSelect({ label, value, onChange, options }) {
   )
 }
 
-// ─── Project Card ──────────────────────────────
 function ProjectCard({ project, onClick }) {
   return (
     <div
@@ -91,7 +84,6 @@ function ProjectCard({ project, onClick }) {
       className="flex items-center gap-5 px-5 py-4 bg-[#FFFFFF] dark:bg-[#1C1C1F] border border-[#E5E5E5] dark:border-[#27272A] rounded-[8px] cursor-pointer transition-all hover:border-[#5E6AD2]/40 dark:hover:border-[#5E6AD2]/40 hover:bg-[#FAFAFA] dark:hover:bg-[#252529]"
       style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}
     >
-      {/* LEFT: Title + meta tags */}
       <div className="flex-1 min-w-0">
         {(project.hasClash || project.phase === 'phased') && (
           <div className="flex items-center gap-2 mb-1.5">
@@ -122,24 +114,19 @@ function ProjectCard({ project, onClick }) {
         </p>
       </div>
 
-      {/* MIDDLE-LEFT: Dept + Type badges */}
       <div className="flex items-center gap-2 flex-shrink-0">
         <Badge label={project.department} className={DEPT_STYLES[project.department] || DEPT_STYLES.PWD} />
         <Badge label={project.type}       className={TYPE_STYLES[project.type] || TYPE_STYLES.Other} />
       </div>
 
-      {/* DIVIDER */}
       <div className="w-px h-8 bg-[#E5E5E5] dark:bg-[#27272A] flex-shrink-0" />
 
-      {/* MIDDLE-RIGHT: Status — standalone, prominent */}
       <div className="flex-shrink-0 w-[110px] flex justify-center">
         <StatusBadge status={project.status} />
       </div>
 
-      {/* DIVIDER */}
       <div className="w-px h-8 bg-[#E5E5E5] dark:bg-[#27272A] flex-shrink-0" />
 
-      {/* RIGHT: Timeline + Ward + MCDM + chevron */}
       <div className="flex items-center gap-6 flex-shrink-0">
         <div className="flex flex-col items-end gap-0.5">
           <span className="text-[11px] font-semibold text-[#9CA3AF] dark:text-[#6B7280] uppercase tracking-wide">Timeline</span>
@@ -161,7 +148,6 @@ function ProjectCard({ project, onClick }) {
   )
 }
 
-// ─── Admin Projects List ───────────────────────
 export default function AdminProjects() {
   const navigate = useNavigate()
   const { data: projects, loading, error, reload } = useProjects()
@@ -202,7 +188,6 @@ export default function AdminProjects() {
     <AsyncState loading={loading} error={error} onRetry={reload} label="Loading projects...">
     <div className="flex flex-col gap-4 h-full" style={{ fontFamily: "'Inter', sans-serif" }}>
 
-      {/* ── Search + Filters ── */}
       <div className="flex flex-col gap-3 flex-shrink-0">
         <div className="relative flex items-center">
           <span className="absolute left-3 text-[#9CA3AF] pointer-events-none flex items-center">
@@ -271,7 +256,6 @@ export default function AdminProjects() {
         </div>
       </div>
 
-      {/* ── Project list ── */}
       <div className="flex flex-col gap-2 flex-1 overflow-y-auto">
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">

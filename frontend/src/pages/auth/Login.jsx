@@ -1,14 +1,11 @@
-// Sign-in screen.
-//
-// The backend returns one message for both an unknown email and a wrong
-// password, so nothing here can distinguish them either — that is deliberate.
+// Sign-in screen. The backend returns one message for both an unknown email and
+// a wrong password, so nothing here can distinguish them either.
 
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { USER_KEY } from '../../services'
 
-// ─── CIVIQ Logo Icon ───────────────────────────
 const LOGO_SIZE = 34
 
 function CiviqLogo({ size = LOGO_SIZE, dark = false }) {
@@ -32,7 +29,6 @@ function CiviqLogo({ size = LOGO_SIZE, dark = false }) {
   )
 }
 
-// ─── Logo Wordmark ─────────────────────────────
 function LogoWordmark({ size = LOGO_SIZE, dark = false }) {
   const textColor = dark ? '#FFFFFF' : '#0D2145'
   return (
@@ -54,7 +50,6 @@ function LogoWordmark({ size = LOGO_SIZE, dark = false }) {
   )
 }
 
-// ─── Eye Icons ─────────────────────────────────
 const EyeIcon = () => (
   <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round">
     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
@@ -69,7 +64,6 @@ const EyeOffIcon = () => (
   </svg>
 )
 
-// ─── Spinner ───────────────────────────────────
 const Spinner = () => (
   <svg width="16" height="16" viewBox="0 0 14 14" fill="none" className="animate-spin">
     <circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeOpacity="0.25" strokeWidth="1.5"/>
@@ -77,7 +71,6 @@ const Spinner = () => (
   </svg>
 )
 
-// ─── City Grid Background ──────────────────────
 function CityGrid() {
   return (
     <svg
@@ -103,7 +96,6 @@ function CityGrid() {
   )
 }
 
-// ─── Login Page ────────────────────────────────
 export default function Login() {
   const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
@@ -170,7 +162,6 @@ const handleSubmit = async () => {
   return (
     <div style={{ display: 'flex', height: '100vh', width: '100vw', overflow: 'hidden', fontFamily: "'Inter', sans-serif" }}>
 
-      {/* ── LEFT PANEL ─────────────────────────── */}
       <div style={{
         width: '42%',
         flexShrink: 0,
@@ -182,13 +173,11 @@ const handleSubmit = async () => {
       }}>
         <CityGrid />
 
-        {/* Logo */}
         <div style={{ position: 'relative', zIndex: 10, display: 'flex', alignItems: 'center', gap: '12px', padding: '44px 52px 0' }}>
           <CiviqLogo size={LOGO_SIZE} dark={true} />
           <LogoWordmark size={LOGO_SIZE} dark={true} />
         </div>
 
-        {/* Center */}
         <div style={{ position: 'relative', zIndex: 10, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 52px' }}>
 
           <div style={{ marginBottom: '24px' }}>
@@ -228,13 +217,8 @@ const handleSubmit = async () => {
             The infrastructure coordination platform that stops city departments from digging up the same road twice.
           </p>
 
-          {/* The three figures that used to sit here (8 departments, 33 screens,
-              100% clash detection) were invented. Login is unauthenticated and
-              every count endpoint requires a token, so there is no honest
-              source for them on this screen. */}
         </div>
 
-        {/* Footer */}
         <div style={{ position: 'relative', zIndex: 10, padding: '0 52px 40px' }}>
           <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.2)', margin: 0 }}>
             © 2025 CIVIQ · Ghaziabad Municipal Corporation
@@ -242,7 +226,6 @@ const handleSubmit = async () => {
         </div>
       </div>
 
-      {/* ── RIGHT PANEL ────────────────────────── */}
       <div style={{
         flex: 1,
         backgroundColor: '#FFFFFF',
@@ -254,7 +237,6 @@ const handleSubmit = async () => {
       }}>
         <div style={{ width: '100%', maxWidth: '400px' }}>
 
-          {/* Heading */}
           <div style={{ marginBottom: '44px' }}>
             <h2 style={{
               fontSize: '28px',
@@ -271,10 +253,8 @@ const handleSubmit = async () => {
             </p>
           </div>
 
-          {/* Form */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
 
-            {/* Email */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <label htmlFor="email" style={{ fontSize: '14px', fontWeight: 600, color: '#0F172A', lineHeight: 1 }}>
                 Work Email
@@ -293,7 +273,6 @@ const handleSubmit = async () => {
               />
             </div>
 
-            {/* Password */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <label htmlFor="password" style={{ fontSize: '14px', fontWeight: 600, color: '#0F172A', lineHeight: 1 }}>
                 Password
@@ -326,7 +305,6 @@ const handleSubmit = async () => {
               </div>
             </div>
 
-            {/* Error */}
             {error && (
               <div style={{
                 display: 'flex', alignItems: 'center', gap: '10px',
@@ -342,7 +320,6 @@ const handleSubmit = async () => {
               </div>
             )}
 
-            {/* Sign in button */}
             <button
               type="button"
               onClick={handleSubmit}
@@ -369,7 +346,6 @@ const handleSubmit = async () => {
 
           </div>
 
-          {/* Help text */}
           <p style={{ textAlign: 'center', fontSize: '13px', color: '#9CA3AF', marginTop: '36px', lineHeight: 1.6 }}>
             Having trouble signing in?{' '}
             <span style={{ color: '#6B7280', fontWeight: 500 }}>Contact your system administrator.</span>

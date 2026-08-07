@@ -1,13 +1,6 @@
-// Adapters — the backend/frontend contract boundary.
-//
-// Every screen reads adapted view models, so these functions are where a
-// backend field rename becomes a blank panel instead of a crash. Two rules are
-// load-bearing and both are covered here:
-//
-//   • Nothing is fabricated. A field with no backend source is null or false,
-//     never an invented value — the standing "zero hardcoded business data" rule.
-//   • A redacted project reference (S2.5) degrades to "details unavailable"
-//     rather than breaking the conflict screens.
+// Adapters — the backend/frontend contract boundary. Every screen reads adapted
+// view models, so a field with no backend source must stay null or false, and a
+// redacted project reference must degrade to "details unavailable".
 
 import test from "node:test"
 import assert from "node:assert/strict"
@@ -83,13 +76,9 @@ test("fields with no backend source are declared and emitted as null", () => {
   }
 })
 
-// PUT /api/projects/:id/progress answers with an UNPOPULATED project — unlike
-// GET /api/projects/:id it populates neither officer, supervisor nor
-// department. SupervisorTaskDetail therefore merges only the three fields that
-// endpoint owns into the project it already loaded, instead of replacing the
-// record wholesale. This pins the asymmetry that makes the merge necessary: if
-// the endpoint ever starts populating, this test fails and the merge can be
-// simplified deliberately rather than left in place by inertia.
+// PUT /api/projects/:id/progress answers with an unpopulated project, unlike GET
+// /api/projects/:id. SupervisorTaskDetail merges only the fields that endpoint
+// owns; this pins the asymmetry that makes the merge necessary.
 test("an unpopulated project reference yields no officer name (progress response shape)", () => {
   const populated = adaptProject(
     { _id: "p1", title: "T", officer: { _id: "u1", fullName: "Amit Sharma" }, department: "d1" },
@@ -130,9 +119,9 @@ test("an unknown conflict status falls back rather than rendering blank", () => 
   assert.equal(adapted.severity, "medium")
 })
 
-// Regression — S2.5. When a viewer is not authorized to see one side of a
-// conflict, the backend collapses that project to a bare id. The adapter must
-// keep the conflict coherent and report the details as unavailable.
+// When a viewer is not authorized to see one side of a conflict, the backend
+// collapses that project to a bare id. The adapter must keep the conflict
+// coherent and report the details as unavailable.
 test("regression: a redacted project reference degrades to details-unavailable (S2.5)", () => {
   const conflict = {
     _id: "c1",

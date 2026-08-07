@@ -47,16 +47,9 @@ export const DEFAULT_MAP_OPTIONS = {
 // edge of the extent is not clipped by the viewport border.
 export const FIT_BOUNDS_PADDING = [24, 24]
 
-/**
- * Deterministic stacking order for GIS layers, expressed as Leaflet panes.
- *
- * Layers name a pane instead of setting z-index at the call site, so the order
- * is decided here alone. Values sit between Leaflet's overlayPane (400) and
- * shadowPane (500); popups and tooltips keep their own higher panes.
- *
- * Ordered least to most specific: broad network geometry underneath, individual
- * citizen reports on top.
- */
+// Deterministic stacking order for GIS layers, expressed as Leaflet panes.
+// Layers name a pane instead of setting z-index at the call site. Values sit
+// between Leaflet's overlayPane (400) and shadowPane (500).
 export const LAYER_PANES = {
   utility: { name: "civiq-utility", zIndex: 410 },
   department: { name: "civiq-department", zIndex: 420 },

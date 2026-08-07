@@ -1,12 +1,6 @@
-// Regression — F-8. Notification links were role-namespaced path literals baked
-// into the producers: every project link was written under /officer and the
-// supervisor assignment pointed at /supervisor/dashboard. A notification is
-// addressed to one recipient, so a path built for the wrong role is refused by
-// the client router, which redirects to that role's own dashboard instead of the
-// record the notification is about.
-//
-// The mapping is pure, so it is asserted here without a database. The role
-// LOOKUP that feeds it is covered over HTTP in the integration suite.
+// A notification is addressed to one recipient, so a path built for the wrong
+// role is refused by the client router. The mapping is pure and asserted here;
+// the role lookup that feeds it is covered over HTTP in the integration suite.
 
 const test = require("node:test")
 const assert = require("node:assert/strict")
@@ -60,8 +54,7 @@ test("an unresolvable destination yields no link rather than a malformed path", 
 })
 
 // The map exists to mirror the client router. A path that no route matches is
-// the exact defect F-8 records, so it is checked against the router itself
-// rather than against a list restated here.
+// checked against the router itself rather than a list restated here.
 test("every mapped path matches a route the frontend actually registers", () => {
   const router = readFileSync(
     join(__dirname, "..", "..", "..", "frontend", "src", "router", "AppRouter.jsx"),

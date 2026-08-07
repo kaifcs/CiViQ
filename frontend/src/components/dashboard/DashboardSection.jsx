@@ -1,10 +1,6 @@
-/**
- * Titled panel used by every dashboard widget.
- *
- * Replaces the per-page card + section-label pair that each dashboard was
- * redefining locally, so spacing, border and label treatment stay identical
- * across the admin, officer, supervisor and citizen dashboards.
- */
+// Titled panel used by every dashboard widget, so spacing, border and label
+// treatment stay identical across the admin, officer, supervisor and citizen
+// dashboards.
 export default function DashboardSection({ title, action, children, className = '', bodyClassName = '' }) {
   return (
     <div
@@ -18,8 +14,7 @@ export default function DashboardSection({ title, action, children, className = 
     >
       {(title || action) && (
         <div className="flex items-center justify-between gap-3 mb-4 flex-shrink-0">
-          {/* A real heading so screen readers can navigate between widgets;
-              styling is unchanged from the paragraph it replaces. */}
+          {/* A real heading so screen readers can navigate between widgets. */}
           {title && (
             <h2 className="text-[12px] font-semibold text-[#6B7280] dark:text-[#9CA3AF] uppercase tracking-[0.06em]">
               {title}

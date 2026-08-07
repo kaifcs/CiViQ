@@ -2,12 +2,7 @@ import PopupCard from "./PopupCard"
 import { projectStatusColor, projectStatusLabel } from "../projectStyles"
 import { departmentColor } from "../departmentStyles"
 
-/**
- * Read-only summary of a department-owned asset.
- *
- * Presentation only: every value arrives through props, it issues no requests,
- * holds no state, performs no navigation and exposes no actions.
- */
+// Read-only summary of a department-owned asset shown inside a map popup.
 export default function DepartmentPopup({ record, colorIndex }) {
   if (!record) return null
 

@@ -1,9 +1,6 @@
-// S1 — the standardized error envelope.
-//
-// These lock the shape every consumer reads. The envelope was unified in S1 on
-// the promise that both historical shapes stay subsets of it, so the duplicated
-// top-level `message` is asserted deliberately: dropping it would silently break
-// consumers that never migrated to `error.code`.
+// The standardised error envelope. The duplicated top-level `message` is
+// asserted deliberately: dropping it would break consumers that never migrated
+// to `error.code`.
 
 const test = require("node:test")
 const assert = require("node:assert/strict")
@@ -56,10 +53,9 @@ test("invalidId labels the resource", () => {
   assert.match(res.body.message, /project/i)
 })
 
-// Regression — S1. The 409 helper is named `conflictError`, not `conflict`,
-// because the conflicts controller holds a local `conflict` document that a
-// bare `conflict` import would shadow. That shadowing produced a runtime
-// TypeError no linter could see, so the name is part of the contract.
+// The 409 helper is named `conflictError` because the conflicts controller
+// holds a local `conflict` document a bare import would shadow — a runtime
+// TypeError no linter can see, so the name is part of the contract.
 test("regression: the 409 helper is exported as conflictError, not conflict", () => {
   const api = require("../../src/utils/apiResponse")
   assert.equal(typeof api.conflictError, "function")

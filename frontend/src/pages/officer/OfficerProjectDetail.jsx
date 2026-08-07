@@ -38,9 +38,7 @@ export default function OfficerProjectDetail() {
   const navigate = useNavigate()
   const { data: project, loading, error, reload } = useProject(id)
   const { data: conflicts } = useConflicts()
-  // Supervisors derived from the officer's accessible projects.
   const { supervisors } = useAssignableSupervisors()
-  // Local state for supervisor assignment.
   const [supervisorId, setSupervisorId] = useState('')
   const [seededFor, setSeededFor] = useState(null)
   if (project && project.id !== seededFor) {
@@ -70,22 +68,19 @@ export default function OfficerProjectDetail() {
       await projectsApi.update(id, { supervisor: supervisorId })
       setSupervisorSaved(true)
     } catch (err) {
-      // The select stays open so the officer can retry, but the reason is
-      // reported rather than swallowed — the backend refuses the write outright
-      // on finished work, and a silently inert button reads as a broken page.
+      // The select stays open so the officer can retry, with the reason shown:
+      // the backend refuses the write outright on finished work.
       setAssignError(normaliseError(err).message)
     }
   }
 
   return (
     <div className="flex flex-col gap-5" style={{ fontFamily: "'Inter', sans-serif" }}>
-      {/* Back */}
       <button onClick={() => navigate('/officer/projects')} className="flex items-center gap-1.5 text-[13px] text-[#6B7280] dark:text-[#9CA3AF] hover:text-[#0F172A] dark:hover:text-[#F8FAFC] transition-colors w-fit">
         <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
         Back to Projects
       </button>
 
-      {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-2.5">
@@ -105,7 +100,6 @@ export default function OfficerProjectDetail() {
           <h1 className="text-[22px] font-bold text-[#0F172A] dark:text-[#F8FAFC] leading-snug">{project.title}</h1>
           <p className="text-[13px] text-[#6B7280] dark:text-[#9CA3AF] mt-1">{project.departmentFull}</p>
         </div>
-        {/* Officer actions */}
         <div className="flex items-center gap-2 flex-shrink-0 mt-1">
           {project.status === 'pending' && (
             <button onClick={() => navigate(`/officer/projects/new`)}
@@ -123,7 +117,6 @@ export default function OfficerProjectDetail() {
         </div>
       </div>
 
-      {/* Clash alert */}
       {clash && (
         <div onClick={() => navigate(`/officer/conflicts/${clash.id}`)}
           className="flex items-center gap-3 px-4 py-3 rounded-[8px] bg-[#FEF2F2] dark:bg-[#1F0A0A] border border-[#FECACA] dark:border-[#7F1D1D] cursor-pointer hover:border-[#DC2626]/60 transition-colors">
@@ -136,7 +129,6 @@ export default function OfficerProjectDetail() {
         </div>
       )}
 
-      {/* Rejection info */}
       {project.status === 'rejected' && project.rejectionReason && (
         <div className="flex items-start gap-3 px-4 py-3 rounded-[8px] bg-[#FFFBEB] dark:bg-[#181305] border border-[#FCD34D] dark:border-[#854F0B]">
           <svg width="15" height="15" fill="none" viewBox="0 0 24 24" className="text-[#D97706] flex-shrink-0 mt-0.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
@@ -148,7 +140,6 @@ export default function OfficerProjectDetail() {
         </div>
       )}
 
-      {/* ROW 1: MCDM + Map */}
       <div className="grid gap-4" style={{ gridTemplateColumns: '3fr 2fr' }}>
         <Card className="p-5">
           <SectionLabel>MCDM priority score</SectionLabel>
@@ -184,7 +175,6 @@ export default function OfficerProjectDetail() {
         </Card>
       </div>
 
-      {/* ROW 2: Project info full width */}
       <Card className="p-5">
         <SectionLabel>Project information</SectionLabel>
         <div className="mb-4 pb-4 border-b border-[#F3F4F6] dark:border-[#27272A]">
@@ -204,7 +194,6 @@ export default function OfficerProjectDetail() {
             <InfoRow label="Contractor"    value={project.contractorName ? `${project.contractorName} · ${project.contractorFirm}` : '—'} />
             <InfoRow label="Ward"          value={project.ward} />
             <InfoRow label="Zone"          value={project.zone} />
-            {/* Assign supervisor */}
             <div className="flex items-start justify-between py-2.5 border-b border-[#F3F4F6] dark:border-[#27272A] last:border-0">
               <span className="text-[13px] text-[#6B7280] dark:text-[#9CA3AF] w-40 flex-shrink-0">Supervisor</span>
               <div className="flex items-center gap-2">
@@ -219,7 +208,6 @@ export default function OfficerProjectDetail() {
                     {project.supervisorName || '—'}
                   </span>
                 ) : supervisors.length === 0 ? (
-                  // Show a helpful message when no assignable supervisors are available.
                   <span className="text-[12px] text-[#9CA3AF] dark:text-[#6B7280] text-right max-w-[220px]">
                     {project.supervisorName
                       ? project.supervisorName
@@ -250,7 +238,7 @@ export default function OfficerProjectDetail() {
         </div>
       </Card>
 
-      {/* ROW 3: Audit trail — administrator-only.*/}
+      {/* The audit trail is administrator-only. */}
       <Card className="p-5">
         <SectionLabel>Audit trail</SectionLabel>
         <p className="text-[13px] text-[#9CA3AF] dark:text-[#6B7280] text-center py-4">

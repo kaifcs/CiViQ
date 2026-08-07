@@ -1,12 +1,6 @@
-/**
- * Shared filter bar for dashboards that read the analytics endpoints.
- *
- * Presentation only: it renders the controls and reports changes upward. The
- * owning page holds the filter state and passes it to the data hooks, so every
- * widget on that page moves together.
- *
- * `fields` is [{ key, label, type: 'select' | 'date', options? }].
- */
+// Shared filter bar for dashboards reading the analytics endpoints. Presentation
+// only: the owning page holds the filter state, so every widget on it moves
+// together. `fields` is [{ key, label, type: 'select' | 'date', options? }].
 export default function DashboardFilters({ fields = [], values = {}, onChange, onReset }) {
   const active = fields.some((f) => values[f.key])
 

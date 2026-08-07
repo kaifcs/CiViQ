@@ -1,7 +1,5 @@
-// N4 — the SSE hub.
-//
-// Transport only: who is connected, who receives an event, and — the part that
-// actually broke during N4 — whether a released connection lets go of its timer.
+// The SSE hub. Transport only: who is connected, who receives an event, and
+// whether a released connection lets go of its heartbeat timer.
 
 const test = require("node:test")
 const assert = require("node:assert/strict")
@@ -106,17 +104,9 @@ test("id is omitted from the frame when none is supplied", () => {
   assert.doesNotMatch(frame, /^id: /m)
 })
 
-// Regression — N4.
-//
-// closeAll() originally ended each response directly instead of going through
-// the connection's own teardown, so heartbeat intervals were never cleared. The
-// timers held the event loop open and the unit test process hung until it was
-// killed (exit 124). The fix routes shutdown through the same cleanup a client
-// disconnect uses.
-//
-// The observable guarantee is asserted two ways: the hub empties, and the
-// process is left with no timer that would keep it alive — which is what the
-// clean exit of this very file demonstrates.
+// Shutdown must route through each connection's own teardown, or heartbeat
+// intervals survive and hold the event loop open. Asserted two ways: the hub
+// empties, and this file's own clean exit shows no timer was left behind.
 test("regression: closeAll releases connections through their own teardown (N4 timer leak)", () => {
   const recipients = [oid(), oid(), oid()]
   const all = recipients.flatMap((r) => [connect(r), connect(r)])

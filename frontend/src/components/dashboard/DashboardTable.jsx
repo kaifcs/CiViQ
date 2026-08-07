@@ -1,19 +1,9 @@
 import { useMemo, useState } from 'react'
 import { LoadingState, ErrorState, EmptyState } from '../AsyncState'
 
-/**
- * Compact table for dashboard widgets, with the loading / error / empty states
- * every dashboard needs. Reuses the shared AsyncState primitives rather than
- * introducing a second set.
- *
- * `columns` is [{ key, header, render?, className?, width?, sortable?, sortValue? }].
- * `render(row)` lets callers supply badges or formatted cells without this
- * component learning any domain vocabulary; `sortValue(row)` supplies the
- * comparable value when the displayed cell is not itself sortable.
- *
- * Sorting is opt-in per column — a table with no sortable column behaves
- * exactly as before.
- */
+// Compact table for dashboard widgets, rendered through the shared AsyncState
+// primitives. `columns` is [{ key, header, render?, className?, width?,
+// sortable?, sortValue? }]; `render` keeps domain vocabulary out of here.
 export default function DashboardTable({
   columns = [],
   rows = [],

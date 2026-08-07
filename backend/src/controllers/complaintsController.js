@@ -1,12 +1,6 @@
-// Citizen complaint intake and handling.
-//
-// Complaints have no ownership filter: unlike projects, any authenticated
-// staff member may see any complaint, because triage depends on whoever is
-// available rather than on who owns the record. Assignment is therefore an
-// operational routing decision, not an access control one.
-//
-// Writable fields are whitelisted rather than blacklisted, so a field added to
-// the schema later is not client-writable by accident.
+// Citizen complaint intake and handling. There is no ownership filter: triage
+// depends on whoever is available, so assignment is an operational routing
+// decision rather than an access control one.
 
 const mongoose = require("mongoose")
 const Complaint = require("../models/Complaint")
@@ -22,31 +16,16 @@ const { ERROR_CODES, badRequest, notFound, sendWriteError, serverError } = requi
 const COMPLAINT_STATUSES = Complaint.schema.path("status").enumValues
 const ISSUE_TYPES = Complaint.schema.path("issueType").enumValues
 
-// Ceiling on an unpaginated read, as the audit trail already applies. This is
-// the one PUBLIC list in the API, so without it an anonymous caller could pull
-// the whole collection in a single request — and the payload would keep growing
-// with the collection for ever. Callers that need more page through ?page/?limit;
-// callers that need city-wide figures use GET /stats, which counts in the
-// database instead of shipping the rows.
+// This is the one public list in the API, so an unpaginated read is capped.
+// Callers needing more page through; callers needing totals use GET /stats.
 const MAX_UNPAGINATED = 200
 
-// Filters GET /stats will honour. See getComplaintStats for why `department`
-// is not among them.
+// Filters GET /stats honours; `department` is deliberately absent.
 const PUBLIC_STAT_FILTERS = ["from", "to", "ward", "status", "complaintStatus"]
 
-// What a REPORTER may supply. POST /api/complaints carries no `protect` — it is
-// the public intake a resident uses without an account — so this list is
-// reachable by anybody on the internet and holds only the description of the
-// problem itself.
-//
-// `status`, `assignedDepartment` and `assignedOfficer` are deliberately absent.
-// They are workflow state the server owns: a complaint always begins at the
-// schema default of "submitted" and unassigned, and only the role-gated
-// PATCH /:id/status and PATCH /:id/assign move them from there. They were
-// previously in the one shared list below, so an unauthenticated caller could
-// file a complaint already marked resolved and already attributed to a named
-// officer — which fabricated the resolution counts and average resolution time
-// reported on both the public citizen page and the admin dashboard.
+// What a REPORTER may supply. The public intake is reachable by anybody, so
+// workflow state is absent: a complaint always begins "submitted" and
+// unassigned, and only the role-gated PATCH routes move it from there.
 const CREATE_WRITABLE_FIELDS = [
   "issueType",
   "description",
@@ -54,9 +33,7 @@ const CREATE_WRITABLE_FIELDS = [
   "photoUrl",
 ]
 
-// What a role-gated update may write: everything a reporter may supply, plus the
-// workflow state. PUT /:id is restricted to admin, officer and supervisor, so
-// this list is only ever reached by an authenticated staff member.
+// What a role-gated update may write: the reporter fields plus workflow state.
 const WRITABLE_FIELDS = [
   ...CREATE_WRITABLE_FIELDS,
   "status",
@@ -69,8 +46,6 @@ function escapeRegex(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 }
 
-// Binds this module's field list to the shared whitelist helper, so complaints
-// and projects apply the one implementation rather than a copy each.
 const pickWritable = (body) => pickFields(body, WRITABLE_FIELDS)
 
 async function validateAssignmentRefs({ assignedDepartment, assignedOfficer }) {
@@ -79,11 +54,8 @@ async function validateAssignmentRefs({ assignedDepartment, assignedOfficer }) {
     if (err) return err
   }
   if (assignedOfficer !== undefined && assignedOfficer !== null && assignedOfficer !== "") {
-    // Staff only. Admin, officer and supervisor can all move a complaint's
-    // status, so any of them is a legitimate assignee; a citizen is not. A
-    // citizen assignee could not act on the complaint at all, and the
-    // assignment notification — which quotes the CNR and issue type — would be
-    // delivered to a member of the public.
+    // Staff only: a citizen assignee could not act on the complaint, and the
+    // assignment notification quotes the CNR and issue type.
     const err = await validateUserRef(assignedOfficer, "assigned officer", STAFF_ROLES)
     if (err) return err
   }
@@ -96,10 +68,8 @@ exports.getComplaints = async (req, res) => {
     const { status, department, assignedOfficer, issueType, from, to, search } = req.query
     const filter = {}
 
-    // Express parses ?status[$ne]=x into an OBJECT, which would reach the query
-    // as a Mongo operator. Each scalar filter is therefore validated or coerced
-    // before use: the two enum fields against the same lists the write path
-    // already checks, and the rest to a plain string.
+    // Express parses ?status[$ne]=x into an object, which would reach the query
+    // as a Mongo operator, so every scalar filter is validated or coerced first.
     if (status) {
       if (!COMPLAINT_STATUSES.includes(status)) {
         return badRequest(res, `status must be one of: ${COMPLAINT_STATUSES.join(", ")}`)
@@ -147,8 +117,7 @@ exports.getComplaints = async (req, res) => {
     let q = Complaint.find(filter).sort("-createdAt")
     q = page.enabled ? q.skip(page.skip).limit(page.limit) : q.limit(MAX_UNPAGINATED)
 
-    // The count rides alongside the read rather than after it — one round trip
-    // instead of two, as projectsController.getProjects already does.
+    // The count rides alongside the read: one round trip instead of two.
     const [complaints, total] = await Promise.all([q.lean(), Complaint.countDocuments(filter)])
 
     if (page.enabled) setPaginationHeaders(res, total, page)
@@ -159,16 +128,12 @@ exports.getComplaints = async (req, res) => {
   } catch (err) { serverError(res, err, "complaintsController:") }
 }
 
-// GET /api/complaints/stats — public.
-//
-// City-wide figures the citizen dashboard reports. Every one is derived by
-// analyticsService, the same module the admin dashboard reads, so the two
-// cannot disagree about the same number — and the page no longer has to
-// download every complaint to count them.
+// Public city-wide figures for the citizen dashboard, derived by
+// analyticsService — the same module the admin dashboard reads, so the two
+// cannot disagree about the same number.
 exports.getComplaintStats = async (req, res) => {
   try {
-    // Only filters that are safe to expose are forwarded. `department` is
-    // deliberately absent: `assignedDepartment` is redacted for an
+    // `department` is not forwarded: `assignedDepartment` is redacted for an
     // unauthenticated caller, and a per-department count would hand it back.
     const query = {}
     for (const key of PUBLIC_STAT_FILTERS) {
@@ -178,10 +143,8 @@ exports.getComplaintStats = async (req, res) => {
     const stats = await analytics.getComplaintAnalytics(query)
     if (stats?.error) return badRequest(res, stats.error)
 
-    // Whitelisted rather than blacklisted, the same rule the write paths use,
-    // so a field added to the analytics payload later is not published here by
-    // accident. `byDepartment` and `unassigned` describe internal allocation
-    // and are the two the redacted list does not disclose.
+    // Whitelisted, so a field added to the analytics payload later is not
+    // published by accident. Internal allocation is deliberately excluded.
     res.json({
       total: stats.total,
       open: stats.open,
@@ -212,12 +175,10 @@ exports.getComplaint = async (req, res) => {
 // POST /api/complaints
 exports.createComplaint = async (req, res) => {
   try {
-    // The reporter list, not the shared one: workflow state is server-owned and
-    // is silently dropped rather than rejected, matching how every other
-    // server-owned field on this API treats an unsolicited value.
+    // Server-owned fields are dropped rather than rejected, as elsewhere.
     const data = pickFields(req.body, CREATE_WRITABLE_FIELDS)
 
-    // create() (not insertOne) so the cnrId pre-save hook runs.
+    // create(), not insertOne, so the cnrId pre-save hook runs.
     const complaint = await Complaint.create(data)
 
     await recordAudit({

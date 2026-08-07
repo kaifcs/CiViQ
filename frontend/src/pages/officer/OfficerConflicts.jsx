@@ -1,10 +1,6 @@
-// Officer's conflict queue.
-//
-// The list is already scoped by the backend to conflicts touching this
-// officer's projects, and the opposing project may arrive as a bare id when
-// they are not authorised to see it — the adapters render that as "details
-// unavailable" rather than hiding the row, so the officer still knows a clash
-// exists and who to ask.
+// Officer's conflict queue, already scoped by the backend to conflicts touching
+// this officer's projects. An opposing project they cannot see arrives as a bare
+// id and renders as "details unavailable", so the row is never hidden.
 
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -50,7 +46,6 @@ export default function OfficerConflicts() {
     <AsyncState loading={loading} error={error} onRetry={reload} label="Loading conflicts...">
     <div className="flex flex-col gap-5 h-full" style={{ fontFamily: "'Inter', sans-serif" }}>
 
-      {/* Stat cards */}
       <div className="flex gap-3 flex-shrink-0">
         {[
           { label: 'Unresolved',       sub: 'Needs action',    value: unresolvedCount,      danger: true  },
@@ -66,7 +61,6 @@ export default function OfficerConflicts() {
         ))}
       </div>
 
-      {/* View-only notice */}
       <div className="flex items-center gap-2 px-4 py-3 rounded-[8px] bg-[#EEF2FF] dark:bg-[#131629] border border-[#C7D2FE] dark:border-[#252870] flex-shrink-0">
         <svg width="14" height="14" fill="none" viewBox="0 0 24 24" className="text-[#5E6AD2] flex-shrink-0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
         <p className="text-[13px] text-[#4338CA] dark:text-[#818CF8]">{dept
@@ -74,7 +68,6 @@ export default function OfficerConflicts() {
           : 'Your account has no department assigned, so no departmental clashes can be listed. Contact an administrator.'}</p>
       </div>
 
-      {/* Filter */}
       <div className="flex items-center gap-3 flex-shrink-0">
         <FilterSelect label="Status" value={filterStatus} onChange={setFilterStatus}
           options={[
@@ -87,7 +80,6 @@ export default function OfficerConflicts() {
         {filterStatus && <button onClick={() => setFilterStatus('')} className="text-[13px] text-[#5E6AD2] font-medium">Clear</button>}
       </div>
 
-      {/* List */}
       <div className="flex flex-col gap-2 flex-1 overflow-y-auto">
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center gap-2">

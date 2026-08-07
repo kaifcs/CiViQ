@@ -1,13 +1,8 @@
-// The README's demo credentials must be accounts the seeder actually creates.
-//
-// They drifted: the table listed admin@civiq.in, officer@civiq.in, officer2@,
-// officer3@ and supervisor@civiq.in, none of which appear in seed/index.js — so
-// following the quick-start verbatim ended in "Invalid email or password" at
-// every documented account.
-//
-// Both files are read as TEXT rather than imported. seed/index.js runs its
-// seeding routine on load, and that routine DELETES every collection in the
-// database named by MONGODB_URI; requiring it from a test would be destructive.
+// The README's demo credentials must be accounts the seeder actually creates,
+// or the quick-start ends in "Invalid email or password".
+
+// Both files are read as TEXT: seed/index.js seeds on load, and that empties
+// every collection in the database MONGODB_URI names.
 
 const test = require("node:test")
 const assert = require("node:assert/strict")
@@ -18,7 +13,7 @@ const ROOT = path.join(__dirname, "..", "..", "..")
 const README = readFileSync(path.join(ROOT, "README.md"), "utf8")
 const SEED = readFileSync(path.join(ROOT, "backend", "src", "seed", "index.js"), "utf8")
 
-/** Emails in the seeder's `userDefs`, each with the role it is created as. */
+// Emails in the seeder's `userDefs`, each with the role it is created as.
 function seededAccounts() {
   const accounts = new Map()
   const row = /email:\s*"([^"]+)"\s*,\s*role:\s*"([^"]+)"/g
@@ -27,7 +22,7 @@ function seededAccounts() {
   return accounts
 }
 
-/** Rows of the README's "Demo Login" table, as { role, email, password }. */
+// Rows of the README's "Demo Login" table.
 function documentedAccounts() {
   const section = README.split("## Demo Login")[1]?.split("\n## ")[0] ?? ""
   return [...section.matchAll(/^\|\s*(\w+)\s*\|\s*(\S+@\S+)\s*\|\s*(\S+)\s*\|/gm)]

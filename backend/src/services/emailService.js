@@ -1,19 +1,12 @@
-// Brevo transactional email delivery.
-//
-// This service knows how to construct and send an email and nothing else — it
-// has no notion of notifications, recipients-by-id, or when a message is
-// warranted. NotificationService decides that and is the only caller.
-//
-// Talks to the Brevo REST API through the global fetch in Node 18+, so no HTTP
-// client or provider SDK is added to the dependency tree.
+// Brevo transactional email delivery. Transport only: it has no notion of
+// notifications or when a message is warranted. Uses the global fetch, so no
+// provider SDK or HTTP client is added to the dependency tree.
 
 const BREVO_ENDPOINT = "https://api.brevo.com/v3/smtp/email"
 const REQUEST_TIMEOUT_MS = 10000
 
-/**
- * Email is optional infrastructure: without credentials the app still runs and
- * notifications still persist, delivery is simply skipped.
- */
+// Optional infrastructure: without credentials the app runs and notifications
+// persist; delivery is simply skipped.
 function isEnabled() {
   return Boolean(process.env.BREVO_API_KEY && process.env.MAIL_FROM_EMAIL)
 }
@@ -25,11 +18,7 @@ function sender() {
   }
 }
 
-/**
- * Sends one transactional email. Resolves with Brevo's response on success and
- * throws on failure — isolating that failure is the caller's responsibility, so
- * a direct caller still sees what went wrong.
- */
+// Throws on failure; isolating that failure is the caller's responsibility.
 async function sendEmail({ to, toName, subject, html, text }) {
   if (!isEnabled()) {
     return { skipped: true, reason: "email_not_configured" }
@@ -38,8 +27,8 @@ async function sendEmail({ to, toName, subject, html, text }) {
     throw new Error("sendEmail requires a recipient address")
   }
 
-  // Node's fetch has no default timeout; without this a hung provider would
-  // keep the handle open indefinitely.
+  // Node's fetch has no default timeout, so a hung provider would keep the
+  // handle open indefinitely.
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
 
@@ -64,8 +53,7 @@ async function sendEmail({ to, toName, subject, html, text }) {
     if (!response.ok) {
       const detail = await response.text().catch(() => "")
       const error = new Error(`Brevo responded ${response.status}: ${detail.slice(0, 200)}`)
-      // Carried so the caller can tell a transient outage from a rejected
-      // payload without re-parsing the message.
+      // So the caller can tell a transient outage from a rejected payload.
       error.status = response.status
       error.retryable = isRetryableStatus(response.status)
       throw error
@@ -73,8 +61,7 @@ async function sendEmail({ to, toName, subject, html, text }) {
 
     return await response.json().catch(() => ({}))
   } catch (err) {
-    // An aborted or refused request never reached the provider, so it is worth
-    // trying again; anything already classified above keeps its own verdict.
+    // An aborted or refused request never reached the provider, so retry it.
     if (err.retryable === undefined) err.retryable = true
     throw err
   } finally {
@@ -82,11 +69,8 @@ async function sendEmail({ to, toName, subject, html, text }) {
   }
 }
 
-/**
- * Rate limiting and provider-side faults are worth retrying. A 4xx other than
- * 429 means the request itself was rejected — retrying sends the same bad
- * payload again, so those are permanent.
- */
+// A 4xx other than 429 means the payload itself was rejected, so retrying would
+// only resend it.
 function isRetryableStatus(status) {
   if (status === 429) return true
   return status >= 500

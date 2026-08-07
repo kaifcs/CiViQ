@@ -1,11 +1,6 @@
-// Canonical marker styling for the complaint layer.
-//
-// Keys are the backend Complaint enums verbatim — issueType is mapped through
-// the Title Case labels adaptComplaint emits, status is the raw enum.
-//
-// NOTE ON SEVERITY: the Complaint model carries no severity, priority or
-// urgency field, and no endpoint returns one. Nothing here invents it; category
-// drives colour and status drives emphasis, both from real stored data.
+// Canonical marker styling for the complaint layer. Keys are the backend
+// Complaint enums verbatim — issueType through the Title Case labels
+// adaptComplaint emits, status as the raw enum.
 
 // Complaint status colours reuse the palette the complaint list screen already
 // established, so the map and the list read the same.
@@ -61,10 +56,8 @@ export const complaintStatusColor = (status) => COMPLAINT_STATUS_COLORS[status] 
 export const complaintStatusLabel = (status) =>
   COMPLAINT_STATUS_LABELS[status] || status || "Unknown"
 
-/**
- * Marker appearance for one complaint. Category drives colour so the map is
- * scannable by issue; resolved complaints are muted so open work stands out.
- */
+// Marker appearance for one complaint. Category drives colour so the map is
+// scannable by issue; resolved complaints are muted so open work stands out.
 export function complaintMarkerStyle(complaint, { selected = false } = {}) {
   const resolved = complaint?.status === "resolved"
   return {

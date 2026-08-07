@@ -1,15 +1,6 @@
-// OpenAPI 3.0.3 specification for the CIVIQ backend; the implementation is the
-// source of truth.
-//
-// Errors are uniform across every module:
-//   { success: false, error: { code, message, details? }, message }
-// `message` is duplicated at the top level so the two historical error shapes
-// — { message } and { success, message } — remain valid subsets.
-//
-// Success payloads are NOT uniform: auth, departments, users and dashboard wrap
-// in { success, ... } while projects, conflicts, complaints, audit and
-// notifications return the raw document or array. They are documented as-is,
-// because converging them would break every existing consumer.
+// OpenAPI 3.0.3 specification; the implementation is the source of truth.
+// Errors are uniform, success payloads deliberately are not — both families are
+// documented as-is, because converging them would break existing consumers.
 
 const ROLES = ["admin", "officer", "supervisor", "citizen"]
 
@@ -22,7 +13,6 @@ const ERROR_CODE_VALUES = [
   "AUDIT_LOG_NOT_FOUND", "ROUTE_NOT_FOUND", "RATE_LIMITED", "INTERNAL_ERROR",
 ]
 
-// ── Reusable error bodies ─────────────────────────────────────────────
 // One shape, described twice only so existing $refs keep resolving.
 const ApiErrorBody = {
   type: "object",
@@ -412,8 +402,7 @@ module.exports = {
       EnvValidation: errRef("EnvelopeError", "Validation failed."),
       EnvConflict: errRef("EnvelopeError", "Duplicate / state conflict."),
       EnvServerError: errRef("EnvelopeError", "Unexpected server error."),
-      // Plain modules: projects, conflicts, complaints, notifications, audit.
-      // 401/403 stay enveloped here — they come from the shared auth middleware.
+      // Plain modules. 401/403 stay enveloped: they come from shared middleware.
       Unauthorized: errRef("EnvelopeError", "Missing, invalid or expired token. Emitted by the shared auth middleware, which uses the enveloped shape on every route.", { success: false, message: "Not authorized — no token provided" }),
       Forbidden: errRef("EnvelopeError", "Authenticated but the role is not permitted. Emitted by the shared auth middleware.", { success: false, message: "Not authorized for this role" }),
       NotFound: errRef("PlainError", "Resource not found."),
@@ -434,8 +423,7 @@ module.exports = {
     },
   },
 
-  // Global default: everything requires a Bearer token unless an operation
-  // overrides it with `security: []`.
+  // Everything requires a Bearer token unless an operation sets `security: []`.
   security: [{ bearerAuth: [] }],
 
   paths: require("./paths"),

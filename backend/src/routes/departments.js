@@ -11,11 +11,9 @@ const {
 
 const { protect, authorize } = require("../middleware/auth")
 
-// Every department route requires authentication. Writes stay admin-only;
-// reads are open to any authenticated role because departments are referenced
-// by id on complaints and users, and non-admins cannot otherwise resolve those
-// ids to the codes the UI displays. Nothing here is sensitive — the same
-// name/code already reaches every role via populated project references.
+// Writes are admin-only; reads are open to any authenticated role, because
+// departments are referenced by id elsewhere and non-admins would otherwise be
+// unable to resolve those ids to the codes the UI displays.
 router.use(protect)
 
 router.route("/")

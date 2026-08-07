@@ -4,10 +4,8 @@ const { protect, authorize } = require("../middleware/auth")
 const { requireProjectAccess } = require("../middleware/ownership")
 router.use(protect)
 
-// Routes addressing a single project carry `requireProjectAccess`, which applies
-// the same officer/supervisor scope the list has always used. Admin-only routes
-// need no scope check — an admin is unrestricted by that rule — so they are left
-// on `authorize` alone.
+// Single-project routes carry `requireProjectAccess` for officer/supervisor
+// scoping. Admin-only routes need none: an admin is unrestricted by that rule.
 router.get("/",           c.getProjects)
 router.get("/:id",        requireProjectAccess, c.getProject)
 router.post("/",          authorize("officer", "admin"), c.createProject)

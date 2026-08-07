@@ -1,18 +1,6 @@
-// Where a notification points, per recipient role.
-//
-// Client routes are namespaced by role: the same project is /admin/projects/:id
-// to an administrator, /officer/projects/:id to its officer and
-// /supervisor/tasks/:id to its supervisor. A notification is addressed to ONE
-// recipient, so its link has to be built for that recipient's role — a stored
-// /officer/... path handed to an administrator is refused by the client router,
-// which redirects them to their own dashboard instead of the record.
-//
-// Producers therefore name a destination (`{ kind, id }`) rather than a path,
-// and notificationService resolves it once it knows who is receiving it.
-//
-// Kinds map to real registered routes only. A role with no screen for a kind
-// resolves to no link at all, which is already a supported state — role_changed
-// has never carried one — rather than to a path that would bounce.
+// Where a notification points, per recipient role. Client routes are namespaced
+// by role, so a path built for the wrong one is refused by the client router.
+// Producers name a destination; notificationService resolves it per recipient.
 
 const NOTIFICATION_LINK_KINDS = {
   PROJECT: "project",
@@ -22,8 +10,7 @@ const NOTIFICATION_LINK_KINDS = {
 }
 
 // Mirrors frontend/src/router/AppRouter.jsx. A kind absent from a role is
-// deliberate: the supervisor shell has dashboard, tasks and settings only, and
-// the citizen routes are the public ones.
+// deliberate: that role has no screen for it.
 const ROLE_ROUTES = {
   admin: {
     project: (id) => `/admin/projects/${id}`,
@@ -38,25 +25,16 @@ const ROLE_ROUTES = {
     complaint: (id) => `/officer/complaints/${id}`,
   },
   supervisor: {
-    // Not the dashboard: /supervisor/tasks/:id is the screen where a supervisor
-    // actually records progress, and it is the same route the supervisor
-    // dashboard and task list already link to.
+    // /supervisor/tasks/:id, not the dashboard: it is where progress is recorded.
     project: (id) => `/supervisor/tasks/${id}`,
   },
   citizen: {
-    // The public project page. Citizens receive no conflict or complaint
-    // notification, so nothing else is mapped.
     project: (id) => `/projects/${id}`,
   },
 }
 
-/**
- * Resolves a destination to a client path for one role.
- *
- * Returns undefined when the role has no screen for that kind, or when the
- * destination is absent or malformed — callers store no link rather than one
- * the recipient cannot open.
- */
+// Undefined when the role has no screen for the kind, or the target is
+// malformed — callers then store no link rather than one that cannot be opened.
 function linkFor(role, target) {
   if (!target || !target.kind) return undefined
   const build = ROLE_ROUTES[role] && ROLE_ROUTES[role][target.kind]

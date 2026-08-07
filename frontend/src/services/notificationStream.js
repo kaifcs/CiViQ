@@ -1,14 +1,6 @@
-// Server-Sent Events transport for notifications.
-//
-// Transport only: it opens the stream, adapts incoming documents with the same
-// adapter the REST layer uses, and hands events to the caller.
-// NotificationContext remains the single owner of notification state.
-//
-// The stream is authenticated with a short-lived single-use ticket rather than
-// the session JWT, so no long-lived credential ever appears in a URL. That
-// ticket cannot be replayed, which means EventSource's built-in reconnect (it
-// retries the identical URL) no longer works — reconnection is handled here
-// instead, fetching a fresh ticket for every attempt.
+// Server-Sent Events transport for notifications; NotificationContext stays the
+// owner of the state. The stream authenticates with a short-lived single-use
+// ticket, so EventSource's own reconnect cannot work and is reimplemented here.
 
 import { adaptNotification } from "./adapters"
 import apiClient, { TOKEN_KEY } from "./apiClient"

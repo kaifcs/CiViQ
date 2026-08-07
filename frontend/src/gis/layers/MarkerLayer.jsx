@@ -10,18 +10,9 @@ import { useMap } from "../useMap"
 import { coordinateOf } from "../gisService"
 import { createDotIcon, createClusterIcon } from "../markerIcons"
 
-/**
- * Generic marker layer: places one marker per record, optionally clustered, and
- * reports selection upward. It knows nothing about projects or complaints —
- * callers supply how to locate, style, draw and describe a record — so every
- * point layer reuses it.
- *
- * `getStyle` returns a plain style object and `createIcon` turns it into a
- * Leaflet icon, which is what lets one layer draw dots and another draw glyphs
- * without this component learning either vocabulary.
- *
- * Renders null; all output goes onto the Leaflet map from useMap().
- */
+// Generic marker layer: one marker per record, optionally clustered, reporting
+// selection upward. Callers supply how to locate, style, draw and describe a
+// record, which is what lets one layer draw dots and another glyphs.
 export default function MarkerLayer({
   records = [],
   getCoordinate = coordinateOf,

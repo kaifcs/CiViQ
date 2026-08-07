@@ -11,7 +11,7 @@ const auditSchema = new mongoose.Schema({
   ipAddress:  { type: String },
 }, { timestamps: true })
 
-// The default view: newest-first over the whole trail.
+// Newest-first default view, and the actor filter.
 auditSchema.index({ createdAt: -1 })
 auditSchema.index({ performedBy: 1, createdAt: -1 })
 

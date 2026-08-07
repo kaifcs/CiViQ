@@ -52,30 +52,16 @@ export function useComplaint(id) {
   return useApi(useCallback(() => complaintsApi.get(id, deptMap), [id, deptMap]), [id, deptMap], { skip: !id })
 }
 
-/**
- * City-wide complaint figures from GET /api/complaints/stats.
- *
- * Public, and counted in the database. Screens use this rather than deriving
- * totals from useComplaints(): that list is capped at 200 records server-side,
- * so counting it would report the cap as the city total once the collection
- * grows past it.
- */
+// City-wide complaint figures from GET /api/complaints/stats. Counted in the
+// database rather than derived from useComplaints(), whose list is capped at 200
+// records server-side and would report that cap as the city total.
 export function useComplaintStats(params) {
   return useApi(useCallback(() => complaintsApi.stats(params), [params]), [params])
 }
 
-/**
- * The complaints a citizen is tracking, resolved one CNR at a time.
- *
- * Reports are anonymous, so there is no "my complaints" endpoint — the CNR
- * watchlist is device-local (useCnrWatchlist). Each reference is fetched
- * through GET /api/complaints/:cnr, which accepts a CNR directly. Filtering the
- * public list instead would only ever find complaints inside its 200-record
- * cap, so an older report would appear to have vanished.
- *
- * A reference that no longer resolves is dropped rather than failing the whole
- * list, so one bad entry cannot empty the table.
- */
+// The complaints a citizen is tracking. Reports are anonymous, so there is no
+// "my complaints" endpoint — each device-local CNR is fetched on its own, and
+// one that no longer resolves is dropped rather than failing the whole list.
 export function useTrackedComplaints(cnrs) {
   const { deptMap } = useAuth()
   return useApi(
@@ -178,7 +164,7 @@ export function useDashboardActivity(params) {
   )
 }
 
-/** Loads several resources in parallel behind a single loading/error pair. */
+// Loads several resources in parallel behind a single loading/error pair.
 export function useCombined(loaders) {
   const keys = Object.keys(loaders)
   const key = keys.join(",")

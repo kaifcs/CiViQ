@@ -1,8 +1,6 @@
 // Single project: full record, MCDM breakdown, clashes and approval actions.
-//
 // Approval and rejection are administrator-only and both notify the owning
-// officer; rejection carries a suggested start date the officer can accept or
-// counter.
+// officer; rejection carries a suggested start date the officer can counter.
 
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
@@ -13,7 +11,6 @@ import { formatDateLong, relativeDay, auditActionLabel, MCDM_CRITERIA, criterion
 import { useAuth } from '../../hooks/useAuth'
 import { DEPT_STYLES, PROJECT_STATUS_CONFIG, TYPE_STYLES } from '../../components/uiStyles'
 
-// ─── Helpers ───────────────────────────────────
 function formatCurrency(n) {
   if (!n) return '—'
   if (n >= 10000000) return `₹${(n / 10000000).toFixed(2)} Cr`
@@ -27,12 +24,10 @@ function getInitials(name) {
   return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
 }
 
-// ─── MCDM criteria ─────────────────────────────
 // `key` matches the mcdmBreakdown field the engine writes for each criterion,
 // so each bar shows its own score rather than the overall total.
 
 
-// ─── Reusable components ───────────────────────
 function Badge({ label, className }) {
   return (
     <span className={`inline-flex items-center text-[12px] font-medium px-2.5 py-1 rounded-full ${className}`}>
@@ -79,7 +74,6 @@ function InfoRow({ label, value }) {
   )
 }
 
-// ─── Reject Modal ──────────────────────────────
 function RejectModal({ onConfirm, onCancel }) {
   const [reason, setReason] = useState('')
   return (
@@ -119,7 +113,6 @@ function RejectModal({ onConfirm, onCancel }) {
   )
 }
 
-// ─── Admin Project Detail ──────────────────────
 export default function AdminProjectDetail() {
   const { id }     = useParams()
   const navigate   = useNavigate()
@@ -128,11 +121,9 @@ export default function AdminProjectDetail() {
   const { data: conflicts } = useConflicts()
   const { data: auditLogs } = useAuditLogs()
 
-  // The status is editable before saving, so it has to be state. `project` is
-  // null on the first render, so seeding from it once would leave this stuck at
-  // 'pending' and keep the Approve/Reject actions live on an already-decided
-  // project. Re-seeded during render when a different project loads, rather
-  // than from an effect, which would commit an extra render every time.
+  // `project` is null on the first render, so seeding once would leave this at
+  // 'pending' and keep Approve/Reject live on an already-decided project.
+  // Re-seeded during render rather than from an effect that costs a render.
   const [projectStatus,   setProjectStatus]   = useState('pending')
   const [seededFor,       setSeededFor]       = useState(null)
   const [showRejectModal, setShowRejectModal] = useState(false)
@@ -160,13 +151,11 @@ export default function AdminProjectDetail() {
     )
   }
 
-  // ── Clash for this project ──
   const clash = conflicts.find(c =>
     (c.projectAId === project.id || c.projectBId === project.id) &&
     c.status === 'unresolved'
   )
 
-  // ── Audit logs for this project ──
   const projectAudit = auditLogs
     .filter(a => a.resourceId === project.id)
     .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
@@ -193,22 +182,18 @@ export default function AdminProjectDetail() {
       setProjectStatus(saved.status)
       setActionDone('rejected')
     } catch (err) {
-      // Previously a bare try/finally: the modal closed and the failure was
-      // invisible, so a rejection that never persisted looked successful.
       setActionError(normaliseError(err).message)
     } finally {
       setShowRejectModal(false)
     }
   }
 
-  // MCDM score color
   const scoreColor = project.mcdmScore >= 75 ? '#16A34A' : project.mcdmScore >= 60 ? '#D97706' : '#DC2626'
   const scoreLabel = project.mcdmScore >= 75 ? 'High priority' : project.mcdmScore >= 60 ? 'Medium priority' : 'Low priority'
 
   return (
     <div className="flex flex-col gap-5" style={{ fontFamily: "'Inter', sans-serif" }}>
 
-      {/* ── Back ── */}
       <button
         onClick={() => navigate('/admin/projects')}
         className="flex items-center gap-1.5 text-[13px] text-[#6B7280] dark:text-[#9CA3AF] hover:text-[#0F172A] dark:hover:text-[#F8FAFC] transition-colors w-fit"
@@ -219,7 +204,6 @@ export default function AdminProjectDetail() {
         Back to Projects
       </button>
 
-      {/* ── Header — title + actions ── */}
       <div className="flex items-start justify-between gap-6">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-2.5">
@@ -244,7 +228,6 @@ export default function AdminProjectDetail() {
           <p className="text-[13px] text-[#6B7280] dark:text-[#9CA3AF] mt-1">{project.departmentFull}</p>
         </div>
 
-        {/* Action buttons */}
         <div className="flex items-center gap-2 flex-shrink-0 mt-1">
           {actionError && (
             <span className="text-[13px] text-[#DC2626] dark:text-[#F87171]">{actionError}</span>
@@ -286,7 +269,6 @@ export default function AdminProjectDetail() {
         </div>
       </div>
 
-      {/* ── Clash Alert Banner ── */}
       {clash && (
         <div
           onClick={() => navigate(`/admin/conflicts/${clash.id}`)}
@@ -310,13 +292,8 @@ export default function AdminProjectDetail() {
         </div>
       )}
 
-      {/* ══════════════════════════════════════════
-          ROW 1 — MCDM (wider) + MAP (narrower)
-          Grid: 3fr 2fr
-      ══════════════════════════════════════════ */}
       <div className="grid gap-4" style={{ gridTemplateColumns: '3fr 2fr' }}>
 
-        {/* MCDM Card */}
         <Card className="p-5">
           <SectionLabel>MCDM priority score</SectionLabel>
           <div className="flex items-end gap-4 mb-5 pb-5 border-b border-[#F3F4F6] dark:border-[#27272A]">
@@ -349,7 +326,6 @@ export default function AdminProjectDetail() {
           </div>
         </Card>
 
-        {/* MAP Card */}
         <Card className="p-5 flex flex-col">
           <SectionLabel>Location</SectionLabel>
           <div
@@ -367,19 +343,14 @@ export default function AdminProjectDetail() {
 
       </div>
 
-      {/* ══════════════════════════════════════════
-          ROW 2 — DETAILS full width
-      ══════════════════════════════════════════ */}
       <Card className="p-5">
         <SectionLabel>Project information</SectionLabel>
 
-        {/* Description */}
         <div className="mb-4 pb-4 border-b border-[#F3F4F6] dark:border-[#27272A]">
           <p className="text-[11px] font-semibold text-[#6B7280] dark:text-[#9CA3AF] uppercase tracking-[0.06em] mb-2">Description</p>
           <p className="text-[14px] text-[#0F172A] dark:text-[#F8FAFC] leading-relaxed">{project.description}</p>
         </div>
 
-        {/* Info rows in 2-col grid for full width efficiency */}
         <div className="grid grid-cols-2 gap-x-12">
           <div>
             <InfoRow label="Submitted by"    value={project.officerName} />
@@ -400,9 +371,6 @@ export default function AdminProjectDetail() {
         </div>
       </Card>
 
-      {/* ══════════════════════════════════════════
-          ROW 3 — AUDIT full width
-      ══════════════════════════════════════════ */}
       <Card className="p-5">
         <SectionLabel>Audit trail</SectionLabel>
         {projectAudit.length === 0 ? (
@@ -433,7 +401,6 @@ export default function AdminProjectDetail() {
         )}
       </Card>
 
-      {/* Reject Modal */}
       {showRejectModal && (
         <RejectModal
           onConfirm={handleReject}

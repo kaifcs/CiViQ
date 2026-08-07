@@ -1,14 +1,7 @@
-// Canonical marker styling for the project layer.
-//
-// Colours are data, not presentation classes: the same value drives the map
-// marker, the legend swatch and the drawer dot, so there is one place to change
-// a project's colour. Tailwind badge classes stay with the screens that own them.
-//
-// Status keys are the backend Project.status enum verbatim; priority keys are
-// the Project.priority enum. Types are the Title Case labels adaptProject emits.
+// Canonical marker styling for the project layer. Colours are data, not
+// presentation classes: the same value drives the map marker, the legend swatch
+// and the drawer dot. Keys are the backend Project.status and .priority enums.
 
-// Reuses the hex values already established by the City Map screens so the
-// visual language is unchanged.
 export const PROJECT_TYPE_COLORS = {
   Road: "#EA580C",
   Water: "#2563EB",
@@ -18,8 +11,7 @@ export const PROJECT_TYPE_COLORS = {
   Other: "#6B7280",
 }
 
-// All six backend statuses. The City Map screens only ever styled four of them;
-// completed and rescheduled previously fell through to a default grey.
+// All six backend statuses, so none falls through to the fallback grey.
 export const PROJECT_STATUS_COLORS = {
   pending: "#94A3B8",
   approved: "#16A34A",
@@ -59,11 +51,8 @@ export const projectStatusColor = (status) => PROJECT_STATUS_COLORS[status] || F
 export const projectStatusLabel = (status) => PROJECT_STATUS_LABELS[status] || status || "Unknown"
 export const projectMarkerSize = (priority) => PRIORITY_MARKER_SIZE[priority] || DEFAULT_MARKER_SIZE
 
-/**
- * Marker appearance for one project. Status drives colour because it is what
- * operators scan for; priority drives size; clashes are deliberately ignored
- * here — conflict visualisation is a separate layer.
- */
+// Marker appearance for one project. Status drives colour because it is what
+// operators scan for; priority drives size. Clashes are the conflict layer's job.
 export function projectMarkerStyle(project, { selected = false } = {}) {
   const size = projectMarkerSize(project?.priority)
   return {

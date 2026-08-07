@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { normaliseError } from "../services"
 
-/** Runs an async loader and exposes { data, loading, error, reload }. */
+// Runs an async loader and exposes { data, loading, error, reload }.
 export function useApi(loader, deps = [], { skip = false, initialData = null } = {}) {
   const [data, setData] = useState(initialData)
   const [loading, setLoading] = useState(!skip)
@@ -33,7 +33,7 @@ export function useApi(loader, deps = [], { skip = false, initialData = null } =
   return { data, loading, error, reload, setData }
 }
 
-/** Wraps a write call so screens can surface backend validation messages. */
+// Wraps a write call so screens can surface backend validation messages.
 export function useMutation(fn) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)

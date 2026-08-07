@@ -1,11 +1,6 @@
 // User management routes — administrator only.
-//
-// Accounts are created through the admin-only POST /api/auth/register endpoint.
-// Accounts are deactivated via /:id/status instead of deleted to preserve
-// project, complaint and audit history.
-//
-// The first administrator is provisioned outside the API (seed or database),
-// avoiding any public bootstrap path.
+// Accounts are deactivated via /:id/status rather than deleted, to preserve the
+// project, complaint and audit history that references them.
 
 const express = require("express")
 const router = express.Router()

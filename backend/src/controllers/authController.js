@@ -1,8 +1,6 @@
-// Authentication endpoints.
-//
-// Login returns the same error for an unknown email or wrong password to avoid
-// account enumeration. Registration is admin-only, so duplicate email errors
-// are safe. Logout records the event; JWT sessions remain stateless.
+// Authentication endpoints. Login returns one error for an unknown email, a
+// wrong password and an inactive account, so it cannot be used to enumerate
+// accounts. Registration is admin-only, so a duplicate email error is safe.
 
 const User = require("../models/User")
 const { generateToken } = require("../utils/token")
@@ -10,9 +8,7 @@ const { validateRegisterInput, validateLoginInput } = require("../utils/validato
 const { ERROR_CODES, badRequest, conflictError, fail, unauthorized } = require("../utils/apiResponse")
 const { logger } = require("../utils/logger")
 
-// POST /api/auth/register — administrator only (see routes/auth.js).
-// Creates a staff account. `role` is constrained to CREATABLE_ROLES, so this
-// cannot mint another administrator in one step.
+// `role` is constrained to CREATABLE_ROLES, so this cannot mint an administrator.
 exports.register = async (req, res) => {
   try {
     const { fullName, email, password, role, phone } = req.body

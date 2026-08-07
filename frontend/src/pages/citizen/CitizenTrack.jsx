@@ -1,7 +1,5 @@
-// Citizen complaint tracking by CNR id — NOT YET BUILT.
-//
-// Registered stub route. Complaints already carry the public cnrId this screen
-// will look up.
+// Citizen complaint tracking by CNR id — not yet built. Complaints already carry
+// the public cnrId this screen will look up.
 
 import CitizenLayout from "./CitizenLayout"
 

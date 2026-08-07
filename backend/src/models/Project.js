@@ -1,16 +1,6 @@
 // A planned or in-progress municipal work — the central entity of the system.
-//
-// Three fields carry system-derived rather than user-entered values, and each
-// is written by exactly one place: `mcdmScore` and `mcdmBreakdown` by the MCDM
-// engine, `hasClash` and `clashes` by clash detection, and `actualEndDate` by
-// the progress endpoint when work reaches 100%.
-//
-// Two distinct notions of "inactive" coexist and are easy to confuse:
-//   status    — the workflow state (pending, approved, active, completed, …)
-//   isActive  — the soft-delete flag; false hides the project everywhere
-//
-// Ownership is likewise two fields: `officer` owns the work, `supervisor`
-// oversees it. Both drive project visibility (see middleware/ownership).
+// `status` is the workflow state; `isActive` is the separate soft-delete flag.
+// `officer` owns the work and `supervisor` oversees it; both drive visibility.
 
 const mongoose = require("mongoose")
 
@@ -99,12 +89,9 @@ const projectSchema = new mongoose.Schema({
     type: String,
   }],
 
-  // A denormalisation of the Conflict collection, which stays authoritative:
-  //   clashes  === the Conflict rows referencing this project
-  //   hasClash === clashes.length > 0
-  // Both sides of a pair are rewritten together (projectsController
-  // .syncClashState), so a project always records a collision the other side
-  // detected — and loses it when the row goes.
+  // Derived from the Conflict collection, which stays authoritative: `clashes`
+  // is the rows referencing this project and `hasClash` is whether any exist.
+  // Both sides of a pair are rewritten together by projectsController.
   hasClash:   { type: Boolean, default: false },
   clashes:    [{ type: mongoose.Schema.Types.ObjectId, ref: "Conflict" }],
 
@@ -119,8 +106,8 @@ const projectSchema = new mongoose.Schema({
 
 }, { timestamps: true })
 
-// Sequence derived from a document count, so concurrent creates can collide on
-// projectId; the unique index is what ultimately rejects a duplicate.
+// Count-derived sequence, so concurrent creates can collide; the unique index
+// is what ultimately rejects a duplicate.
 projectSchema.pre("save", async function(next) {
   if (!this.projectId) {
     const count = await mongoose.model("Project").countDocuments()
@@ -129,9 +116,8 @@ projectSchema.pre("save", async function(next) {
   next()
 })
 
-// The first two serve clash detection's candidate search, which selects on ward
-// OR a coordinate bounding box before measuring exact distances. The ownership
-// pairs serve the scoped list views, which always sort newest-first.
+// The first two serve clash detection's ward-or-bounding-box candidate search;
+// the ownership pairs serve the scoped, newest-first list views.
 projectSchema.index({ "location.ward": 1, status: 1 })
 projectSchema.index({ "location.centerCoords.lat": 1, "location.centerCoords.lng": 1 })
 projectSchema.index({ officer: 1, createdAt: -1 })

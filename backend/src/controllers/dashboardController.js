@@ -1,20 +1,12 @@
-// Analytics endpoints — a thin pass-through to analyticsService.
-//
-// No aggregation logic lives here. Each endpoint hands the query string to the
-// service and wraps whatever comes back, which is what keeps every dashboard
-// figure derived in one place rather than recomputed per route.
+// Analytics endpoints — a thin pass-through to analyticsService, so every
+// dashboard figure is derived in one place rather than recomputed per route.
 
 const analytics = require("../services/analyticsService")
 const { ERROR_CODES, badRequest, fail } = require("../utils/apiResponse")
 const { logger } = require("../utils/logger")
 
-/**
- * Builds a route handler around one analytics function.
- *
- * The service reports a bad filter by returning `{ error }` rather than
- * throwing, so an invalid query becomes a 400 while a genuine fault becomes a
- * 500 — the two are distinguished here instead of in every endpoint.
- */
+// The service returns { error } for a bad filter rather than throwing, so an
+// invalid query becomes a 400 while a genuine fault stays a 500.
 function handler(fn, failureMessage) {
   return async (req, res) => {
     try {

@@ -1,22 +1,6 @@
-// Referential stability of arguments passed to the data hooks.
-//
-// `useApi` spreads its `deps` argument straight into a useEffect dependency
-// array (hooks/useApi.js). The resource hooks in hooks/useResources.js forward
-// whatever the caller gives them into that array, so an argument that is a
-// fresh object or array literal changes identity on every render — the effect
-// re-runs, its fetch sets state, the component renders again, and the cycle
-// repeats without bound. React reports it as "Maximum update depth exceeded",
-// and the requests exhaust the shared /api rate limit for the caller's address.
-//
-// That is not a hypothetical: AdminAudit.jsx passed an inline literal and
-// issued ~20 000 requests per 400ms in a renderer harness, against 1 for every
-// other screen. Referential stability is therefore a contract, and this file
-// enforces it by reading the source — no renderer, and so no test framework
-// dependency, which is the repository's standing constraint.
-//
-// The rule: an argument to a guarded hook must be an identifier (a `useMemo`
-// result, or a module-scope constant). A `{` or `[` opening the argument is a
-// new value every render and is rejected.
+// Referential stability of the arguments screens pass to the data hooks: useApi
+// spreads `deps` into a useEffect dependency array, so an inline literal changes
+// identity every render and refetches forever. Checked by reading the source.
 
 import test from "node:test"
 import assert from "node:assert/strict"
@@ -37,9 +21,8 @@ const GUARDED = [
   "useDashboardComplaints", "useDashboardDepartments", "useDashboardActivity",
 ]
 
-// Hooks that take an argument but are NOT subject to the rule, each for a
-// stated reason. Listed explicitly so the exemption is a decision, not an
-// oversight.
+// Hooks that take an argument but are not subject to the rule, listed
+// explicitly so each exemption is a decision rather than an oversight.
 const EXEMPT = {
   // Derives its own stable key from Object.keys(loaders).join(","), so an
   // inline object of loaders is deliberately safe here.
@@ -54,7 +37,7 @@ function sourceFiles(dir) {
   })
 }
 
-/** Call sites of `hook` whose first argument opens with `{` or `[`. */
+// Call sites of `hook` whose first argument opens with `{` or `[`.
 function literalArgumentCallSites(source, hook) {
   const hits = []
   const call = new RegExp(`\\b${hook}\\s*\\(`, "g")

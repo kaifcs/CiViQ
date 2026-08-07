@@ -1,8 +1,6 @@
 // Express application: middleware, routes and error handling.
-//
-// Separated from server.js so the app can be tested independently. Middleware
-// order is intentional: correlation first, then routes, then 404 and error
-// handlers last.
+// Middleware order is load-bearing: correlation first, then routes, then the
+// 404 and error handlers last.
 
 const express = require("express")
 const cors = require("cors")
@@ -17,15 +15,14 @@ const errorHandler = require("./middleware/error")
 const { logger } = require("./utils/logger")
 const { requestContext } = require("./middleware/requestContext")
 
-// express-rate-limit emits its own body; route it through the shared helper so
-// a 429 looks like every other error in the API.
+// Routed through the shared helper so a 429 carries the same envelope as every
+// other error in the API.
 const rateLimited = (req, res) =>
   fail(res, 429, ERROR_CODES.RATE_LIMITED, "Too many requests, please try again later.")
 
 const app = express()
 
-// Configure Express proxy trust from TRUST_PROXY to preserve accurate client
-// IPs for rate limiting and audit logging across different deployments.
+// Governs req.ip, which rate limiting and the audit trail both depend on.
 function parseTrustProxy(raw) {
   if (raw === undefined || raw === "") return false
   const value = String(raw).trim()
@@ -40,7 +37,6 @@ app.set("trust proxy", parseTrustProxy(process.env.TRUST_PROXY))
 // Correlation first: every later log line, including Morgan's, carries the id.
 app.use(requestContext)
 
-// Security / parsing / performance middleware
 app.use(helmet())
 app.use(cors({ origin: process.env.CLIENT_URL || "http://localhost:5173" }))
 app.use(compression())
@@ -56,7 +52,6 @@ if (process.env.NODE_ENV !== "production") {
     { stream: logger.stream }))
 }
 
-// Basic API-wide rate limiting
 app.use(
   "/api",
   rateLimit({
@@ -65,14 +60,12 @@ app.use(
     standardHeaders: true,
     legacyHeaders: false,
     handler: rateLimited,
-    // One SSE connection is a single long-lived request, but a flapping
-    // network reconnects repeatedly; counting those would drain the user's
-    // ordinary API allowance. The stream has its own limiter below.
+    // A flapping network reconnects repeatedly, which would drain the user's
+    // ordinary API allowance. The stream has its own budget below.
     skip: (req) => req.path === "/notifications/stream",
   })
 )
 
-// Reconnection budget for the stream itself, kept separate from the API quota.
 app.use(
   "/api/notifications/stream",
   rateLimit({
@@ -84,9 +77,8 @@ app.use(
   })
 )
 
-// Authentication endpoints use a stricter rate limit to slow credential
-// stuffing. Successful logins do not count, and /auth/me is excluded so normal
-// page loads are unaffected.
+// Stricter budget to slow credential stuffing. Successful logins do not count,
+// and /auth/me is outside it so ordinary page loads are unaffected.
 app.use(
   ["/api/auth/login", "/api/auth/register"],
   rateLimit({
@@ -99,12 +91,9 @@ app.use(
   })
 )
 
-// Infrastructure routes
 app.use("/api/health", require("./routes/health"))
-// OpenAPI docs: GET /api/docs (UI) and GET /api/docs.json (raw spec)
 app.use("/api", require("./routes/docs"))
 
-// Routes
 app.use("/api/auth", require("./routes/auth"))
 app.use("/api/departments", require("./routes/departments"))
 app.use("/api/projects", require("./routes/projects"))
@@ -115,7 +104,7 @@ app.use("/api/audit", require("./routes/audit"))
 app.use("/api/dashboard", require("./routes/dashboard"))
 app.use("/api/notifications", require("./routes/notifications"))
 
-// 404 + error handling (must be registered last, in this order)
+// Must stay last, in this order.
 app.use(notFound)
 app.use(errorHandler)
 

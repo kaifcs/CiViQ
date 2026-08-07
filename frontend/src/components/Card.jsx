@@ -1,8 +1,6 @@
-// Project summary card used by the list and dashboard screens.
-//
-// Presentational only: it renders the adapted view model it is given and reads
-// no data of its own, which is what lets the same card appear in scoped and
-// unscoped lists without knowing the difference.
+// Project summary cards for the list and dashboard screens. Presentational
+// only: they render the adapted view model they are given, which lets the same
+// card appear in scoped and unscoped lists without knowing the difference.
 
 const progressBarColor = (pct) => pct > 0 ? '#5E6AD2' : 'transparent'
 const ACCENT = '#5E6AD2'
@@ -17,7 +15,6 @@ const subLabelColor = {
 
 const paddingMap = { none: '', sm: 'p-3', md: 'p-4', lg: 'p-5' }
 
-// ─── Base Card ─────────────────────────────────
 export default function Card({ variant = 'default', children, className = '', onClick, hoverable = false, padding = 'md' }) {
   const clickable = Boolean(onClick) || hoverable
   const base = ['rounded-[8px] transition-all duration-150', paddingMap[padding]]
@@ -37,7 +34,6 @@ export default function Card({ variant = 'default', children, className = '', on
   )
 }
 
-// ─── Project Card ──────────────────────────────
 export function ProjectCard({ title, meta, projectType, progress = 0, status, typeBadge, extraBadges, date, onClick, selected = false, className = '' }) {
   const isDanger = projectType === 'clash'
 
@@ -81,7 +77,6 @@ export function ProjectCard({ title, meta, projectType, progress = 0, status, ty
   )
 }
 
-// ─── Stat Card ─────────────────────────────────
 export function StatCard({ label, value, valueColor = 'default', subLabel, subLabelColor: subColor = 'muted', className = '' }) {
   return (
     <div

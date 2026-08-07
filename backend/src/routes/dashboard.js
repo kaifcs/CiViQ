@@ -1,8 +1,6 @@
 // Analytics routes — administrator only, read-only.
-//
-// Every endpoint reports across the whole municipality rather than a caller's
-// own scope, which is why the role gate covers the entire router: there is no
-// per-record filtering here to fall back on.
+// Every endpoint reports municipality-wide rather than per caller scope, so the
+// role gate covers the whole router; there is no per-record filtering to fall back on.
 
 const router = require("express").Router()
 const c = require("../controllers/dashboardController")

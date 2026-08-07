@@ -6,13 +6,8 @@ const PRIORITY_DOT = {
   low: 'bg-[#94A3B8]',
 }
 
-/**
- * One notification row, shared by the dropdown and the Notification Center.
- *
- * Activating a row marks it read and, when the notification carries a deep
- * link, navigates to it. Rendered as a button so it is reachable by keyboard
- * and announced correctly.
- */
+// One notification row, shared by the dropdown and the Notification Center.
+// Rendered as a button so activation is reachable by keyboard and announced.
 export default function NotificationItem({
   notification, onActivate, compact = false,
   selectable = false, selected = false, onSelectChange, actions,

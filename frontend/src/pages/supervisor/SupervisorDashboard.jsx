@@ -1,9 +1,6 @@
-// Supervisor landing screen.
-//
-// Scoped server-side to the projects this supervisor oversees. This screen is
-// read-only: progress is recorded on /supervisor/tasks/:id, which both tables
-// below link to, and reaching 100% there marks the project complete and
-// notifies the owning officer.
+// Supervisor landing screen, scoped server-side to the projects this supervisor
+// oversees. Read-only: progress is recorded on /supervisor/tasks/:id, which both
+// tables below link to.
 
 import { useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -16,13 +13,11 @@ import {
   PROJECT_STATUS_LABELS, PROJECT_TERMINAL_STATUSES, conflictStatusLabel,
 } from '../../components/dashboard'
 
-// ─── Helpers ───────────────────────────────────
 const isOverdue = (p) =>
   !PROJECT_TERMINAL_STATUSES.includes(p.status) &&
   !!p.endDate &&
   new Date(p.endDate).getTime() < Date.now()
 
-// ─── Supervisor Dashboard ──────────────────────
 export default function SupervisorDashboard() {
   const navigate = useNavigate()
 
@@ -88,7 +83,6 @@ export default function SupervisorDashboard() {
     return Math.round(teamProjects.reduce((s, p) => s + (p.progress ?? 0), 0) / teamProjects.length)
   }, [teamProjects])
 
-  // ── Stats ──
   const stats = useMemo(() => {
     const active = teamProjects.filter((p) => p.status === 'active').length
     return [
@@ -102,7 +96,6 @@ export default function SupervisorDashboard() {
     ]
   }, [teamProjects, pendingReviews, team, avgProgress, openConflicts, overdueProjects])
 
-  // ── Charts ──
   const progressByProject = useMemo(
     () => teamProjects
       .filter((p) => !PROJECT_TERMINAL_STATUSES.includes(p.status))
@@ -141,8 +134,8 @@ export default function SupervisorDashboard() {
 
   const go = useCallback((to) => navigate(to), [navigate])
 
-  // Only routes that exist for the supervisor role are offered. There is no
-  // supervisor map or conflicts route — see the report.
+  // Only routes that exist for the supervisor role are offered; there is no
+  // supervisor map or conflicts route.
   const quickActions = useMemo(() => [
     { id: 'tasks', label: 'Review Projects', hint: `${pendingReviews.length} awaiting review`, to: '/supervisor/tasks',
       icon: <ActionIcon d={<><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></>} /> },
@@ -154,7 +147,6 @@ export default function SupervisorDashboard() {
     <AsyncState loading={loading} error={error} onRetry={reload} label="Loading dashboard...">
     <div className="flex flex-col gap-4" style={{ fontFamily: "'Inter', sans-serif" }}>
 
-      {/* ── Overdue warning ── */}
       {overdueProjects.length > 0 && (
         <div className="flex items-start gap-3 px-4 py-3 rounded-[8px] flex-shrink-0 bg-[#FEF2F2] dark:bg-[#1F0A0A] border border-[#FCA5A5] dark:border-[#7F1D1D]">
           <svg width="15" height="15" fill="none" viewBox="0 0 24 24" className="text-[#DC2626] dark:text-[#FCA5A5] flex-shrink-0 mt-0.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -171,10 +163,8 @@ export default function SupervisorDashboard() {
 
       <QuickActions actions={quickActions} onNavigate={go} />
 
-      {/* ── Stat cards ── */}
       <StatGrid stats={stats} columns={7} />
 
-      {/* ── Charts ── */}
       <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
         <DashboardSection title="Department project progress">
           <BarChart
@@ -206,7 +196,6 @@ export default function SupervisorDashboard() {
         </DashboardSection>
       </div>
 
-      {/* ── Tables ── */}
       <div className="grid gap-4 grid-cols-1 xl:grid-cols-2">
         <DashboardSection title="Team projects">
           <DashboardTable
@@ -303,7 +292,6 @@ export default function SupervisorDashboard() {
         </DashboardSection>
       </div>
 
-      {/* ── Activity ── */}
       <DashboardSection title="Recent activity">
         <AsyncState loading={loadingNotifications} error={notificationsError} label="Loading...">
           {recentNotifications.length === 0 ? (

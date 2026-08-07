@@ -1,9 +1,6 @@
-// Single definition of the notification vocabulary. Types were previously bare
-// string literals repeated across notificationService; every producer and
-// consumer now reads them from here.
-//
-// Category and priority are derived from the type rather than passed in, so a
-// given event always renders consistently and callers cannot drift.
+// Single definition of the notification vocabulary. Category and priority are
+// derived from the type rather than passed in, so callers cannot classify the
+// same event two ways.
 
 const NOTIFICATION_TYPES = {
   CLASH_DETECTED: "clash_detected",
@@ -30,7 +27,6 @@ const NOTIFICATION_PRIORITIES = {
   HIGH: "high",
 }
 
-// Every type maps to exactly one category and priority.
 const TYPE_METADATA = {
   [NOTIFICATION_TYPES.CLASH_DETECTED]: {
     category: NOTIFICATION_CATEGORIES.CONFLICT,
@@ -70,16 +66,14 @@ const TYPE_METADATA = {
   },
 }
 
-// Account and security notices are not optional: a user who no longer has the
-// role they think they have must be told regardless of their preferences.
+// Account notices cannot be muted: a user whose role changed must be told.
 const MANDATORY_CATEGORIES = [NOTIFICATION_CATEGORIES.SYSTEM]
 
 const NOTIFICATION_TYPE_VALUES = Object.values(NOTIFICATION_TYPES)
 const NOTIFICATION_CATEGORY_VALUES = Object.values(NOTIFICATION_CATEGORIES)
 const NOTIFICATION_PRIORITY_VALUES = Object.values(NOTIFICATION_PRIORITIES)
 
-// Unknown types fall back to system/normal so a notification is never lost to a
-// validation error; the enum on the model is what rejects genuinely bad input.
+// Unknown types fall back rather than throw; the model enum rejects bad input.
 const DEFAULT_METADATA = {
   category: NOTIFICATION_CATEGORIES.SYSTEM,
   priority: NOTIFICATION_PRIORITIES.NORMAL,

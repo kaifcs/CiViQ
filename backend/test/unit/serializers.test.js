@@ -1,9 +1,6 @@
-// S2.5 — conflict payload redaction.
-//
-// S2 locked the front door on projects; a conflict embeds two of them, so
-// without this the conflict payload was a way around that lock. These tests
-// assert the two halves of the guarantee: an unauthorized project collapses to
-// a bare id, and an authorized one is returned untouched.
+// Conflict payload redaction. A conflict embeds two projects, so without this
+// its payload is a way around project ownership. Both halves are asserted: an
+// unauthorized project collapses to a bare id, an authorized one is untouched.
 
 const test = require("node:test")
 const assert = require("node:assert/strict")
@@ -55,8 +52,8 @@ test("admins see both sides in full", () => {
   assert.equal(result.project2.title, "Sector 5 resurfacing")
 })
 
-// The case the vulnerability actually turned on: an officer owning one side of
-// a conflict must see their own project and only an id for the other.
+// An officer owning one side of a conflict must see their own project, and only
+// an id for the other.
 test("mixed ownership redacts only the side the viewer does not own", () => {
   const mine = oid()
   const theirs = populatedProject({ officer: oid(), title: "Not mine" })

@@ -10,7 +10,6 @@ import { DEFAULT_CENTER } from '../../gis/config'
 import { isValidLatitude, isValidLongitude } from '../../gis/coordinates'
 import { inputCls, labelCls } from '../../components/uiStyles'
 
-// ─── Step indicator ────────────────────────────
 const STEPS = ['Phase', 'Identity', 'Location', 'Timeline', 'Budget', 'MCDM', 'Team', 'Documents']
 
 function StepBar({ current }) {
@@ -84,10 +83,9 @@ export default function OfficerProjectNew() {
   const navigate = useNavigate()
   const { user, deptMap } = useAuth()
   // No fallback: an account with no department must surface that, not silently
-  // file its work under someone else's. handleSubmit reports it below.
+  // file its work under someone else's.
   const dept = user?.department || null
-  // Derived from the officer's own projects. GET /api/users is admin-only, so
-  // reading it here returned 403 and left this control permanently empty.
+  // Derived from the officer's own projects, since GET /api/users is admin-only.
   const { supervisors } = useAssignableSupervisors()
   const { data: departments } = useDepartments()
   const [submitError, setSubmitError] = useState('')
@@ -96,7 +94,6 @@ export default function OfficerProjectNew() {
   const [submitted, setSubmitted] = useState(false)
   const [mcdmResult, setMcdmResult] = useState(null)
 
-  // Form state
   const [phase,    setPhase]    = useState('standalone')
   const [title,    setTitle]    = useState('')
   const [type,     setType]     = useState('Road')
@@ -104,8 +101,8 @@ export default function OfficerProjectNew() {
   const [address,  setAddress]  = useState('')
   const [ward,     setWard]     = useState('Ward 12')
   // Project.location.centerCoords is required by the backend and is what every
-  // GIS layer plots. Seeded from the configured city centre so the field is
-  // never submitted empty, but the officer must be able to correct it.
+  // GIS layer plots. Seeded from the configured city centre so it is never
+  // submitted empty, but the officer must be able to correct it.
   const [lat,      setLat]      = useState(String(DEFAULT_CENTER.lat))
   const [lng,      setLng]      = useState(String(DEFAULT_CENTER.lng))
   const [startDate,setStartDate]= useState('')
@@ -115,7 +112,6 @@ export default function OfficerProjectNew() {
   const [tender,   setTender]   = useState('')
   const [contractor,setContractor]=useState('')
   const [firm,     setFirm]     = useState('')
-  // MCDM answers
   const [condition,       setCondition]       = useState('poor')
   const [incidents,       setIncidents]       = useState([])
   const [lastWorkYear,    setLastWorkYear]    = useState('')
@@ -124,9 +120,7 @@ export default function OfficerProjectNew() {
   const [roadClosure,     setRoadClosure]     = useState('partial')
   const [utilities,       setUtilities]       = useState([])
   const [disruptionDays,  setDisruptionDays]  = useState('')
-  // Team
   const [supervisorId, setSupervisorId] = useState('')
-  // Docs
   const [docName, setDocName] = useState('')
 
   function duration() {
@@ -222,7 +216,6 @@ export default function OfficerProjectNew() {
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-2xl mx-auto">
 
-          {/* STEP 0 — Phase */}
           {step === 0 && (
             <div className="flex flex-col gap-6">
               <div>
@@ -245,7 +238,6 @@ export default function OfficerProjectNew() {
             </div>
           )}
 
-          {/* STEP 1 — Identity */}
           {step === 1 && (
             <div className="flex flex-col gap-5">
               <div>
@@ -272,7 +264,6 @@ export default function OfficerProjectNew() {
             </div>
           )}
 
-          {/* STEP 2 — Location */}
           {step === 2 && (
             <div className="flex flex-col gap-5">
               <div>
@@ -319,14 +310,8 @@ export default function OfficerProjectNew() {
                       )}
                     </div>
                   </div>
-                  {/* Clash detection runs on the server when the project is
-                      submitted, so nothing is known about clashes at this
-                      point. The panel states that instead of reporting a
-                      result it does not have — it previously always read
-                      "no existing projects detected", because the clash count
-                      it consulted is only populated after submission. The
-                      zone/population/facility figures that sat here had no
-                      backend source at all and have been removed. */}
+                  {/* Clash detection runs server-side on submit, so nothing is
+                      known about clashes at this point. */}
                   {ward && (
                     <div className="p-3 rounded-[8px] border bg-[#F8FAFC] dark:bg-[#18181B] border-[#E5E5E5] dark:border-[#27272A]">
                       <p className="text-[12px] text-[#6B7280] dark:text-[#9CA3AF]">
@@ -335,7 +320,6 @@ export default function OfficerProjectNew() {
                     </div>
                   )}
                 </div>
-                {/* Map placeholder */}
                 <div className="rounded-[8px] bg-[#F8FAFC] dark:bg-[#18181B] border border-[#E5E5E5] dark:border-[#27272A] flex flex-col items-center justify-center gap-2" style={{ minHeight: '280px' }}>
                   <svg width="28" height="28" fill="none" viewBox="0 0 24 24" className="text-[#D1D5DB] dark:text-[#374151]" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                     <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/>
@@ -346,7 +330,6 @@ export default function OfficerProjectNew() {
             </div>
           )}
 
-          {/* STEP 3 — Timeline */}
           {step === 3 && (
             <div className="flex flex-col gap-5">
               <div>
@@ -378,7 +361,6 @@ export default function OfficerProjectNew() {
             </div>
           )}
 
-          {/* STEP 4 — Budget */}
           {step === 4 && (
             <div className="flex flex-col gap-5">
               <div>
@@ -412,7 +394,6 @@ export default function OfficerProjectNew() {
             </div>
           )}
 
-          {/* STEP 5 — MCDM */}
           {step === 5 && (
             <div className="flex flex-col gap-6">
               <div>
@@ -478,7 +459,6 @@ export default function OfficerProjectNew() {
             </div>
           )}
 
-          {/* STEP 6 — Team */}
           {step === 6 && (
             <div className="flex flex-col gap-5">
               <div>
@@ -503,14 +483,12 @@ export default function OfficerProjectNew() {
             </div>
           )}
 
-          {/* STEP 7 — Documents */}
           {step === 7 && (
             <div className="flex flex-col gap-5">
               <div>
                 <h2 className="text-[18px] font-bold text-[#0F172A] dark:text-[#F8FAFC] mb-1">Documents</h2>
                 <p className="text-[13px] text-[#6B7280] dark:text-[#9CA3AF]">Upload required project documentation.</p>
               </div>
-              {/* Project document — required */}
               <div>
                 <label className={labelCls}>Project document PDF <span className="text-[#DC2626]">*</span></label>
                 <div className="flex items-center gap-3 p-4 rounded-[8px] border-2 border-dashed border-[#E2E8F0] dark:border-[#27272A] hover:border-[#5E6AD2]/50 transition-colors cursor-pointer"
@@ -531,7 +509,6 @@ export default function OfficerProjectNew() {
                   )}
                 </div>
               </div>
-              {/* Photos — optional */}
               <div>
                 <label className={labelCls}>Site photos <span className="text-[12px] font-normal text-[#9CA3AF]">(optional)</span></label>
                 <div className="flex items-center gap-3 p-4 rounded-[8px] border-2 border-dashed border-[#E2E8F0] dark:border-[#27272A] hover:border-[#5E6AD2]/50 transition-colors cursor-pointer">
@@ -548,7 +525,6 @@ export default function OfficerProjectNew() {
         </div>
       </div>
 
-      {/* Navigation buttons */}
       <div className="flex items-center justify-between mt-6 pt-4 border-t border-[#E5E5E5] dark:border-[#27272A] flex-shrink-0">
         <button onClick={handleBack} disabled={step === 0}
           className="flex items-center gap-2 h-9 px-4 text-[13px] font-medium text-[#6B7280] dark:text-[#9CA3AF] border border-[#E2E8F0] dark:border-[#27272A] rounded-[6px] hover:bg-[#F8FAFC] dark:hover:bg-[#18181B] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">

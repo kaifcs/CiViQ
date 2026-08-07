@@ -22,11 +22,9 @@ export function isValidCoordinate(coord) {
   return !!coord && isValidLatitude(coord.lat) && isValidLongitude(coord.lng)
 }
 
-/**
- * Accepts the coordinate shapes used across this codebase — {lat,lng},
- * {latitude,longitude} and the adapted {centerLat,centerLng} — and returns a
- * canonical {lat,lng}, or null when the input is absent or out of range.
- */
+// Accepts the coordinate shapes used across this codebase — {lat,lng},
+// {latitude,longitude} and the adapted {centerLat,centerLng} — and returns a
+// canonical {lat,lng}, or null when the input is absent or out of range.
 export function normalizeCoordinate(input) {
   if (!input || typeof input !== "object") return null
 
@@ -46,36 +44,34 @@ export function normalizeCoordinates(inputs = []) {
   return inputs.map(normalizeCoordinate).filter(Boolean)
 }
 
-// ── ordering conversions ──────────────────────────────────────────────
 // Kept explicit rather than inferred: a [number, number] pair is ambiguous.
 
-/** GeoJSON position [lng, lat] -> {lat, lng}. */
+// GeoJSON position [lng, lat] -> {lat, lng}.
 export function fromPosition(position) {
   if (!Array.isArray(position) || position.length < 2) return null
   return normalizeCoordinate({ lng: position[0], lat: position[1] })
 }
 
-/** {lat, lng} -> GeoJSON position [lng, lat]. */
+// {lat, lng} -> GeoJSON position [lng, lat].
 export function toPosition(coord) {
   const c = normalizeCoordinate(coord)
   return c ? [c.lng, c.lat] : null
 }
 
-/** {lat, lng} -> Leaflet tuple [lat, lng]. */
+// {lat, lng} -> Leaflet tuple [lat, lng].
 export function toLatLngTuple(coord) {
   const c = normalizeCoordinate(coord)
   return c ? [c.lat, c.lng] : null
 }
 
-/** Leaflet tuple [lat, lng] -> {lat, lng}. */
+// Leaflet tuple [lat, lng] -> {lat, lng}.
 export function fromLatLngTuple(tuple) {
   if (!Array.isArray(tuple) || tuple.length < 2) return null
   return normalizeCoordinate({ lat: tuple[0], lng: tuple[1] })
 }
 
-// ── bounds ────────────────────────────────────────────────────────────
 
-/** Axis-aligned bounding box of a coordinate set, or null if none are valid. */
+// Axis-aligned bounding box of a coordinate set, or null if none are valid.
 export function boundsOf(coords = []) {
   const valid = normalizeCoordinates(coords)
   if (valid.length === 0) return null
@@ -100,7 +96,7 @@ export function centerOfBounds(bounds) {
   })
 }
 
-/** Arithmetic mean of a coordinate set. Distinct from the bounds centre. */
+// Arithmetic mean of a coordinate set. Distinct from the bounds centre.
 export function centerOf(coords = []) {
   const valid = normalizeCoordinates(coords)
   if (valid.length === 0) return null
@@ -121,11 +117,9 @@ export function isValidBounds(bounds) {
   )
 }
 
-/**
- * Bounding box of the given radius around a point. Longitude degrees are
- * divided by cos(lat), which collapses toward the poles, so the divisor is
- * floored to keep the box finite.
- */
+// Bounding box of the given radius around a point. Longitude degrees are
+// divided by cos(lat), which collapses toward the poles, so the divisor is
+// floored to keep the box finite.
 export function boundingBoxAround(coord, meters) {
   const c = normalizeCoordinate(coord)
   if (!c || !Number.isFinite(meters) || meters < 0) return null
@@ -142,7 +136,7 @@ export function boundingBoxAround(coord, meters) {
   }
 }
 
-/** Grows a bounding box outward by a fixed margin in metres. */
+// Grows a bounding box outward by a fixed margin in metres.
 export function padBounds(bounds, meters) {
   if (!isValidBounds(bounds) || !Number.isFinite(meters)) return null
   const centre = centerOfBounds(bounds)
@@ -157,7 +151,7 @@ export function padBounds(bounds, meters) {
   }
 }
 
-/** Bounds as the nested tuple Leaflet's fitBounds expects. */
+// Bounds as the nested tuple Leaflet's fitBounds expects.
 export function toBoundsTuple(bounds) {
   if (!isValidBounds(bounds)) return null
   return [
@@ -166,9 +160,8 @@ export function toBoundsTuple(bounds) {
   ]
 }
 
-// ── distance ──────────────────────────────────────────────────────────
 
-/** Great-circle distance in metres. Mirrors the backend clash engine. */
+// Great-circle distance in metres. Mirrors the backend clash engine.
 export function distanceBetween(a, b) {
   const p1 = normalizeCoordinate(a)
   const p2 = normalizeCoordinate(b)

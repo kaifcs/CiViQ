@@ -1,11 +1,6 @@
-/**
- * 15px stroked SVG wrapper used by quick actions and inline table controls.
- * `d` is the path content, so callers supply geometry only and every icon
- * inherits the same stroke weight and cap style.
- *
- * Decorative by default: quick actions and buttons carry their own visible or
- * aria label, so the glyph is hidden from assistive technology.
- */
+// 15px stroked SVG wrapper: `d` is the path content, so every icon inherits the
+// same stroke weight and cap style. Decorative by default — callers carry their
+// own visible or aria label, so the glyph is hidden from assistive technology.
 export default function ActionIcon({ d, size = 15, className = '' }) {
   return (
     <svg

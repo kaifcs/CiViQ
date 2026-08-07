@@ -5,16 +5,9 @@ import { useMap } from "../useMap"
 import { coordinateOf } from "../gisService"
 import { HEATMAP_DEFAULTS, HEATMAP_GRADIENT, densityWeight } from "../heatmapStyles"
 
-/**
- * Spatial density surface over any record set that carries coordinates.
- *
- * Follows the same contract as MarkerLayer — `records` plus resolver functions,
- * renders null, output goes onto the map from useMap() — so it composes with
- * the other layers without touching them. It resolves coordinates through the
- * shared gisService rather than reading location fields itself.
- *
- * Records without a usable coordinate are skipped; nothing is interpolated.
- */
+// Spatial density surface over any record set carrying coordinates. Follows the
+// same contract as MarkerLayer — `records` plus resolvers, renders null, output
+// goes onto the map from useMap() — so it composes without touching them.
 export default function HeatmapLayer({
   records = [],
   getCoordinate = coordinateOf,
@@ -56,14 +49,9 @@ export default function HeatmapLayer({
     layerRef.current = layer
 
     return () => {
-      // leaflet.heat schedules redraws through requestAnimationFrame and does
-      // not cancel them in onRemove, so a frame queued just before teardown
-      // fires against a null _map and throws. Cancelling the pending frame is
-      // not sufficient on its own — Leaflet's own removeLayer can emit one more
-      // event during removal — so the draw callbacks are neutralised too.
-      // Order matters: removeLayer must run first so leaflet.heat's onRemove
-      // can deregister its own listeners, which Leaflet matches by function
-      // reference. Only then is it safe to neutralise the callbacks.
+      // leaflet.heat queues redraws with requestAnimationFrame and never cancels
+      // them in onRemove, so a frame landing after teardown throws on a null _map.
+      // removeLayer must run first, before the draw callbacks are neutralised.
       map.removeLayer(layer)
       if (layer._frame) {
         L.Util.cancelAnimFrame(layer._frame)

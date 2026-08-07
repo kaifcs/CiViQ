@@ -1,19 +1,10 @@
-// Domain tuning constants for clash detection and MCDM scoring.
-//
-// These are policy, not implementation: the distances, buffer periods and
-// weights encode how the municipality decides that two works collide and which
-// work matters more. They are collected here so those judgements can be
-// reviewed and adjusted without reading the engines.
-//
-// Changing any value changes real recommendations. `mcdmWeights` must continue
-// to total 1.0 — each criterion scores 1-10, so the weighted sum lands on the
-// 0-10 scale the engine reports as `score` (and x10 as `outOf100`).
-//
+// Domain tuning constants for clash detection and MCDM scoring. These are
+// policy, not implementation, and changing any value changes real
+// recommendations. `mcdmWeights` must total 1.0 to keep `score` on its 0-10 scale.
 
 module.exports = {
   // Recovery period after a work completes, before neighbouring work may start.
-  // Keys match Project.projectType enum so getSuggestedStartDate resolves them
-  // directly without falling back to the 7-day default.
+  // Keys match the Project.projectType enum, so no lookup falls back.
   bufferDays: {
     road:        14,
     water:       10,

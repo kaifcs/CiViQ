@@ -1,7 +1,5 @@
-// Public navigation bar for the citizen area.
-//
-// Carries no account controls by design: these routes are unauthenticated, and
-// staff sign in through /login rather than from here.
+// Public navigation bar for the citizen area. Carries no account controls by
+// design: these routes are unauthenticated, and staff sign in through /login.
 
 import { useNavigate, useLocation } from "react-router-dom"
 
@@ -56,8 +54,7 @@ export default function CitizenHeader() {
           <CiviqWordmark size={28} />
         </button>
         <span className="hidden md:block text-[12px] font-medium text-[#9CA3AF] uppercase tracking-[0.06em]">Ghaziabad Municipal Corporation</span>
-        {/* Scrolls rather than pushing the page wide: the four links exceed a
-            390px viewport. Layout and styling are otherwise unchanged. */}
+        {/* Scrolls rather than widening the page: four links exceed a 390px viewport. */}
         <nav className="flex items-center gap-1 min-w-0 overflow-x-auto">
           {navLinks.map(link => {
             const active = location.pathname === link.path

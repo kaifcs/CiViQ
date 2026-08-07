@@ -7,16 +7,9 @@ import {
   conflictTypesLabel,
 } from "../conflictStyles"
 
-/**
- * Read-only summary of a backend-detected conflict.
- *
- * Presentation only: every value arrives through `conflict`, it issues no
- * requests, holds no state, performs no navigation and exposes no actions.
- * Nothing here is computed — the conflict engine is the source of truth.
- *
- * "Recommendation" is the coordination note or suggested date the backend
- * stored; there is no dedicated recommendation field on the model.
- */
+// Read-only summary of a backend-detected conflict. "Recommendation" is the
+// coordination note or suggested date the backend stored; the model carries no
+// dedicated recommendation field.
 export default function ConflictPopup({ conflict }) {
   if (!conflict) return null
 

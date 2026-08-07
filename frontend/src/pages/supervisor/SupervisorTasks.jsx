@@ -1,12 +1,6 @@
-// Supervised work, and the way into recording progress on it.
-//
-// GET /api/projects is already scoped to `supervisor = req.user._id` by the
-// backend, so this list IS the supervisor's assignment — no client-side
-// ownership filter is applied, and none would be trustworthy if it were.
-//
-// The row click lands on /supervisor/tasks/:id, which is where progress is
-// actually recorded. The supervisor dashboard already links to that same route
-// from both of its tables.
+// Supervised work, and the way into recording progress on it. GET /api/projects
+// is already scoped to `supervisor = req.user._id` by the backend, so no
+// client-side ownership filter is applied — none would be trustworthy anyway.
 
 import { useCallback, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'

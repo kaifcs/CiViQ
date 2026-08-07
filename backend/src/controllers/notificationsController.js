@@ -5,13 +5,10 @@ const { parsePagination, setPaginationHeaders } = require("../utils/pagination")
 const { issueTicket } = require("../utils/streamTicket")
 const { ERROR_CODES, badRequest, notFound, serverError } = require("../utils/apiResponse")
 
-// Bulk endpoints take client-supplied id arrays; without a ceiling one request
-// could ask the database to touch an unbounded number of documents.
+// Bulk endpoints take client-supplied id arrays, so they need a ceiling.
 const MAX_BULK_IDS = 200
 
-// GET /api/notifications
-// Returns a bare array, as it always has. Pagination is opt-in via ?page/?limit
-// and reports totals through the X-Total-* headers used elsewhere in the API.
+// GET /api/notifications — bare array; pagination is opt-in.
 exports.getNotifications = async (req, res) => {
   try {
     // `protect` already loaded the user, so preferences cost no extra query.
@@ -25,20 +22,15 @@ exports.getNotifications = async (req, res) => {
   } catch (err) { serverError(res, err, "notificationsController:") }
 }
 
-// POST /api/notifications/stream-ticket
-// Exchanges the caller's session JWT — presented normally in the Authorization
-// header — for a 30-second single-use ticket the EventSource can carry in its
-// URL. `protect` has already authenticated the request.
+// Exchanges the caller's session JWT for a short-lived single-use ticket the
+// EventSource can carry in its URL.
 exports.issueStreamTicket = (req, res) => {
   res.json(issueTicket(req.user._id))
 }
 
-// GET /api/notifications/stream — Server-Sent Events.
-// Authentication is already enforced by `protect` on the route, so this only
-// registers the connection and hands ownership of the socket to the hub.
+// Authentication is enforced by the route, so this only hands the socket to the hub.
 exports.streamNotifications = (req, res) => {
-  // Long-lived response: no timeout, and Nagle disabled so each small frame
-  // leaves immediately rather than waiting to coalesce.
+  // No timeout, and Nagle disabled so each small frame leaves immediately.
   req.socket.setTimeout(0)
   req.socket.setNoDelay(true)
   req.socket.setKeepAlive(true)
@@ -71,7 +63,6 @@ exports.updatePreferences = async (req, res) => {
   } catch (err) { serverError(res, err, "notificationsController:") }
 }
 
-// PATCH /api/notifications/:id/archive and /:id/unarchive
 const archiveHandler = (archived) => async (req, res) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
@@ -85,7 +76,6 @@ const archiveHandler = (archived) => async (req, res) => {
 exports.archiveOne = archiveHandler(true)
 exports.unarchiveOne = archiveHandler(false)
 
-// PATCH /api/notifications/bulk-archive and /bulk-unarchive
 function readBulkIds(req, res) {
   const ids = req.body?.ids
   if (!Array.isArray(ids) || ids.length === 0) {
@@ -137,8 +127,7 @@ exports.getNotification = async (req, res) => {
       return badRequest(res, "Invalid notification ID")
     }
     const notification = await service.getNotification(req.user._id, req.params.id)
-    // A notification owned by someone else is reported as missing rather than
-    // forbidden, so ids cannot be probed for existence.
+    // Reported as missing rather than forbidden, so ids cannot be probed.
     if (!notification) return notFound(res, "Notification not found", ERROR_CODES.NOTIFICATION_NOT_FOUND)
     res.json(notification)
   } catch (err) { serverError(res, err, "notificationsController:") }
@@ -159,8 +148,7 @@ exports.markOneRead = async (req, res) => {
 // PATCH /api/notifications/read-all
 exports.markRead = async (req, res) => {
   try {
-    // Preferences are passed so this clears exactly the set the badge counts;
-    // `protect` already loaded the user, so this costs no extra query.
+    // Clears exactly the set the badge counts.
     const updated = await service.markAllRead(req.user._id, req.user.notificationPreferences)
     res.json({ message: "All marked as read", updated })
   } catch (err) { serverError(res, err, "notificationsController:") }

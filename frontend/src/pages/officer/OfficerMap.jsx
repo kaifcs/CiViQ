@@ -1,6 +1,5 @@
-// Map of this officer's own projects.
-//
-// Lazily loaded — one of only two routes that pull in Leaflet.
+// Map of this officer's own projects. Lazily loaded — one of only two routes
+// that pull in Leaflet.
 
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -70,13 +69,11 @@ export default function OfficerMap() {
     <AsyncState loading={loading} error={error} onRetry={reload} label="Loading map data...">
     <div className="flex flex-col gap-4 h-full" style={{ fontFamily: "'Inter', sans-serif" }}>
 
-      {/* Info notice */}
       <div className="flex items-center gap-2 px-4 py-2.5 rounded-[8px] bg-[#EEF2FF] dark:bg-[#131629] border border-[#C7D2FE] dark:border-[#252870] flex-shrink-0">
         <svg width="13" height="13" fill="none" viewBox="0 0 24 24" className="text-[#5E6AD2] flex-shrink-0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
         <p className="text-[12px] text-[#4338CA] dark:text-[#818CF8]">Showing approved and active projects only. Use this map to plan your submissions and avoid clashes.</p>
       </div>
 
-      {/* Filters */}
       <div className="flex items-center gap-3 flex-wrap flex-shrink-0">
         <FilterSelect label="Type" value={filterType} onChange={v => { setFilterType(v); setSelectedProject(null) }}
           options={[{ value: 'Road', label: 'Road' }, { value: 'Water', label: 'Water' }, { value: 'Sewage', label: 'Sewage' }, { value: 'Electrical', label: 'Electrical' }, { value: 'Parks', label: 'Parks' }]}
@@ -91,12 +88,10 @@ export default function OfficerMap() {
         </div>
       </div>
 
-      {/* Map + Drawer */}
-      {/* Below lg the fixed 300px drawer column squeezed the map to zero width,
-          so narrow viewports stack instead. */}
+      {/* Narrow viewports stack: below lg the fixed 300px drawer column would
+          squeeze the map to zero width. */}
       <div className="flex-1 min-h-0 grid gap-4 grid-cols-1 lg:grid-cols-[1fr_300px]">
 
-        {/* Map */}
         <div className="rounded-[8px] bg-[#F8FAFC] dark:bg-[#18181B] border border-[#E5E5E5] dark:border-[#27272A] flex flex-col overflow-hidden" style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
           <div className="flex-1 relative">
             <MapContainer
@@ -120,7 +115,6 @@ export default function OfficerMap() {
               </div>
             )}
           </div>
-          {/* Legend */}
           <div className="flex-shrink-0 border-t border-[#E5E5E5] dark:border-[#27272A] px-5 py-3 flex items-center gap-5 flex-wrap bg-[#FFFFFF] dark:bg-[#1C1C1F]">
             <span className="text-[11px] font-semibold text-[#9CA3AF] dark:text-[#6B7280] uppercase tracking-wide">Legend</span>
             {Object.entries(TYPE_CONFIG).map(([type, config]) => (
@@ -132,7 +126,6 @@ export default function OfficerMap() {
           </div>
         </div>
 
-        {/* Drawer */}
         <div className="rounded-[8px] bg-[#FFFFFF] dark:bg-[#1C1C1F] border border-[#E5E5E5] dark:border-[#27272A] flex flex-col overflow-hidden" style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
           {!selected ? (
             <div className="flex-1 flex flex-col items-center justify-center px-6 text-center gap-3">

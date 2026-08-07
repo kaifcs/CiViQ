@@ -1,9 +1,6 @@
-// N5 — delivery preferences.
-//
-// The one place that answers "should this notification be delivered?". The
-// invariant worth protecting is that preferences govern DELIVERY and default
-// VISIBILITY only — never persistence — and that a client cannot switch off a
-// mandatory category.
+// Delivery preferences. The invariants worth protecting: they govern delivery
+// and default visibility only, never persistence, and a client cannot switch
+// off a mandatory category.
 
 const test = require("node:test")
 const assert = require("node:assert/strict")

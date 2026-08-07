@@ -4,18 +4,9 @@ import DepartmentPopup from "./DepartmentPopup"
 import { departmentColorIndex, departmentMarkerStyle } from "../departmentStyles"
 import { LAYER_PANES } from "../config"
 
-/**
- * Department-owned assets on the map, coloured by the owning department.
- *
- * Departments themselves carry no coordinates — the model has none — so the
- * layer plots the assets they own, which do. It answers "who owns what, where";
- * the project layer answers "what state is the work in". Same records, a
- * different lens, no shared state between them.
- *
- * Independent by construction: it owns its own Leaflet layer group and pane,
- * holds no reference to any other layer, and unmounting removes only its own
- * markers.
- */
+// Department-owned assets on the map, coloured by the owning department.
+// Departments carry no coordinates of their own, so the layer plots the assets
+// they own: "who owns what, where", where the project layer shows work state.
 export default function DepartmentLayer({
   records = [],
   departments = [],

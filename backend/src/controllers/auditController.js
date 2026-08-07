@@ -1,26 +1,14 @@
-// Audit trail reads — administrator only.
-//
-// Read-only: nothing here writes to the trail. Entries are created by
-// services/auditService from within the operation being recorded, so the
-// trail cannot be edited through the API.
+// Audit trail reads — administrator only. Nothing here writes to the trail, so
+// it cannot be edited through the API.
 
 const mongoose = require("mongoose")
 const AuditLog = require("../models/AuditLog")
 const { parsePagination, setPaginationHeaders } = require("../utils/pagination")
 const { ERROR_CODES, badRequest, notFound, serverError } = require("../utils/apiResponse")
 
-/**
- * Server-side filters for the trail.
- *
- * Filtering used to happen only in the browser, over the 200 most recent rows
- * the unpaginated read returns — so a filter silently missed everything older.
- * Applying it here narrows the query itself, and the paginated total counts the
- * same filtered set.
- *
- * Every value is validated or coerced before it reaches the query: a query
- * string parses `?action[$ne]=x` into an object, which would otherwise arrive
- * as a Mongo operator.
- */
+// Filters are applied server-side, so they narrow the whole trail rather than
+// only the rows already returned. Every value is validated or coerced first:
+// `?action[$ne]=x` parses into an object that would arrive as a Mongo operator.
 function buildAuditFilter(query = {}) {
   const { action, performedBy, targetType, isOverride, from, to } = query
   const filter = {}
@@ -61,8 +49,7 @@ exports.getLogs = async (req, res) => {
 
     const page = parsePagination(req.query)
     let q = AuditLog.find(filter).populate("performedBy","fullName role department").sort("-createdAt")
-    // Capped when unpaginated: the trail grows without bound and the default
-    // view only ever shows recent activity.
+    // Capped when unpaginated: the trail grows without bound.
     q = page.enabled ? q.skip(page.skip).limit(page.limit) : q.limit(200)
 
     const logs = await q.lean()

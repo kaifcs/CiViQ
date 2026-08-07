@@ -1,8 +1,6 @@
-// Account administration.
-//
-// Role changes take effect on the user's next request because `protect`
-// re-reads the account every time. Accounts are deactivated, never deleted, so
-// the history referencing them stays readable.
+// Account administration. Role changes take effect on the user's next request
+// because `protect` re-reads the account every time. Accounts are deactivated,
+// never deleted, so the history referencing them stays readable.
 
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -13,7 +11,6 @@ import { useAuth } from '../../hooks/useAuth'
 import { DEPT_STYLES, ROLE_STYLES } from '../../components/uiStyles'
 import { formatDateLong } from '../../components/dashboard'
 
-// ─── Helpers ───────────────────────────────────
 function getInitials(name) {
   if (!name) return '?'
   return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
@@ -39,7 +36,6 @@ const VDivider = () => (
   <div className="w-px h-8 bg-[#E5E5E5] dark:bg-[#27272A] flex-shrink-0" />
 )
 
-// ─── Create User Modal ─────────────────────────
 function CreateUserModal({ onClose, onCreate, departments }) {
   const [form, setForm] = useState({
     name: '', email: '', role: 'officer',
@@ -141,7 +137,6 @@ function CreateUserModal({ onClose, onCreate, departments }) {
   )
 }
 
-// ─── Admin Users ───────────────────────────────
 export default function AdminUsers() {
   const navigate = useNavigate()
 
@@ -149,10 +144,9 @@ export default function AdminUsers() {
   const { data: fetchedUsers, loading, error, reload } = useUsers()
   const { data: departments } = useDepartments()
   const departmentOptions = useDepartmentOptions()
-  // Local copy: the status toggle updates optimistically and reverts on
-  // failure, so the list has to be mutable independently of the fetch. It is
-  // re-seeded during render whenever the server list arrives or reloads,
-  // rather than from an effect that would commit an extra render each time.
+  // Local copy: the status toggle updates optimistically and reverts on failure,
+  // so the list must be mutable independently of the fetch. Re-seeded during
+  // render whenever the server list arrives, rather than from an effect.
   const [userList,     setUserList]     = useState([])
   const [seededFrom,   setSeededFrom]   = useState(null)
   if (fetchedUsers && fetchedUsers !== seededFrom) {
@@ -209,7 +203,6 @@ export default function AdminUsers() {
     <AsyncState loading={loading} error={error} onRetry={reload} label="Loading users...">
     <div className="flex flex-col gap-4 h-full" style={{ fontFamily: "'Inter', sans-serif" }}>
 
-      {/* ── Top bar ── */}
       <div className="flex items-center gap-3 flex-wrap flex-shrink-0">
         <FilterSelect label="Department" value={filterDept} onChange={setFilterDept}
           options={departmentOptions}
@@ -248,7 +241,6 @@ export default function AdminUsers() {
         </div>
       </div>
 
-      {/* ── User list ── */}
       <div className="flex flex-col gap-2 flex-1 overflow-y-auto">
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
@@ -267,7 +259,6 @@ export default function AdminUsers() {
               }`}
               style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}
             >
-              {/* Avatar + name */}
               <div className="flex items-center gap-3 flex-shrink-0 w-[200px] min-w-0">
                 <div className="w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center text-[12px] font-semibold bg-[#EEF2FF] dark:bg-[#1E2260] text-[#5E6AD2] dark:text-[#9BA3F0] border border-[#E0E7FF] dark:border-[#252870]">
                   {getInitials(u.name)}
@@ -280,7 +271,6 @@ export default function AdminUsers() {
 
               <VDivider />
 
-              {/* Role badge */}
               <div className="flex-shrink-0 w-[100px] flex justify-center">
                 <span className={`inline-flex items-center text-[12px] font-medium px-2.5 py-1 rounded-full ${ROLE_STYLES[u.role] || ROLE_STYLES.officer}`}>
                   {u.role.charAt(0).toUpperCase() + u.role.slice(1)}
@@ -289,7 +279,6 @@ export default function AdminUsers() {
 
               <VDivider />
 
-              {/* Department */}
               <div className="flex-shrink-0 w-[80px] flex justify-center">
                 {u.department ? (
                   <span className={`inline-flex items-center text-[12px] font-medium px-2.5 py-1 rounded-full ${DEPT_STYLES[u.department] || ''}`}>
@@ -302,14 +291,12 @@ export default function AdminUsers() {
 
               <VDivider />
 
-              {/* Email */}
               <div className="flex-1 min-w-0">
                 <p className="text-[13px] text-[#6B7280] dark:text-[#9CA3AF] truncate">{u.email}</p>
               </div>
 
               <VDivider />
 
-              {/* Last active */}
               <div className="flex-shrink-0 w-[120px] text-right">
                 <p className="text-[11px] font-semibold text-[#9CA3AF] dark:text-[#6B7280] uppercase tracking-wide mb-0.5">Last active</p>
                 <p className="text-[12px] font-medium text-[#0F172A] dark:text-[#F8FAFC]">{formatDateLong(u.lastActive)}</p>
@@ -317,7 +304,6 @@ export default function AdminUsers() {
 
               <VDivider />
 
-              {/* Status toggle */}
               <div className="flex-shrink-0" onClick={e => e.stopPropagation()}>
                 <button
                   onClick={e => handleToggleStatus(e, u.id)}

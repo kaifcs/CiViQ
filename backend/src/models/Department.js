@@ -1,12 +1,6 @@
 // A municipal department — the owning body for projects and complaints.
-//
-// `code` is the short form the UI labels and colours by, and `color` drives the
-// department map layer, so both are presentation-affecting stored values rather
-// than incidental metadata.
-//
-// Departments are deactivated, never deleted: existing projects reference them
-// and history has to stay readable. `isActive` is what the reference validators
-// check before allowing a new assignment.
+// Deactivated, never deleted: existing projects reference them and history must
+// stay readable. `isActive` is what the reference validators check.
 
 const mongoose = require("mongoose")
 

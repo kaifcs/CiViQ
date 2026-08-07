@@ -1,6 +1,6 @@
-// Maps backend models to frontend view models while preserving the existing UI.
-// Field names, enum casing and the conflict vocabulary all differ from what the
-// screens consume, so every entity is projected here rather than in the JSX.
+// Maps backend models to frontend view models. Field names, enum casing and the
+// conflict vocabulary all differ from what the screens consume, so every entity
+// is projected here rather than in the JSX.
 
 // Fields the UI renders that have no backend source; adapters emit null/false
 // for these rather than fabricating a value.
@@ -10,7 +10,6 @@ export const UNAVAILABLE_FIELDS = {
   auditLog: ["resourceTitle", "description"],
 }
 
-// ── helpers ───────────────────────────────────────────────────────────
 const id = (v) => (v && typeof v === "object" ? v._id : v) || null
 
 export function initialsOf(name) {
@@ -50,12 +49,9 @@ const CONFLICT_STATUS = {
 }
 const CONFLICT_SEVERITY = { incompatible: "high", conditional: "medium" }
 
-// Project.mcdmScore is stored on the engine's 0–10 scale; the same value on the
-// 0–100 scale the screens display is what the engine reports as `outOf100`
-// (mcdmEngine: outOf100 === round(score * 10)). Only the create response
-// carries `outOf100`, so reads convert here — once, at the contract boundary —
-// rather than each screen doing it. No score is recomputed; this is a unit
-// change, not a second scoring implementation.
+// Project.mcdmScore is stored on the engine's 0–10 scale; screens display the
+// 0–100 scale the engine reports as `outOf100`. Only the create response carries
+// that field, so reads convert here, once, at the contract boundary.
 const scoreOutOf100 = (score) => (Number.isFinite(score) ? Math.round(score * 10) : null)
 
 // Per-criterion scores stay on their own 0–10 scale, which is what the
@@ -67,7 +63,7 @@ const breakdownOf = (breakdown) =>
 // missing value as -Infinity so an unscored project always yields.
 const rankScore = (score) => (Number.isFinite(score) ? score : -Infinity)
 
-/** Build an id -> department lookup so ObjectId references can be shown as codes. */
+// Build an id -> department lookup so ObjectId references can be shown as codes.
 export function departmentIndex(departments = []) {
   const map = new Map()
   for (const d of departments) map.set(String(d._id), d)
@@ -82,7 +78,6 @@ function resolveDept(ref, deptMap) {
   return hit ? { code: hit.code, name: hit.name } : { code: null, name: null }
 }
 
-// ── User ──────────────────────────────────────────────────────────────
 export function adaptUser(u, deptMap) {
   if (!u) return null
   const dept = resolveDept(u.department, deptMap)
@@ -104,7 +99,6 @@ export function adaptUser(u, deptMap) {
   }
 }
 
-// ── Project ───────────────────────────────────────────────────────────
 export function adaptProject(p, deptMap) {
   if (!p) return null
   const dept = resolveDept(p.department, deptMap)
@@ -154,7 +148,6 @@ export function adaptProject(p, deptMap) {
   }
 }
 
-// ── Conflict ──────────────────────────────────────────────────────────
 
 // Kept local to the adapter so services stay free of GIS imports; returns null
 // for absent or out-of-range coordinates rather than a partial object.
@@ -196,11 +189,9 @@ export function adaptConflict(c, deptMap) {
     projectBScore: scoreOutOf100(B?.mcdmScore),
     projectABreakdown: breakdownOf(A?.mcdmBreakdown),
     projectBBreakdown: breakdownOf(B?.mcdmBreakdown),
-    // Which side the backend would keep if an admin picks `reject_lower`.
-    // conflictsController.resolveConflict defers the LOWER mcdmScore, treating a
-    // non-finite score as lowest and keeping project1 on a tie. project1 and
-    // project2 carry no precedence of their own (models/Conflict.js), so screens
-    // must read this rather than assume the first side is the higher one.
+    // Which side the backend keeps for `reject_lower`: resolveConflict defers
+    // the lower mcdmScore, treats a non-finite score as lowest, and keeps
+    // project1 on a tie. The two sides carry no precedence of their own.
     higherPriorityId: rankScore(A?.mcdmScore) >= rankScore(B?.mcdmScore)
       ? id(c.project1)
       : id(c.project2),
@@ -233,7 +224,6 @@ export function adaptConflict(c, deptMap) {
   }
 }
 
-// ── Complaint ─────────────────────────────────────────────────────────
 export function adaptComplaint(c, deptMap) {
   if (!c) return null
   const loc = c.location || {}
@@ -262,7 +252,6 @@ export function adaptComplaint(c, deptMap) {
   }
 }
 
-// ── Audit ─────────────────────────────────────────────────────────────
 export function adaptAuditLog(a, deptMap) {
   if (!a) return null
   const by = a.performedBy && typeof a.performedBy === "object" ? a.performedBy : null
@@ -272,9 +261,8 @@ export function adaptAuditLog(a, deptMap) {
     userId: id(a.performedBy),
     userName: by?.fullName || "System",
     userRole: by?.role || null,
-    // performedBy.department is a Department id stored as a String, exactly as
-    // on User. Resolved through the same index every other reference uses, so
-    // the trail shows a department code rather than a raw ObjectId.
+    // performedBy.department is a Department id stored as a String, resolved
+    // through the same index as every other reference.
     department: resolveDept(by?.department, deptMap).code,
     action: a.action,
     resourceType: a.targetType || null,
@@ -289,7 +277,6 @@ export function adaptAuditLog(a, deptMap) {
   }
 }
 
-// ── Notification ──────────────────────────────────────────────────────
 export function adaptNotification(n) {
   if (!n) return null
   return {

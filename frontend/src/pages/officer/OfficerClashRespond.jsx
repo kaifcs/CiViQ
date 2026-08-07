@@ -1,7 +1,6 @@
-// Officer's response to an administrator's reschedule decision.
-//
-// Accepting takes the suggested date; countering proposes another, which the
-// backend re-checks for clashes before recording whether it is actually clear.
+// Officer's response to an administrator's reschedule decision. Accepting takes
+// the suggested date; countering proposes another, which the backend re-checks
+// for clashes before recording whether it is actually clear.
 
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
@@ -94,8 +93,8 @@ export default function OfficerClashRespond() {
         ) : (
           <div>
             <h2 className="text-[22px] font-bold text-[#0F172A] dark:text-[#F8FAFC] mb-2">New clash detected</h2>
-            {/* Same source as the success branch: on the accept path customDate
-                is never set, so reading it alone rendered "(—)". */}
+            {/* Same source as the success branch: customDate is unset on the
+                accept path. */}
             <p className="text-[14px] text-[#6B7280] dark:text-[#9CA3AF]">
               {acceptedSuggested ? 'The suggested date' : 'Your proposed date'}
               {' ('}{acceptedSuggested ? formatDateLong(suggestedDate) : formatDateLong(customDate)}{') '}

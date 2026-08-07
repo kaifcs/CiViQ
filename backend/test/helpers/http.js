@@ -1,11 +1,6 @@
-// Express request/response doubles.
-//
-// The response helpers under test only ever call status(), json(), set() and
-// writeHead()/write()/end(), so a recording stub is enough to assert the exact
-// shape a client would receive — no HTTP server, no port, no timing.
-//
-// One double for the whole suite: tests assert against `res.body`, `res.status`
-// and `res.headers` rather than each inventing its own mock.
+// Express request/response doubles. A recording stub is enough to assert the
+// exact shape a client would receive, with no server, port or timing involved.
+// One double for the whole suite, so no test invents its own.
 
 const { EventEmitter } = require("node:events")
 
@@ -36,14 +31,14 @@ function mockRes() {
   return res
 }
 
-/** Request double with the EventEmitter surface the SSE hub subscribes to. */
+// Carries the EventEmitter surface the SSE hub subscribes to.
 function mockReq(overrides = {}) {
   const req = new EventEmitter()
   Object.assign(req, { params: {}, query: {}, body: {}, headers: {} }, overrides)
   return req
 }
 
-/** Text written to an SSE response, as the client would receive it. */
+// Text written to an SSE response, as the client would receive it.
 const written = (res) => res.chunks.join("")
 
 module.exports = { mockRes, mockReq, written }

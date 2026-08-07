@@ -1,11 +1,6 @@
-/**
- * Shared presentational shell for map popups: title, optional identifier,
- * badges, labelled rows and a short description.
- *
- * Extracted so every layer's popup renders the same card without duplicating
- * markup. Presentation only — no state, no effects, no handlers — because
- * MarkerLayer renders popups to static markup.
- */
+// Shared presentational shell for map popups: title, optional identifier,
+// badges, labelled rows and a description. Stateless and handler-free, because
+// MarkerLayer renders popups to static markup.
 export default function PopupCard({ title, subtitle, badges = [], rows = [], description }) {
   const visibleBadges = badges.filter((b) => b && b.label)
   const visibleRows = rows.filter((r) => r && r.label)

@@ -10,14 +10,9 @@ const monthLabel = (key) => {
   return m ? MONTHS[Number(m[2]) - 1] : String(key || '')
 }
 
-/**
- * Monthly trend as vertical columns. Uses the same CSS-driven approach as
- * BarChart rather than adding a charting library, so the two read as one
- * visual system.
- *
- * `data` is the `monthly` series the dashboard analytics endpoints return:
- * [{ month: "2026-08", count: 12 }].
- */
+// Monthly trend as vertical columns, drawn with CSS rather than a charting
+// library so it matches BarChart. `data` is the analytics endpoints' `monthly`
+// series: [{ month: "2026-08", count: 12 }].
 export default function TrendChart({ data = [], color = ACCENT, height = 120, emptyHint }) {
   const { series, max } = useMemo(() => {
     const s = data.map((d) => ({

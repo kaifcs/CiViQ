@@ -1,22 +1,6 @@
-// Every figure the dashboard reports, derived in one place.
-//
-// Aggregation happens in MongoDB rather than in JavaScript: each endpoint issues
-// a single `$facet` pipeline per collection, so a dozen counts and groupings
-// cost one round trip instead of a dozen. Independent collections are queried
-// concurrently.
-//
-// Two conventions run through the file:
-//
-//   • Enum values are read from the schemas, never restated here, so a new
-//     status appears in the results automatically and a removed one cannot
-//     linger as a phantom bucket.
-//   • A bad filter is REPORTED, not thrown — every entry point returns
-//     `{ error }` for invalid input, which the controller turns into a 400
-//     while genuine faults stay 500s.
-//
-// Filters are not uniform across collections, and deliberately so: ward lives
-// at a different path per model, and the project and complaint status enums are
-// disjoint, so one `status` value cannot serve both.
+// Every figure the dashboard reports, derived in one place. One $facet pipeline
+// per collection keeps a dozen counts to one round trip. Enum values are read
+// from the schemas, and a bad filter returns { error } rather than throwing.
 
 const mongoose = require("mongoose")
 const Project = require("../models/Project")
@@ -94,9 +78,9 @@ function monthlyStage(dateField = "createdAt") {
   ]
 }
 
-// Ward and complaintStatus are carried alongside the Mongo match rather than
-// inside it: ward lives at a different path per collection, and project and
-// complaint status enums are disjoint so one `status` cannot serve both.
+// Ward and complaintStatus ride alongside the match rather than inside it: ward
+// sits at a different path per collection, and the project and complaint status
+// enums are disjoint, so one `status` cannot serve both.
 function buildFilters(query = {}) {
   const { department, from, to, status, priority, ward, complaintStatus } = query
   const match = {}
@@ -129,10 +113,8 @@ function buildFilters(query = {}) {
     match.createdAt = { ...(match.createdAt || {}), $lte: new Date(to) }
   }
 
-  // A single `status` query param might be meant for projects, conflicts, or
-  // complaints, so we validate it against the union of all three enums.
-  // This prevents silent empty results for typos while allowing a cross-domain
-  // status (like "pending") to filter whatever it matches.
+  // Validated against the union of all three enums, so a typo is reported
+  // rather than silently returning nothing.
   if (status !== undefined && status !== "") {
     const s = String(status)
     const validStatuses = new Set([...PROJECT_STATUSES, ...CONFLICT_STATUSES, ...COMPLAINT_STATUSES])
@@ -149,8 +131,7 @@ function buildFilters(query = {}) {
 function toComplaintMatch(match, extra = {}) {
   const out = {}
   if (match.createdAt) out.createdAt = match.createdAt
-  // A project status would never match a complaint, so complaintStatus takes
-  // precedence and a project-only status is simply not applied here.
+  // complaintStatus takes precedence; a project-only status is not applied here.
   if (extra.complaintStatus) out.status = extra.complaintStatus
   else if (match.status && COMPLAINT_STATUSES.includes(match.status)) out.status = match.status
   if (match.department) out.assignedDepartment = String(match.department)
@@ -173,7 +154,7 @@ async function getSummary(query = {}) {
 
   const now = new Date()
   const complaintMatch = toComplaintMatch(match, extra)
-  // Conflicts / notifications / audit carry no department or priority.
+  // Conflicts, notifications and audit carry no department or priority.
   const dateOnlyMatch = toDateOnlyMatch(match)
   const conflictMatch = dateOnlyMatch
 
@@ -245,11 +226,10 @@ async function getSummary(query = {}) {
   return {
     projects: {
       total: firstCount(p.total),
-      // Workflow state — NOT the soft-delete flag.
+      // Workflow state, not the soft-delete flag.
       active: projectsByStatus.active || 0,
       completed: projectsByStatus.completed || 0,
-      // Derived: past its endDate and not in a terminal status. There is no
-      // "delayed" status on the schema.
+      // Derived at query time; there is no "delayed" status on the schema.
       delayed: firstCount(p.delayed),
       softDeleted: firstCount(p.softDeleted),
       byStatus: projectsByStatus,
@@ -286,7 +266,6 @@ async function getSummary(query = {}) {
   }
 }
 
-// ── projects ──────────────────────────────────────────────────────────
 
 async function getProjectAnalytics(query = {}) {
   const { error, match } = buildFilters(query)
@@ -302,8 +281,7 @@ async function getProjectAnalytics(query = {}) {
         byType: groupStage("projectType"),
         byWard: wardStage(),
         monthly: monthlyStage("createdAt"),
-        // Elapsed calendar days from planned start to the date progress hit
-        // 100 (actualEndDate is stamped by the progress endpoint).
+        // Elapsed calendar days from planned start to actualEndDate.
         completion: [
           { $match: { actualEndDate: { $ne: null }, startDate: { $ne: null } } },
           {
@@ -368,8 +346,7 @@ async function getConflictAnalytics(query = {}) {
         bySeverity: groupStage("severity"),
         monthly: monthlyStage("createdAt"),
         recheckPassed: [{ $match: { recheckPassed: true } }, { $count: "n" }],
-        // Conflicts carry no location of their own; the hotspot is the ward of
-        // the first clashing project, joined here rather than in the client.
+        // Conflicts carry no location, so the hotspot is the first project's ward.
         byWard: [
           { $lookup: { from: "projects", localField: "project1", foreignField: "_id", as: "p" } },
           { $unwind: { path: "$p", preserveNullAndEmptyArrays: true } },
@@ -409,8 +386,7 @@ async function getComplaintAnalytics(query = {}) {
         byStatus: groupStage("status"),
         byIssueType: groupStage("issueType"),
         byWard: wardStage(),
-        // Complaint has no resolvedAt; updatedAt is the closest stored signal
-        // for when a resolved complaint was last actioned.
+        // Complaint has no resolvedAt; updatedAt is the closest stored signal.
         resolution: [
           { $match: { status: "resolved" } },
           {
@@ -422,16 +398,13 @@ async function getComplaintAnalytics(query = {}) {
           },
         ],
         monthly: monthlyStage("createdAt"),
-        // Resolutions per month, keyed on updatedAt for the same reason
-        // `resolution` above is: Complaint has no resolvedAt, and updatedAt is
-        // the closest stored signal for when a resolved complaint was actioned.
+        // Keyed on updatedAt for the same reason `resolution` above is.
         resolvedMonthly: [{ $match: { status: "resolved" } }, ...monthlyStage("updatedAt")],
         unassigned: [{ $match: { assignedOfficer: null } }, { $count: "n" }],
         byDepartment: [
           { $group: { _id: "$assignedDepartment", count: { $sum: 1 } } },
-          // assignedDepartment is a String holding a Department _id, so it
-          // must be converted before joining. onError/onNull keep malformed
-          // or absent values in an "Unassigned" bucket instead of failing.
+          // assignedDepartment is a String, so it must be converted before the
+          // join; onError/onNull bucket malformed values as "Unassigned".
           {
             $addFields: {
               deptOid: { $convert: { input: "$_id", to: "objectId", onError: null, onNull: null } },
@@ -479,8 +452,7 @@ async function getDepartmentAnalytics(query = {}) {
 
   const complaintMatch = toComplaintMatch(match, extra)
 
-  // Three grouped reads, then a single in-memory merge over the number of
-  // DEPARTMENTS (not documents) — so this is not an N+1.
+  // The in-memory merge is over the number of departments, not documents.
   const [departments, projectRows, complaintRows] = await Promise.all([
     Department.find(match.department ? { _id: match.department } : {}).select("name code isActive").lean(),
     Project.aggregate([

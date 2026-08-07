@@ -1,8 +1,6 @@
-// S3 — structured logging and secret redaction.
-//
-// The redaction rules are a security control, not formatting: a credential that
-// reaches a log line has leaked. These tests cover both routes into a log —
-// a secret-looking KEY, and a secret embedded in a string VALUE.
+// Structured logging and secret redaction. Redaction is a security control,
+// not formatting: a credential that reaches a log line has leaked. Both routes
+// in are covered — a secret-looking key, and a secret inside a string value.
 
 const test = require("node:test")
 const assert = require("node:assert/strict")

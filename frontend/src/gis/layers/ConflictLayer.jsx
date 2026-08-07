@@ -7,19 +7,9 @@ import { conflictLineStyle, conflictMarkerStyle } from "../conflictStyles"
 import { createGlyphIcon } from "../markerIcons"
 import { LAYER_PANES } from "../config"
 
-/**
- * Conflicts detected by the backend, drawn as a dashed connector between the
- * two conflicting projects with a warning marker at each end.
- *
- * Composes the two existing primitives rather than adding a third: GeoJSONLayer
- * draws the connectors, MarkerLayer draws the endpoints. Neither is modified.
- *
- * GEOMETRY: the connector is a two-point segment between the projects' real
- * stored coordinates. The relationship is explicit in the data (project1 /
- * project2) and both endpoints are stored values — nothing is interpolated or
- * routed. A conflict missing either coordinate is omitted entirely rather than
- * drawn from a guessed position.
- */
+// Conflicts drawn as a dashed connector between the two conflicting projects
+// with a warning marker at each end, composing GeoJSONLayer and MarkerLayer
+// rather than adding a third primitive.
 export default function ConflictLayer({
   conflicts = [],
   selectedId = null,
@@ -63,9 +53,8 @@ export default function ConflictLayer({
           getTitle={(e) => e.title || "Conflicting project"}
           renderPopup={showPopup ? (e) => <ConflictPopup conflict={e.conflict} /> : undefined}
           onSelect={onSelect ? (_, e) => onSelect(e.conflictId, e.conflict) : undefined}
-          // Endpoints are indicators, not a cluster: collapsing the two ends of
-          // a conflict into one badge would hide the relationship the layer exists
-          // to show.
+          // Endpoints are indicators, not a cluster: collapsing the two ends of a
+          // conflict into one badge would hide the relationship it exists to show.
           cluster={false}
           pane={LAYER_PANES.conflict.name}
         />

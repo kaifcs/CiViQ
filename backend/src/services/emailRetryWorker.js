@@ -1,12 +1,6 @@
-// Retry sweep for transient email failures.
-//
-// The queue is the Notification collection itself: a row that failed a
-// retryable send goes back to `pending` with a `nextAttemptAt`, and this worker
-// re-drives it when due. No broker and no second collection are involved,
-// which is why BullMQ is not a dependency here.
-//
-// Safe to run on several instances at once: NotificationService claims each
-// row atomically, so only one sweep can ever send a given notification.
+// Retry sweep for transient email failures. The queue is the Notification
+// collection itself, so no broker is involved. Safe on several instances at
+// once: each row is claimed atomically before it is sent.
 
 const service = require("./notificationService")
 const { isEnabled: emailEnabled } = require("./emailService")
@@ -17,7 +11,6 @@ const BATCH_SIZE = 25
 
 let timer = null
 let running = false
-// Tracks the sweep in flight so shutdown can wait for it to finish.
 let inFlight = null
 
 async function sweep() {
@@ -42,11 +35,11 @@ async function sweep() {
 function start() {
   if (timer) return
   timer = setInterval(() => { inFlight = sweep() }, SWEEP_INTERVAL_MS)
-  // The sweep must never be the reason the process stays alive.
+  // Unref'd so the sweep can never be the reason the process stays alive.
   timer.unref?.()
 }
 
-/** Stops the sweep and waits for any pass already running to finish. */
+// Waits for any pass already running, so a send in progress is recorded.
 async function stop() {
   if (timer) {
     clearInterval(timer)

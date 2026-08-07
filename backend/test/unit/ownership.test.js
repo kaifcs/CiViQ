@@ -1,9 +1,6 @@
-// S2 — resource-level authorization (ownership).
-//
-// S2 closed three exploitable escalation paths. The rule it introduced lives in
-// exactly one place so the list and the single-resource routes cannot drift
-// apart again; these tests pin the rule itself, in both of the forms callers
-// use it: as a Mongo filter fragment, and as a decision on a loaded document.
+// Resource-level authorization. The rule lives in one place so the list and the
+// single-resource routes cannot drift apart; these pin it in both forms callers
+// use — a Mongo filter fragment, and a decision on a loaded document.
 
 const test = require("node:test")
 const assert = require("node:assert/strict")
@@ -33,12 +30,9 @@ test("only admin receives an unrestricted filter", () => {
   }
 })
 
-// P1-1 regression. `citizen` is a real value of the User.role enum and is
-// reachable through PUT /api/users/:id, but it is named by none of the three
-// scoped branches. It previously fell through to `{}` and received an
-// admin-wide scope, so a citizen account could list and read every project.
-// The fallback must deny, and it must deny the same way `canAccessProject`
-// already did — the two halves of one rule disagreeing is what the defect was.
+// `citizen` is a real role, reachable through PUT /api/users/:id, but named by
+// none of the three scoped branches. The fallback must deny, and deny the same
+// way `canAccessProject` does — two halves of one rule must not disagree.
 test("regression: an unnamed role is denied, not silently granted everything", () => {
   const citizen = asUser("citizen")
   const filter = projectScopeFilter(citizen)
@@ -50,10 +44,9 @@ test("regression: an unnamed role is denied, not silently granted everything", (
   )
 })
 
-// The fallback denies rather than tolerating. Neither call site can reach this
-// — both run behind `protect`, which guarantees a loaded user — but a scope
-// filter that answers "everything" when it does not know who is asking is the
-// exact shape of the defect above, so the safe answer is pinned here too.
+// Unreachable in practice, since both call sites run behind `protect`. Pinned
+// anyway: a scope filter that answers "everything" when it does not know who is
+// asking is the dangerous shape.
 test("projectScopeFilter denies a missing user", () => {
   assert.notDeepEqual(projectScopeFilter(undefined), {})
   assert.notDeepEqual(projectScopeFilter(null), {})
@@ -99,15 +92,9 @@ test("canAccessProject denies a missing project and an unknown role", () => {
   assert.equal(canAccessProject(undefined, { officer: oid() }), false)
 })
 
-// Documents actual behaviour, including one latent edge.
-//
-// The comparison is String(a) === String(b), so a user whose _id is null and a
-// project whose supervisor is null both stringify to "null" and match. That is
-// NOT reachable through the application: `protect` loads a real user document
-// before any handler runs, so req.user._id is always a populated ObjectId, and
-// an undefined id (the shape a malformed caller would actually have) correctly
-// does not match. The case is pinned here so that if the id ever becomes
-// caller-influenced, this test fails and the risk surfaces rather than hiding.
+// The comparison is String(a) === String(b), so two nulls stringify alike and
+// match. Unreachable through the application, since `protect` guarantees a
+// populated ObjectId — pinned so the risk surfaces if that ever changes.
 test("supervisor access against an unsupervised project: real behaviour", () => {
   assert.equal(
     canAccessProject({ _id: undefined, role: "supervisor" }, { supervisor: null }), false,

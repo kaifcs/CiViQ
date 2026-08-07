@@ -1,11 +1,6 @@
-// API regression — authentication, RBAC and ownership over real HTTP.
-//
-// The Express app is mounted on an ephemeral port so the whole middleware chain
-// runs exactly as it does in production: helmet, rate limiting, request
-// correlation, `protect`, `authorize`, the ownership guard and the error
-// handler. Unit tests cannot show that those are wired in the right order.
-//
-// Port 0 lets the OS choose, so this never collides with a running dev server.
+// Authentication, RBAC and ownership over real HTTP. The app is mounted on an
+// ephemeral port so the whole middleware chain runs as it does in production —
+// unit tests cannot show that those are wired in the right order.
 
 const test = require("node:test")
 const assert = require("node:assert/strict")
@@ -52,8 +47,8 @@ test("API regression", async (t) => {
   const officerA = await mk("officer", "officer-a@s5.test")
   const officerB = await mk("officer", "officer-b@s5.test")
   const supervisor = await mk("supervisor", "supervisor@s5.test")
-  // `citizen` is a real role an administrator can assign; it owns no project
-  // and must therefore see none. See the regression below.
+  // A real role an administrator can assign; it owns no project, so it must
+  // see none.
   const citizenUser = await mk("citizen", "citizen@s5.test")
 
   const ownedByA = await Project.create(projectDoc({
@@ -90,7 +85,6 @@ test("API regression", async (t) => {
     citizen: await login("citizen@s5.test"),
   }
 
-  // ── Authentication ──────────────────────────────────────────────────
 
   await t.test("a protected route rejects an absent, malformed or forged token", async () => {
     const forged = require("jsonwebtoken").sign({ id: String(admin._id) }, "wrong-secret")
@@ -115,9 +109,7 @@ test("API regression", async (t) => {
       "differing messages let an attacker enumerate accounts")
   })
 
-  // Regression — Account creation used to be unauthenticated, so anyone
-  // could mint a working `officer` and read every complaint unredacted. The
-  // role enum alone was never the control; authentication on the route is.
+  // The role enum is not the control here; authentication on the route is.
   await t.test("regression: account creation is not self-service (P0-1)", async (st) => {
     const payload = {
       fullName: "Mallory", email: "mallory@s5.test",
@@ -171,7 +163,6 @@ test("API regression", async (t) => {
     assert.equal(JSON.stringify(me.body).includes('"password"'), false)
   })
 
-  // ── RBAC and ownership (S2) ─────────────────────────────────────────
 
   await t.test("officers see only their own projects; admin sees all", async () => {
     const adminList = await call("/projects", { token: tokens.admin })
@@ -193,8 +184,8 @@ test("API regression", async (t) => {
     assert.equal(String(list.body[0]._id), String(ownedByA._id))
   })
 
-  // Regression — S2. This is the escalation path S2 closed: the list was scoped
-  // but a direct id reference was not, so any officer could read any project.
+  // Scoping the list is not enough on its own: a direct id reference must be
+  // scoped too, or any officer can read any project.
   await t.test("regression: an officer cannot read another officer's project by id (S2 IDOR)", async () => {
     const res = await call(`/projects/${ownedByB._id}`, { token: tokens.officerA })
     assert.equal(res.status, 404, "a foreign project must not be readable")
@@ -219,12 +210,8 @@ test("API regression", async (t) => {
     assert.notEqual(untouched.title, "hijacked", "a foreign project was modified")
   })
 
-  // Regression. `projectScopeFilter` named officer and supervisor and
-  // fell through to `{}` for everything else. An empty Mongo filter matches
-  // every document, so `citizen` — a role an administrator can assign through
-  // PUT /api/users/:id — received the admin-wide scope on both the list and,
-  // via `requireProjectAccess`, on any project by id. Both halves are pinned
-  // because they read the rule from the same function.
+  // An unnamed role must be denied, not handed an empty filter that matches
+  // every document. Both halves are pinned, since they read the same rule.
   await t.test("regression: a citizen sees no project through the list (P1-1)", async () => {
     const res = await call("/projects", { token: tokens.citizen })
     assert.equal(res.status, 200, "the endpoint stays available to any authenticated role")
@@ -249,12 +236,9 @@ test("API regression", async (t) => {
     assert.equal(String(res.body._id), String(ownedByA._id))
   })
 
-  // Regression — P1-2. PUT /:id can rewrite every input both engines read, but
-  // re-ran neither: a project could be moved onto occupied ground and stay
-  // recorded as clash-free, while its MCDM score kept describing the inputs it
-  // was created with. Both fixtures sit at the same coordinates, in the same
-  // ward, over the same dates, and are both `road` — which the matrix calls
-  // incompatible — so a location update must find the collision.
+  // PUT /:id can rewrite every input both engines read, so both must re-run.
+  // The two fixtures are co-located, contemporaneous and both `road`, which the
+  // matrix calls incompatible, so a location update must find the collision.
   await t.test("regression: updating a project re-runs clash detection (P1-2)", async () => {
     assert.equal(await Conflict.countDocuments(), 0, "precondition: no conflicts yet")
     const before = await Project.findById(ownedByA._id).lean()
@@ -303,10 +287,8 @@ test("API regression", async (t) => {
     assert.equal(typeof after.mcdmScore, "number")
   })
 
-  // The engines are re-run only for updates that touch what they read, so an
-  // unrelated edit cannot make conflict rows appear or disappear as a side
-  // effect. This is what keeps `an officer cannot modify another officer's
-  // project` above — a title-only PUT — free of engine work.
+  // The engines re-run only for updates that touch what they read, so an
+  // unrelated edit cannot make conflict rows appear or disappear.
   await t.test("an edit touching no engine input leaves clash and score state alone", async () => {
     const before = await Project.findById(ownedByA._id).lean()
     const conflictsBefore = await Conflict.countDocuments()
@@ -323,15 +305,9 @@ test("API regression", async (t) => {
     assert.equal(await Conflict.countDocuments(), conflictsBefore, "conflict rows changed on an unrelated edit")
   })
 
-  // Regression — P2-4. approve, reject and progress wrote `status` with no
-  // precondition, so a completed or rejected project could be decided again and
-  // a rejected one could be driven to completed. The rules asserted here are the
-  // ones the repository already implemented: AdminProjectDetail gates approve
-  // and reject on `status === 'pending'` (canTakeAction), and completed/rejected
-  // are the terminal pair analyticsService already excludes from work in flight.
-  // These three create their own projects, so each removes them again: the
-  // pagination assertions below count the fixture set exactly and would
-  // otherwise fail on rows this block left behind.
+  // approve and reject apply only to a `pending` project; completed and rejected
+  // are terminal. The next three clean up after themselves, because the
+  // pagination assertions below count the fixture set exactly.
   const scratchProjects = []
   const scratchProject = async (status, overrides = {}) => {
     const project = await Project.create(projectDoc({
@@ -376,9 +352,8 @@ test("API regression", async (t) => {
     }
   })
 
-  // Regression — P2-1. approve, reject and progress all guarded `status`, but
-  // the broadest write on the resource guarded nothing, so finished work stayed
-  // freely editable. Moving `startDate` past a stamped `actualEndDate` made the
+  // The broadest write on the resource needs the same guard the narrow ones
+  // have: moving `startDate` past a stamped `actualEndDate` would make the
   // dashboard's average completion time negative.
   await t.test("regression: finished work can no longer be edited (P2-1)", async (st) => {
     st.after(dropScratchProjects)
@@ -437,10 +412,8 @@ test("API regression", async (t) => {
     }
   })
 
-  // Regression — P2-2. `active` was declared by the schema, counted by the
-  // dashboard, labelled by the frontend and used by clash detection, but no
-  // code path ever wrote it — so "active projects" was permanently zero and
-  // approved work in flight was invisible.
+  // `active` is counted by the dashboard and read by clash detection, so
+  // something has to write it: recording real progress is what does.
   await t.test("regression: recording progress makes a project active (P2-2)", async (st) => {
     st.after(dropScratchProjects)
 
@@ -476,9 +449,8 @@ test("API regression", async (t) => {
     assert.equal(done.body.status, "completed")
   })
 
-  // Prevents progress updates on unapproved projects.
-  // This preserves the approval workflow and ensures only authorized work
-  // can reach completion.
+  // Progress on an unapproved project would let work reach completion without
+  // ever passing through the approval workflow.
   await t.test("regression: progress cannot be recorded before approval (P1-1)", async (st) => {
     st.after(dropScratchProjects)
 
@@ -596,10 +568,8 @@ test("API regression", async (t) => {
     assert.equal((await Conflict.findById(conflict._id).lean()).status, "pending")
   })
 
-  // The guard is scoped to the project each branch actually writes, so it
-  // refuses invalid transitions without blocking valid ones. reject_lower never
-  // rewrites the winner — it only reads its endDate for the suggested date — so
-  // a finished winner must not stop the loser being rescheduled.
+  // The guard is scoped to the project each branch writes. reject_lower never
+  // rewrites the winner, so a finished winner must not block the deferral.
   await t.test("reject_lower still runs when only the winner is finished (terminal-status guard)", async (st) => {
     st.after(dropScratch)
 
@@ -616,8 +586,8 @@ test("API regression", async (t) => {
     assert.equal((await Conflict.findById(conflict._id).lean()).status, "awaiting_officer")
   })
 
-  // Regression — F-1. Conflict resolution writes Project.status directly, so it
-  // must enforce the same lifecycle invariants.
+  // Conflict resolution writes Project.status directly, so it must enforce the
+  // same lifecycle invariants the project routes do.
 
   await t.test("regression: approve_both does not roll in-flight work back to approved (F-1)", async (st) => {
     st.after(dropScratch)
@@ -757,8 +727,8 @@ test("API regression", async (t) => {
     ...over,
   })
 
-  // Regression — F-2. Denormalized clash state must stay synchronized with the
-  // Conflict collection on both projects.
+  // Denormalised clash state must stay in step with the Conflict collection on
+  // both projects, not just the one being saved.
   const dropClashFixtures = async (projectIds) => {
     await Conflict.deleteMany({
       $or: [{ project1: { $in: projectIds } }, { project2: { $in: projectIds } }],
@@ -858,7 +828,7 @@ test("API regression", async (t) => {
     }
   })
 
-  // Regression. Project managers and assigned officers must always be staff.
+  // Project managers and assigned officers must always be staff.
   await t.test("regression: a project manager must be staff", async (st) => {
     st.after(dropPostedProjects)
 
@@ -918,12 +888,9 @@ test("API regression", async (t) => {
       "the stored supervisor changed despite the refusal")
   })
 
-  // The guard rejects the wrong role and nothing else: assigning a real
-  // supervisor, and completing the work afterwards, must both still succeed.
-  // Regression — F-8. The mapping itself is unit-tested; what needs a database
-  // is the step before it — resolving the RECIPIENT's role. Assigning a
-  // supervisor and completing the work raises notifications to two different
-  // roles from the same request path, so one exercise covers both.
+  // The mapping is unit-tested; what needs a database is resolving the
+  // recipient's role. Assigning a supervisor and then completing the work
+  // notifies two different roles, so one exercise covers both.
   await t.test("regression: a notification links to the recipient's own screen (F-8)", async (st) => {
     const Notification = require("../../src/models/Notification")
     st.after(async () => {
@@ -984,7 +951,7 @@ test("API regression", async (t) => {
     assert.equal(reassign.status, 200, "reassigning the same supervisor must still work")
 
     // A new project is `pending`, and progress does not apply until an
-    // administrator has approved it — see the P1-1 regression below.
+    // administrator has approved it.
     const approved = await call(`/projects/${id}/approve`, { token: tokens.admin, method: "PUT", body: {} })
     assert.equal(approved.status, 200)
 
@@ -1011,7 +978,7 @@ test("API regression", async (t) => {
     assert.equal((await Conflict.findById(conflict._id).lean()).status, "resolved_both")
   })
 
-  // Regression — P2-3. Public complaint creation must not accept workflow or assignment fields.
+  // Public complaint creation must not accept workflow or assignment fields.
   await t.test("regression: an anonymous report cannot set workflow state (P2-3)", async () => {
     const Complaint = require("../../src/models/Complaint")
     const report = {
@@ -1059,9 +1026,8 @@ test("API regression", async (t) => {
     assert.equal(anonymous.status, 401, "assignment must stay authenticated")
   })
 
-  // Regression — F-3. GET /api/complaints is the one public list in the API and
-  // applied no ceiling when neither ?page nor ?limit was given, so an anonymous
-  // caller received the entire collection — a payload that grows without bound.
+  // The one public list in the API, so an unpaginated read must be bounded —
+  // otherwise the payload grows with the collection for ever.
   await t.test("regression: the public complaint list is capped, and says so (F-3)", async (st) => {
     const Complaint = require("../../src/models/Complaint")
     const bulk = []
@@ -1093,7 +1059,7 @@ test("API regression", async (t) => {
     assert.equal(res.headers.get("x-total-count"), String(total),
       "X-Total-Count must be sent even when unpaginated")
 
-    // Newest first, as before — the cap keeps the most recent window.
+    // Newest first: the cap keeps the most recent window.
     for (let i = 1; i < res.body.length; i++) {
       assert.ok(new Date(res.body[i - 1].createdAt) >= new Date(res.body[i].createdAt),
         "the capped read must still be newest-first")
@@ -1160,7 +1126,6 @@ test("API regression", async (t) => {
     assert.equal(typeof res.body.total, "number", "the response was the complaint lookup, not the aggregate")
   })
 
-  // ── Contract (S1) ───────────────────────────────────────────────────
 
   await t.test("errors carry the standard envelope with a machine-readable code", async () => {
     const res = await call("/projects/not-an-object-id", { token: tokens.admin })
@@ -1199,7 +1164,7 @@ test("API regression", async (t) => {
     assert.equal(paged.headers.get("x-has-previous"), "false")
   })
 
-  // Regression — S4. Pagination metadata must respect the caller's scope.
+  // Pagination metadata must respect the caller's scope.
   await t.test("regression: paginated totals respect the caller's scope (S4 parallel count)", async () => {
     const res = await call("/projects?page=1&limit=10", { token: tokens.officerA })
     assert.equal(res.headers.get("x-total-count"), "1",
@@ -1207,7 +1172,6 @@ test("API regression", async (t) => {
     assert.equal(res.body.length, 1)
   })
 
-  // ── Observability (S3) ──────────────────────────────────────────────
 
   await t.test("every response carries a correlation id", async () => {
     const res = await call("/projects", { token: tokens.admin })

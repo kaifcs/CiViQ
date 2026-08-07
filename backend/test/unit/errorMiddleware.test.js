@@ -1,9 +1,6 @@
-// S3 — the unhandled-error middleware.
-//
-// This is the last line before a client sees a failure, so a fault here turns
-// every unexpected error into a second, worse one. S3 shipped exactly that bug
-// (see the regression at the foot of this file), which is why the happy path
-// and the production guard are both pinned.
+// The unhandled-error middleware: the last line before a client sees a failure,
+// so a fault here turns every unexpected error into a second, worse one. The
+// happy path and the production guard are both pinned.
 
 const test = require("node:test")
 const assert = require("node:assert/strict")
@@ -101,16 +98,9 @@ test("test and staging environments are treated as non-development", () => {
   }
 })
 
-// Regression — S3.
-//
-// The middleware logged the failure BEFORE `const status` was declared, so
-// reading `status` inside the log call hit the temporal dead zone. Every
-// unhandled error threw a ReferenceError from the handler meant to report it,
-// and because that happened inside the error path it surfaced only as a broken
-// response. The bug was found by noticing non-JSON lines in a production log.
-//
-// This asserts the observable guarantee: the middleware always produces a
-// response and never throws, whatever it is handed.
+// The observable guarantee: the middleware always produces a response and never
+// throws, whatever it is handed. A fault inside the error path would surface
+// only as a broken response, so it is asserted directly.
 test("regression: the handler responds instead of throwing (S3 temporal dead zone)", () => {
   const inputs = [
     new Error("standard"),

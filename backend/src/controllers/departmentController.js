@@ -1,9 +1,5 @@
-// Department administration.
-//
-// Departments are reference data: nearly every other entity points at one, and
-// the frontend caches the whole list at sign-in to resolve those references
-// without a second request. There is deliberately no delete — a department is
-// deactivated so existing projects and complaints stay readable.
+// Department administration. Reference data: the frontend caches the whole list
+// at sign-in to resolve references. There is deliberately no delete.
 
 const mongoose = require("mongoose")
 const Department = require("../models/Department")
@@ -18,7 +14,6 @@ exports.getDepartments = async (req, res) => {
     let q = Department.find().sort({ createdAt: -1 })
     if (page.enabled) q = q.skip(page.skip).limit(page.limit)
 
-    // lean(): read-only; Department has no toJSON transform.
     const departments = await q.lean()
     if (page.enabled) setPaginationHeaders(res, await Department.countDocuments(), page)
     res.status(200).json({ success: true, count: departments.length, departments })
@@ -86,7 +81,7 @@ exports.updateDepartment = async (req, res) => {
       return badRequest(res, "Invalid department ID")
     }
 
-    // Do not allow updating isActive via PUT
+    // isActive is not writable here; use PATCH /:id/status.
     const { name, code, description, color } = req.body
 
     let department = await Department.findById(req.params.id)

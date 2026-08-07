@@ -4,7 +4,6 @@
 import { GEOMETRY_TYPES, GEOJSON_TYPES } from "./constants"
 import { boundsOf, fromPosition, toPosition, normalizeCoordinate } from "./coordinates"
 
-// ── constructors ──────────────────────────────────────────────────────
 // Each returns null on invalid input so callers never emit malformed geometry.
 
 export function point(coord) {
@@ -19,10 +18,8 @@ export function lineString(coords = []) {
   return { type: GEOMETRY_TYPES.LINE_STRING, coordinates: positions }
 }
 
-/**
- * Builds a Polygon from an outer ring plus optional holes. Rings are closed
- * automatically when the caller omits the repeated final position.
- */
+// Builds a Polygon from an outer ring plus optional holes. Rings are closed
+// automatically when the caller omits the repeated final position.
 export function polygon(outerRing = [], holes = []) {
   const outer = closeRing(outerRing.map(toPosition).filter(Boolean))
   if (!outer) return null
@@ -63,7 +60,6 @@ export function featureCollection(features = []) {
   }
 }
 
-// ── guards ────────────────────────────────────────────────────────────
 
 export function isGeometry(value) {
   return (
@@ -85,20 +81,16 @@ export function isFeatureCollection(value) {
   )
 }
 
-/** Geometry type of a geometry, Feature or FeatureCollection; null otherwise. */
+// Geometry type of a geometry, Feature or FeatureCollection; null otherwise.
 export function geometryTypeOf(value) {
   if (isGeometry(value)) return value.type
   if (isFeature(value)) return value.geometry.type
   return null
 }
 
-// ── readers ───────────────────────────────────────────────────────────
 
-/**
- * Every coordinate in a geometry, Feature or FeatureCollection, flattened to
- * canonical {lat,lng}. Used for bounds and centre calculations without each
- * caller re-implementing the nesting rules per geometry type.
- */
+// Every coordinate in a geometry, Feature or FeatureCollection, flattened to
+// canonical {lat,lng}, so callers need not re-implement the per-type nesting.
 export function coordinatesOf(value) {
   if (isFeatureCollection(value)) return value.features.flatMap(coordinatesOf)
   if (isFeature(value)) return coordinatesOf(value.geometry)
@@ -118,16 +110,14 @@ export function coordinatesOf(value) {
   }
 }
 
-/** Bounding box of any GeoJSON value, or null when it carries no coordinates. */
+// Bounding box of any GeoJSON value, or null when it carries no coordinates.
 export function boundsOfGeoJSON(value) {
   return boundsOf(coordinatesOf(value))
 }
 
-/**
- * Parses a value that may already be GeoJSON or a JSON string of it. Returns
- * null rather than throwing, so a malformed stored geometry degrades to "no
- * geometry" instead of breaking the render.
- */
+// Parses a value that may already be GeoJSON or a JSON string of it. Returns
+// null rather than throwing, so a malformed stored geometry degrades to "no
+// geometry" instead of breaking the render.
 export function parseGeoJSON(value) {
   if (typeof value === "string") {
     try {
@@ -140,7 +130,7 @@ export function parseGeoJSON(value) {
   return null
 }
 
-/** Convenience wrapper for the most common conversion: a coordinate to a Feature. */
+// Convenience wrapper for the most common conversion: a coordinate to a Feature.
 export function pointFeature(coord, properties = {}, id) {
   const c = normalizeCoordinate(coord)
   return c ? feature(point(c), properties, id) : null

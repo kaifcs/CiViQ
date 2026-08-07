@@ -1,7 +1,5 @@
-// Liveness and subsystem diagnostics.
-//
-// The one unauthenticated route in the API, so it reports state without ever
-// revealing configuration: subsystems are "connected", "configured" or
+// Liveness and subsystem diagnostics. Unauthenticated, so it reports state
+// without revealing configuration: subsystems are "connected", "configured" or
 // "disabled", never a host, URI or credential.
 
 const router = require("express").Router()
@@ -24,10 +22,8 @@ router.get(
     const dbState = CONNECTION_STATES[mongoose.connection.readyState] || "unknown"
     const streamStats = notificationStream.stats()
 
-    // Optional infrastructure reports "disabled", never "down": running
-    // without Redis or Brevo is a supported configuration, and a probe must
-    // not treat it as a fault. The top-level fields are the stable contract;
-    // `subsystems` carries the detail.
+    // Optional infrastructure reports "disabled", never "down", so a probe
+    // does not treat an unconfigured subsystem as a fault.
     res.status(200).json({
       status: "ok",
       uptime: process.uptime(),

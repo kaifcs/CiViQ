@@ -1,8 +1,6 @@
-// Conflict queue awaiting administrator decision.
-//
-// The administrator is the only role that can resolve a clash — approving both
-// works or rejecting the lower-scoring one — which is why this list is the
-// entry point to the resolution flow.
+// Conflict queue awaiting administrator decision. The administrator is the only
+// role that can resolve a clash — approving both works or rejecting the
+// lower-scoring one — so this list is the entry point to the resolution flow.
 
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -11,9 +9,7 @@ import AsyncState from '../../components/AsyncState'
 import { CONFLICT_STATUS_CONFIG, DEPT_STYLES, SEVERITY_CONFIG, scoreColor } from '../../components/uiStyles'
 import { daysSince } from '../../components/dashboard'
 
-// ─── Helpers ───────────────────────────────────
 
-// ─── Small components ──────────────────────────
 function Badge({ label, className }) {
   return (
     <span className={`inline-flex items-center text-[12px] font-medium px-2.5 py-1 rounded-full ${className}`}>
@@ -63,7 +59,6 @@ function FilterSelect({ label, value, onChange, options }) {
   )
 }
 
-// ─── Conflict Card ─────────────────────────────
 function ConflictCard({ conflict, onClick }) {
   const days       = daysSince(conflict.detectedAt)
   const isUnresolved = conflict.status === 'unresolved'
@@ -74,10 +69,8 @@ function ConflictCard({ conflict, onClick }) {
       className="px-5 py-4 bg-[#FFFFFF] dark:bg-[#1C1C1F] border border-[#E5E5E5] dark:border-[#27272A] rounded-[8px] cursor-pointer transition-all hover:border-[#5E6AD2]/40 dark:hover:border-[#5E6AD2]/40 hover:bg-[#FAFAFA] dark:hover:bg-[#252529] flex flex-col gap-3"
       style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}
     >
-      {/* Top: Project A | VS | Project B — both title top, meta below */}
       <div className="flex items-start gap-4">
 
-        {/* Project A */}
         <div className="flex-1 min-w-0 flex flex-col gap-1.5">
           <p className="text-[14px] font-semibold text-[#0F172A] dark:text-[#F8FAFC] leading-snug">
             {conflict.projectATitle}
@@ -91,14 +84,12 @@ function ConflictCard({ conflict, onClick }) {
           </div>
         </div>
 
-        {/* VS pill */}
         <div className="flex items-center pt-1 flex-shrink-0">
           <span className="text-[11px] font-bold text-[#9CA3AF] dark:text-[#6B7280] bg-[#F8FAFC] dark:bg-[#18181B] border border-[#E5E5E5] dark:border-[#27272A] px-2.5 py-1 rounded-full">
             VS
           </span>
         </div>
 
-        {/* Project B — mirrored right */}
         <div className="flex-1 min-w-0 flex flex-col gap-1.5 items-end">
           <p className="text-[14px] font-semibold text-[#0F172A] dark:text-[#F8FAFC] leading-snug text-right">
             {conflict.projectBTitle}
@@ -114,10 +105,8 @@ function ConflictCard({ conflict, onClick }) {
 
       </div>
 
-      {/* Divider */}
       <div className="border-t border-[#F3F4F6] dark:border-[#27272A]" />
 
-      {/* Bottom: overlap + badges + days */}
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-2 flex-1 min-w-0">
           <svg width="12" height="12" fill="none" viewBox="0 0 24 24" className="text-[#9CA3AF] flex-shrink-0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -144,7 +133,6 @@ function ConflictCard({ conflict, onClick }) {
   )
 }
 
-// ─── Admin Conflicts List ──────────────────────
 export default function AdminConflicts() {
   const navigate = useNavigate()
   const { data: conflicts, loading, error, reload } = useConflicts()
@@ -187,7 +175,6 @@ export default function AdminConflicts() {
     <AsyncState loading={loading} error={error} onRetry={reload} label="Loading conflicts...">
     <div className="flex flex-col gap-5 h-full" style={{ fontFamily: "'Inter', sans-serif" }}>
 
-      {/* ── Stat cards — flex row, minWidth, no stretch ── */}
       <div className="flex gap-3 flex-shrink-0">
         {[
           { label: 'Unresolved',       sub: 'Needs action',    value: unresolvedCount,      danger: true  },
@@ -215,7 +202,6 @@ export default function AdminConflicts() {
         ))}
       </div>
 
-      {/* ── Search + Filters ── */}
       <div className="flex flex-col gap-3 flex-shrink-0">
         <div className="relative flex items-center">
           <span className="absolute left-3 text-[#9CA3AF] pointer-events-none flex items-center">
@@ -261,7 +247,6 @@ export default function AdminConflicts() {
         </div>
       </div>
 
-      {/* ── Conflict list ── */}
       <div className="flex flex-col gap-2 flex-1 overflow-y-auto">
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">

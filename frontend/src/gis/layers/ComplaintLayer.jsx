@@ -4,16 +4,9 @@ import { complaintMarkerStyle } from "../complaintStyles"
 import { createGlyphIcon } from "../markerIcons"
 import { LAYER_PANES } from "../config"
 
-/**
- * Complaint markers on the map. Deliberately thin, like ProjectLayer: it binds
- * complaint styling, the category glyph and the complaint popup to the generic
- * MarkerLayer and adds no behaviour of its own.
- *
- * Independent by construction — it owns its own Leaflet layer group, holds no
- * reference to any other layer, and unmounting it removes only its own markers.
- * Accepts the adapted complaint view models the screens already hold, so it
- * performs no fetching.
- */
+// Complaint markers on the map. Thin, like ProjectLayer: it binds complaint
+// styling, the category glyph and the complaint popup to the generic
+// MarkerLayer and adds no behaviour of its own.
 export default function ComplaintLayer({
   complaints = [],
   selectedId = null,

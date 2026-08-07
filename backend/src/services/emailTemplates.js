@@ -1,6 +1,5 @@
-// Email rendering for notifications. One layout, one call site — nothing here
-// duplicates markup, and every category renders through the same shell so the
-// branding cannot drift between project, complaint, conflict and user mail.
+// Email rendering for notifications. Every category renders through one shell,
+// so the branding cannot drift between them.
 
 const { NOTIFICATION_CATEGORIES } = require("../config/notificationTypes")
 
@@ -8,7 +7,6 @@ const BRAND = "CiViQ"
 const BRAND_TAGLINE = "Plan together. Build once."
 const ACCENT = "#5E6AD2"
 
-// Only the accent differs per category; the shell is shared.
 const CATEGORY_ACCENT = {
   [NOTIFICATION_CATEGORIES.PROJECT]: "#5E6AD2",
   [NOTIFICATION_CATEGORIES.COMPLAINT]: "#0EA5E9",
@@ -23,7 +21,7 @@ const CATEGORY_LABEL = {
   [NOTIFICATION_CATEGORIES.SYSTEM]: "Account update",
 }
 
-/** Minimal HTML escaping — every value below is interpolated through this. */
+// Every interpolated value passes through this.
 function escapeHtml(value) {
   return String(value ?? "")
     .replace(/&/g, "&amp;")
@@ -33,7 +31,7 @@ function escapeHtml(value) {
     .replace(/'/g, "&#39;")
 }
 
-/** Turns a stored relative link into an absolute one the mail client can open. */
+// Mail clients cannot resolve a relative path, so links are made absolute.
 function absoluteLink(link) {
   if (!link) return null
   if (/^https?:\/\//i.test(link)) return link
@@ -41,10 +39,8 @@ function absoluteLink(link) {
   return `${base}/${String(link).replace(/^\/+/, "")}`
 }
 
-/**
- * The single email shell. Table-based and inline-styled because mail clients
- * strip stylesheets and collapse modern layout.
- */
+// Table-based and inline-styled because mail clients strip stylesheets and
+// collapse modern layout.
 function layout({ accent, eyebrow, heading, body, actionUrl, actionLabel }) {
   const button = actionUrl
     ? `<tr><td style="padding:8px 32px 0 32px;">
@@ -94,10 +90,7 @@ function layout({ accent, eyebrow, heading, body, actionUrl, actionLabel }) {
 </body></html>`
 }
 
-/**
- * Renders a persisted notification into a subject, HTML body and plain-text
- * fallback. Takes the notification as stored, so nothing has to be re-derived.
- */
+// Takes the notification as stored, so nothing has to be re-derived.
 function renderNotificationEmail(notification) {
   const category = notification.category || NOTIFICATION_CATEGORIES.SYSTEM
   const accent = CATEGORY_ACCENT[category] || ACCENT

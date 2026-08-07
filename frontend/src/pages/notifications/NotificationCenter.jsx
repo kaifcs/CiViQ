@@ -1,7 +1,6 @@
 // Full notification management: filtering, search, archive and bulk actions.
-//
-// Reads the same shared notification state as the navbar badge and dropdown, so
-// the three can never disagree about what is unread.
+// Reads the same shared state as the navbar badge and dropdown, so the three
+// can never disagree about what is unread.
 
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -56,11 +55,7 @@ function PreferenceToggle({ checked, disabled, onChange, label }) {
   )
 }
 
-/**
- * Full notification history for the signed-in user. Role-agnostic: it renders
- * inside whichever dashboard shell the route mounts it in, and reads the same
- * shared state as the navbar badge and dropdown.
- */
+// Role-agnostic: renders inside whichever dashboard shell the route mounts it in.
 export default function NotificationCenter() {
   const navigate = useNavigate()
   const {
@@ -147,7 +142,6 @@ export default function NotificationCenter() {
         </div>
       </div>
 
-      {/* ── Preferences ── */}
       {showPrefs && (
         <div className="bg-[#FFFFFF] dark:bg-[#1C1C1F] border border-[#E5E5E5] dark:border-[#27272A] rounded-[8px] p-5">
           <p className="text-[11px] font-semibold text-[#6B7280] dark:text-[#9CA3AF] uppercase tracking-[0.06em] mb-1">
@@ -180,7 +174,6 @@ export default function NotificationCenter() {
         </div>
       )}
 
-      {/* ── Search + filters ── */}
       <div className="flex flex-col gap-3">
         <input
           type="search"
@@ -223,7 +216,6 @@ export default function NotificationCenter() {
         </div>
       </div>
 
-      {/* ── Bulk actions ── */}
       {visible.length > 0 && (
         <div className="flex items-center gap-3 flex-wrap">
           <label className="flex items-center gap-2 cursor-pointer">

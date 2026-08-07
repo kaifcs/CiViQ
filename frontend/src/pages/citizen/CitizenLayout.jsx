@@ -1,8 +1,6 @@
-// Shell for the public citizen area.
-//
-// Separate from DashboardLayout because these routes are unauthenticated: there
-// is no sidebar, no role navigation and no notification bell, and nothing here
-// may assume a session exists.
+// Shell for the public citizen area. Separate from DashboardLayout because these
+// routes are unauthenticated: no sidebar, no role navigation, no notification
+// bell, and nothing here may assume a session exists.
 
 import CitizenHeader from "./CitizenHeader"
 import CitizenFooter from "./CitizenFooter"

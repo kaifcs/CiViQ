@@ -1,14 +1,10 @@
-// The default feed excludes archived rows with `archived: false`, a point
-// equality, rather than `{ $ne: true }` — $ne compiles to two open-ended index
-// ranges, which breaks the sorted prefix of { recipient, archived, createdAt }
-// and forces the feed to sort a recipient's entire history to return one page.
-//
-// Two things must hold forever, and only a real database can show either: which
-// rows the predicate selects, and that the query plan does not sort in memory.
-//
-// Every assertion below goes through `service.listNotifications`, so it binds to
-// buildFilter rather than to a query shape restated here — a predicate written
-// out in the test would keep passing however the implementation changed.
+// The default feed excludes archived rows with a point equality rather than
+// `$ne`, which would open two index ranges and force an in-memory sort. Only a
+// real database can show which rows are selected and how the plan is served.
+
+// Every assertion goes through `service.listNotifications`, so it binds to
+// buildFilter — a predicate restated in the test would keep passing whatever
+// the implementation did.
 
 const test = require("node:test")
 const assert = require("node:assert/strict")
@@ -50,10 +46,8 @@ test("notification feed query", async (t) => {
     rows.push(notificationDoc({ recipient: other, title: "Someone else" }))
     await Notification.insertMany(rows)
 
-    // Rows with no `archived` field at all. The schema defaults it to false, so
-    // nothing written through the model can look like this — only data migrated
-    // from before the field existed, or inserted through the raw driver as here.
-    // `archived: false` does not select them; the test below states that.
+    // Rows with no `archived` field. The schema defaults it, so only migrated
+    // or raw-driver data looks like this; the test below states what happens.
     await Notification.collection.insertMany([0, 1, 2].map((i) => ({
       recipient, type: "project_approved", title: `Legacy ${i}`, message: "m",
       read: false, category: "project", priority: "normal", deliveryStatus: "skipped",
@@ -73,10 +67,7 @@ test("notification feed query", async (t) => {
     assert.ok(!feed.some((n) => n.title === "Someone else"))
   })
 
-  // The predicate the feed actually applies, asserted through the service so it
-  // cannot drift from buildFilter. This replaces a check that compared two query
-  // shapes written out in the test: it exercised MongoDB rather than the
-  // implementation, and kept passing while the two disagreed.
+  // Asserted through the service, so it cannot drift from buildFilter.
   await t.test("the default feed selects exactly the recipient's non-archived rows", async () => {
     const feed = await service.listNotifications(
       recipient, {}, { enabled: true, skip: 0, limit: 500 }, prefs
@@ -88,10 +79,8 @@ test("notification feed query", async (t) => {
     assert.deepEqual(selected, new Set(expected.map((r) => String(r._id))),
       "the feed and `archived: false` must select the same rows")
 
-    // A point equality does not match a missing field. The schema defaults
-    // `archived` to false, so this can only describe data migrated from before
-    // the field existed — stated here so the behaviour is a decision on record
-    // rather than something discovered during a migration.
+    // A point equality does not match a missing field. Stated here so the
+    // behaviour is a decision on record rather than a migration surprise.
     const fieldless = await Notification.find({ recipient, archived: { $exists: false } }).select("_id").lean()
     assert.equal(fieldless.length, 3, "the fixture must actually contain field-less rows")
     for (const row of fieldless) {
@@ -105,7 +94,7 @@ test("notification feed query", async (t) => {
       "the badge must count exactly what the feed shows")
   })
 
-  // Regression — S4. The performance guarantee, asserted structurally rather
+  // The performance guarantee, asserted structurally rather
   // than by timing, so it is deterministic on any machine.
   await t.test("regression: the feed is served from the index without a blocking sort", async () => {
     // The shape buildFilter emits for a default feed. A point equality on
@@ -149,7 +138,7 @@ test("notification feed query", async (t) => {
     assert.ok(all.some((n) => n.archived === true) && all.some((n) => n.archived !== true))
   })
 
-  // Regression — S4. The category clause is dropped when the allow-list covers
+  // The category clause is dropped when the allow-list covers
   // everything; muting one category must still filter.
   await t.test("regression: a muted category is excluded, an unmuted set is not", async () => {
     const muted = sanitisePreferences({ inApp: { project: false } }, defaultPreferences())

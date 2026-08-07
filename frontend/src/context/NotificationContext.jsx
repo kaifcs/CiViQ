@@ -1,9 +1,6 @@
-// The single source of notification state for the whole app.
-//
-// The badge, the dropdown and the Notification Center all read from here, so
-// one fetch serves every consumer and the unread count can never disagree
-// between them. Notifications belong to an authenticated recipient, so nothing
-// is fetched until a user is present.
+// The single source of notification state for the whole app: the badge, the
+// dropdown and the Notification Center all read from here, so one fetch serves
+// every consumer and the unread count can never disagree between them.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { NotificationContext } from './notification-context'
@@ -117,10 +114,9 @@ export function NotificationProvider({ children }) {
     return close
   }, [user, applyCreated, applyRead, applyReadAll, removeLocally])
 
-  // ── Lifecycle actions ───────────────────────────────────────────────
-  // Each is optimistic and reverts on failure, matching markRead. The server
-  // also broadcasts the change, which other tabs apply through the handlers
-  // above; this tab has already converged, so those arrive as no-ops.
+  // Archive and delete are optimistic and revert on failure, like markRead. The
+  // server also broadcasts the change for other tabs; this one has already
+  // converged, so its own broadcast arrives as a no-op.
 
   const runLifecycle = useCallback(async (ids, call) => {
     const wanted = Array.isArray(ids) ? ids : [ids]
@@ -145,8 +141,6 @@ export function NotificationProvider({ children }) {
     (ids) => runLifecycle(ids, notificationsApi.remove),
     [runLifecycle]
   )
-
-  // ── Preferences ─────────────────────────────────────────────────────
 
   const loadPreferences = useCallback(async () => {
     try {

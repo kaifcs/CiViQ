@@ -1,9 +1,6 @@
-// Application entry point.
-//
-// Provider order matters: NotificationProvider reads the session through
-// useAuth, so it must sit inside AuthProvider. It fetches nothing until a user
-// is present, which is what keeps the signed-out app from opening a
-// notification stream.
+// Application entry point. Provider order matters: NotificationProvider reads
+// the session through useAuth, so it must sit inside AuthProvider — that is what
+// keeps the signed-out app from opening a notification stream.
 
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'

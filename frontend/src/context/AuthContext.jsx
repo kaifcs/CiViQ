@@ -17,18 +17,9 @@ export function AuthProvider({ children }) {
     setUser(null)
   }, [])
 
-  /**
-   * Adopts an already-adapted user record into the live session.
-   *
-   * A profile save returns the updated record, so applying it here is what makes
-   * the navbar follow immediately. Re-reading `GET /auth/me` instead would be a
-   * second request for data the caller is already holding.
-   *
-   * Guarded on identity: administrators edit other accounts through the same
-   * `usersApi.update`, and one of those must never overwrite the signed-in
-   * session. The persisted copy is rewritten alongside the state so the two
-   * cannot disagree — Login reads it back to route on the stored role.
-   */
+  // Adopts an already-adapted user into the live session, so a profile save
+  // updates the navbar without a second GET /auth/me. Guarded on identity so an
+  // admin editing another account never overwrites the signed-in session.
   const applyUserUpdate = useCallback((updated) => {
     if (!updated?.id) return
     setUser((current) => {
@@ -45,10 +36,9 @@ export function AuthProvider({ children }) {
     return () => window.removeEventListener(AUTH_EXPIRED_EVENT, onExpired)
   }, [])
 
-  // Departments are needed to resolve references, and every authenticated role
-  // may read them. The index is returned as well as stored: the signed-in user
-  // carries a department reference of its own, and adapting that user before
-  // this resolves would leave their department permanently null.
+  // Departments resolve the reference fields the adapters need. The index is
+  // returned as well as stored, since adapting the signed-in user before the
+  // state settles would leave their own department permanently null.
   const loadDepartments = useCallback(async () => {
     try {
       const raw = await departmentsApi.listRaw()
@@ -89,7 +79,7 @@ export function AuthProvider({ children }) {
     return () => { cancelled = true }
   }, [clearSession, loadDepartments])
 
-  /** Returns null on success, or a message string on failure. */
+  // Returns null on success, or a message string on failure.
   async function login(email, password) {
     try {
       const { token, user: raw } = await authApi.login(email, password)

@@ -1,7 +1,5 @@
-// Administrator profile and notification preferences.
-//
-// Preference changes are persisted per channel and category and take effect
-// immediately for both email and the in-app feed.
+// Administrator profile and notification preferences. Changes persist per
+// channel and category, and take effect on both email and the in-app feed.
 
 import { useState } from 'react'
 import { useAuth } from '../../hooks/useAuth'
@@ -61,31 +59,27 @@ export default function AdminSettings() {
   const [pwError,     setPwError]     = useState('')
   const [pwSuccess,   setPwSuccess]   = useState(false)
 
-  // PUT /api/users/:id — the admin updating their own record. The success
-  // indicator now follows the response instead of firing unconditionally.
+  // PUT /api/users/:id — the admin updating their own record.
   const [nameError, setNameError] = useState('')
   async function handleSaveName() {
     if (!name.trim() || !user?.id) return
     setNameError('')
     try {
-      // The response is the updated record, already adapted — handing it
-      // straight to the session updates the navbar on this render rather than
-      // on the next reload, and costs no second request.
+      // The response is the updated record, already adapted; handing it straight
+      // to the session updates the navbar now, at no extra request.
       const saved = await usersApi.update(user.id, { fullName: name.trim() }, deptMap)
       applyUserUpdate(saved)
       setNameSaved(true)
       setTimeout(() => setNameSaved(false), 2500)
     } catch (err) {
       // normaliseError, not err.message: an Axios rejection carries only
-      // "Request failed with status code 404" there, while the backend's own
-      // message sits at err.response.data.message.
+      // "Request failed with status code 404" there.
       setNameError(normaliseError(err).message || 'Could not save your name.')
     }
   }
 
-  // No password-change endpoint exists on the backend, so this form cannot
-  // complete. It reports that plainly rather than showing a success message
-  // for something that never happened.
+  // No password-change endpoint exists on the backend, so this form reports
+  // that plainly rather than confirming something that never ran.
   function handleChangePassword() {
     setPwError('Password changes are not available yet — ask an administrator to reset it for you.')
     setPwSuccess(false)
@@ -94,11 +88,9 @@ export default function AdminSettings() {
   return (
     <div className="flex flex-col gap-5" style={{ fontFamily: "'Inter', sans-serif" }}>
 
-      {/* ── Profile ── */}
       <Card>
         <SectionLabel>Profile</SectionLabel>
         <div className="flex items-center gap-5 mb-6 pb-5 border-b border-[#F3F4F6] dark:border-[#27272A]">
-          {/* Avatar */}
           <div className="relative flex-shrink-0">
             <div className="w-16 h-16 rounded-full flex items-center justify-center text-[20px] font-bold bg-[#EEF2FF] dark:bg-[#1E2260] text-[#5E6AD2] dark:text-[#9BA3F0] border-2 border-[#E0E7FF] dark:border-[#252870]">
               {getInitials(name)}
@@ -157,7 +149,6 @@ export default function AdminSettings() {
         </div>
       </Card>
 
-      {/* ── Security ── */}
       <Card>
         <SectionLabel>Security</SectionLabel>
         <div className="grid grid-cols-3 gap-4">
@@ -189,7 +180,6 @@ export default function AdminSettings() {
         </div>
       </Card>
 
-      {/* ── Preferences ── */}
       <Card>
         <SectionLabel>Preferences</SectionLabel>
         <div className="flex flex-col gap-4">

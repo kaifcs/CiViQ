@@ -1,9 +1,6 @@
-// N4 — SSE stream tickets.
-//
-// EventSource cannot set an Authorization header, so a credential has to travel
-// in the URL. The ticket exists to make that exposure survivable: 30 seconds and
-// one use. Both properties are security controls, so both are pinned here —
-// along with the rule that a session JWT must never be accepted in its place.
+// SSE stream tickets. A credential has to travel in the URL, so the ticket
+// makes that exposure survivable: 30 seconds and one use. Both are security
+// controls, as is the rule that a session JWT is never accepted in its place.
 
 const test = require("node:test")
 const assert = require("node:assert/strict")

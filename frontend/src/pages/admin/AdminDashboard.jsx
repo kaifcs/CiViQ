@@ -1,8 +1,6 @@
-// Administrator landing screen.
-//
-// Stat cards come from /api/dashboard/summary and the charts from the per-entity
-// analytics endpoints; the recent-activity tables use the ordinary list
-// endpoints. All are consumed as-is — no figure is recomputed client-side.
+// Administrator landing screen. Stat cards come from /api/dashboard/summary and
+// the charts from the per-entity analytics endpoints, with the recent-activity
+// tables on the ordinary list endpoints. No figure is recomputed client-side.
 
 import { useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -17,7 +15,6 @@ import {
   formatDate, timeAgo, daysSince,
   PROJECT_STATUS_LABELS, COMPLAINT_STATUS_LABELS, auditActionLabel } from '../../components/dashboard'
 
-// ─── Helpers ───────────────────────────────────
 const MONSOON_MONTHS = [6, 7, 8, 9]
 
 function getMonth(dateStr) {
@@ -38,7 +35,6 @@ function getInitials(name) {
 const RECENT_LIMIT = 5
 const RECENT_PARAMS = { page: 1, limit: RECENT_LIMIT }
 
-// ─── Severity Badge ────────────────────────────
 function SeverityBadge({ severity }) {
   const map = {
     high:   'bg-[#FEF2F2] text-[#B91C1C] dark:bg-[#1F0A0A] dark:text-[#F87171]',
@@ -53,7 +49,6 @@ function SeverityBadge({ severity }) {
   )
 }
 
-// ─── Admin Dashboard ───────────────────────────
 export default function AdminDashboard() {
   const navigate = useNavigate()
 
@@ -74,7 +69,7 @@ export default function AdminDashboard() {
   const { data: complaints, loading: loadingComplaints, error: complaintsError } = useComplaints(RECENT_PARAMS)
   const { data: auditLogs } = useAuditLogs()
 
-  // ── Stat cards — every value comes from GET /api/dashboard/summary ──
+  // Every stat value comes from GET /api/dashboard/summary.
   const stats = useMemo(() => [
     { label: 'Total Projects',     value: summary?.projects?.total ?? 0,            sub: 'All departments' },
     { label: 'Active Projects',    value: summary?.projects?.active ?? 0,           sub: 'Currently in progress' },
@@ -87,7 +82,6 @@ export default function AdminDashboard() {
     { label: 'Citizens',           value: summary?.users?.byRole?.citizen ?? 0,     sub: 'Registered residents' },
   ], [summary])
 
-  // ── Charts ──
   const projectsByDepartment = useMemo(
     () => (projectStats?.byDepartment || []).map(d => ({ label: d.code || d.name, value: d.count })),
     [projectStats]
@@ -102,7 +96,7 @@ export default function AdminDashboard() {
 
   const showMonsoonWarning = useMemo(() => hasMonsoonRoadProject(projects), [projects])
 
-  // ── Tables — sliced from lists already fetched for other widgets ──
+  // Tables slice lists already fetched for other widgets.
   const recentProjects = useMemo(
     () => [...(projects || [])]
       .sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt))
@@ -131,8 +125,8 @@ export default function AdminDashboard() {
 
   const go = useCallback((to) => navigate(to), [navigate])
 
-  // Only routes that exist are offered; see the report for the two actions
-  // that have no destination screen yet.
+  // Only routes that exist are offered; two of the intended actions have no
+  // destination screen yet.
   const quickActions = useMemo(() => [
     { id: 'gis',        label: 'View GIS',         hint: 'City map & layers', to: '/admin/map',
       icon: <ActionIcon d={<><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></>} /> },
@@ -148,7 +142,6 @@ export default function AdminDashboard() {
     <AsyncState loading={loading} error={error} onRetry={reload} label="Loading dashboard...">
     <div className="flex flex-col gap-4" style={{ fontFamily: "'Inter', sans-serif" }}>
 
-      {/* ── Seasonal Warning ── */}
       {showMonsoonWarning && (
         <div className="flex items-start gap-3 px-4 py-3 rounded-[8px] flex-shrink-0 bg-[#FFFBEB] dark:bg-[#181305] border border-[#FCD34D] dark:border-[#854F0B]">
           <svg width="15" height="15" fill="none" viewBox="0 0 24 24" className="text-[#D97706] dark:text-[#FACC15] flex-shrink-0 mt-0.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -162,13 +155,10 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* ── Quick actions ── */}
       <QuickActions actions={quickActions} onNavigate={go} />
 
-      {/* ── Stat cards ── */}
       <StatGrid stats={stats} columns={5} />
 
-      {/* ── Distribution charts ── */}
       <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
         <DashboardSection title="Projects by department">
           <AsyncState loading={loadingProjectStats} error={projectStatsError} label="Loading...">
@@ -181,7 +171,6 @@ export default function AdminDashboard() {
         </DashboardSection>
       </div>
 
-      {/* ── Trends ── */}
       <div className="grid gap-4 grid-cols-1 lg:grid-cols-3">
         <DashboardSection title="Monthly project trend">
           <AsyncState loading={loadingProjectStats} error={projectStatsError} label="Loading...">
@@ -202,7 +191,6 @@ export default function AdminDashboard() {
         </DashboardSection>
       </div>
 
-      {/* ── Recent tables ── */}
       <div className="grid gap-4 grid-cols-1 xl:grid-cols-3">
         <DashboardSection title="Recent projects">
           <DashboardTable
@@ -255,7 +243,6 @@ export default function AdminDashboard() {
         </DashboardSection>
       </div>
 
-      {/* ── Clash alerts + activity ── */}
       <div className="grid gap-4 grid-cols-1 xl:grid-cols-3">
         <DashboardSection title="Clash alerts" className="xl:col-span-2">
           {unresolvedConflicts.length === 0 ? (

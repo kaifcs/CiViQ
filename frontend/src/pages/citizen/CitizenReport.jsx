@@ -1,7 +1,5 @@
-// Citizen complaint submission — NOT YET BUILT.
-//
-// Registered stub route. The backend complaint intake exists and is documented
-// in the OpenAPI spec; only this screen is outstanding.
+// Citizen complaint submission — not yet built. The backend complaint intake
+// exists and is documented in the OpenAPI spec; only this screen is outstanding.
 
 import CitizenLayout from "./CitizenLayout"
 

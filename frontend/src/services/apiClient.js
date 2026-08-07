@@ -33,10 +33,8 @@ apiClient.interceptors.response.use(
   }
 )
 
-/**
- * Collapses any backend error into { status, message }.
- * Error envelopes differ per module ({ success, message } vs bare { message }).
- */
+// Collapses any backend error into { status, message }. Error envelopes differ
+// per module ({ success, message } vs bare { message }).
 export function normaliseError(error) {
   const status = error?.response?.status ?? 0
   const data = error?.response?.data
@@ -45,17 +43,15 @@ export function normaliseError(error) {
     (typeof data === "string" && data) ||
     error?.message ||
     "Something went wrong"
-  // Stable machine-readable code from the standard error envelope. Callers that
-  // only read `message` are unaffected; `code` is null for anything older.
+  // Machine-readable code from the standard error envelope; null when absent.
   const code = (data && typeof data === "object" && data.error?.code) || null
-  // The backend echoes its correlation id on every response. Carrying it here
-  // lets a reported fault be matched to the exact server-side log line. It is
-  // never rendered — no internal detail is exposed to the user.
+  // The backend echoes its correlation id on every response; carrying it lets a
+  // reported fault be matched to a server log line. It is never rendered.
   const requestId = error?.response?.headers?.["x-request-id"] || null
   return { status, message, code, requestId }
 }
 
-/** Read opt-in pagination metadata the backend returns as headers. */
+// Read opt-in pagination metadata the backend returns as headers.
 export function readPagination(response) {
   const h = response?.headers || {}
   if (h["x-total-count"] === undefined) return null

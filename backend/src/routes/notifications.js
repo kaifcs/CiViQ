@@ -5,29 +5,19 @@ const { consumeTicket } = require("../utils/streamTicket")
 const { generateToken } = require("../utils/token")
 const { unauthorized } = require("../utils/apiResponse")
 
-/**
- * EventSource cannot set an Authorization header, so the stream is opened with
- * a short-lived single-use ticket obtained from POST /stream-ticket. The ticket
- * is exchanged for a Bearer header here and validated by the unmodified
- * `protect` middleware, so account state and RBAC are still enforced by the one
- * authentication pipeline. Session JWTs are rejected: they carry no ticket type.
- */
+// EventSource cannot set an Authorization header, so the stream is opened with a
+// single-use ticket that is exchanged for a Bearer header here — account state
+// and RBAC stay enforced by the one `protect` pipeline. Session JWTs are refused.
 async function streamAuth(req, res, next) {
   const userId = await consumeTicket(req.query.ticket)
   if (!userId) {
-    // Routed through the shared helper so this failure carries the same
-    // { success, error: { code, message }, message } envelope as every other
-    // 401. It was the one rejection in the API emitting a bare body, so a
-    // client branching on error.code got undefined for the failure the stream's
-    // reconnect loop meets most often.
     return unauthorized(res, "Invalid or expired stream ticket")
   }
   req.headers.authorization = `Bearer ${generateToken(userId)}`
   return protect(req, res, next)
 }
 
-// Registered before the blanket `protect` so it can supply its own credential
-// source; authentication is still mandatory and still performed by `protect`.
+// Before the blanket `protect` so it can supply its own credential source.
 router.get("/stream", streamAuth, c.streamNotifications)
 
 router.use(protect)
@@ -39,7 +29,7 @@ router.get("/", c.getNotifications)
 // Static paths registered before "/:id" so they can never be captured as ids.
 router.get("/unread-count", c.getUnreadCount)
 router.patch("/read-all", c.markRead)
-// Original route kept so existing clients calling PUT continue to work.
+// Legacy alias, kept for existing clients.
 router.put("/read-all", c.markRead)
 
 router.route("/preferences")

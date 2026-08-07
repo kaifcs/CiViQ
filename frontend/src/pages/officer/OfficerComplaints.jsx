@@ -63,7 +63,6 @@ export default function OfficerComplaints() {
     <AsyncState loading={loading} error={error} onRetry={reload} label="Loading complaints...">
     <div className="flex flex-col gap-4 h-full" style={{ fontFamily: "'Inter', sans-serif" }}>
 
-      {/* Filter */}
       <div className="flex items-center gap-3 flex-wrap flex-shrink-0">
         <FilterSelect label="Status" value={filterStatus} onChange={setFilterStatus}
           options={[
@@ -77,7 +76,6 @@ export default function OfficerComplaints() {
         </div>
       </div>
 
-      {/* List */}
       <div className="flex flex-col gap-2 flex-1 overflow-y-auto">
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
@@ -95,13 +93,11 @@ export default function OfficerComplaints() {
                 c.overdue ? 'bg-[#FEF2F2] dark:bg-[#1F0A0A] border-[#FECACA] dark:border-[#7F1D1D] hover:border-[#DC2626]/40' : 'bg-[#FFFFFF] dark:bg-[#1C1C1F] border-[#E5E5E5] dark:border-[#27272A] hover:border-[#5E6AD2]/40 hover:bg-[#FAFAFA] dark:hover:bg-[#252529]'
               }`} style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
 
-              {/* CNR */}
               <div className="flex-shrink-0 w-[108px]">
                 <span className="text-[12px] font-bold text-[#5E6AD2] dark:text-[#818CF8] font-mono">{c.cnrId}</span>
               </div>
               <VDivider />
 
-              {/* Issue + address */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <p className="text-[14px] font-semibold text-[#0F172A] dark:text-[#F8FAFC]">{c.issueType}</p>
@@ -111,7 +107,6 @@ export default function OfficerComplaints() {
               </div>
               <VDivider />
 
-              {/* Days */}
               <div className="flex-shrink-0 w-[80px] flex flex-col items-end gap-0.5">
                 <span className="text-[11px] font-semibold text-[#9CA3AF] dark:text-[#6B7280] uppercase tracking-wide">Filed</span>
                 <span className={`text-[14px] font-bold leading-none ${c.overdue ? 'text-[#DC2626] dark:text-[#FCA5A5]' : 'text-[#0F172A] dark:text-[#F8FAFC]'}`}>{days}d</span>
@@ -119,7 +114,6 @@ export default function OfficerComplaints() {
               </div>
               <VDivider />
 
-              {/* Status */}
               <div className="flex-shrink-0 w-[130px] flex justify-center">
                 <span className={`inline-flex items-center gap-1.5 text-[12px] font-semibold px-2.5 py-1 rounded-full ${st.bg} ${st.color}`}>
                   <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: st.dot }} />{st.text}
@@ -127,7 +121,6 @@ export default function OfficerComplaints() {
               </div>
               <VDivider />
 
-              {/* Update status button */}
               <div className="flex-shrink-0" onClick={e => e.stopPropagation()}>
                 {nextSt ? (
                   <button onClick={e => handleUpdateStatus(e, c.id, currentStatus)}

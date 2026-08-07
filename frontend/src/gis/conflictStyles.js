@@ -1,13 +1,6 @@
-// Canonical styling for the conflict layer.
-//
-// SEVERITY: the backend Conflict.severity enum has exactly two values,
-// "incompatible" and "conditional", which adaptConflict maps to "high" and
-// "medium". The four-level scale below is defined in full so the layer is ready
-// if the enum grows, but only `high` and `medium` are reachable from real data
-// today — nothing here invents a severity a conflict does not have.
-//
-// STATUS and TYPE keys are the backend vocabularies, mapped through the same
-// adapter the conflict screens already use.
+// Canonical styling for the conflict layer. Keys are the backend vocabularies
+// mapped through adaptConflict; the severity scale is defined in full, but only
+// `high` and `medium` are reachable from the two-value Conflict.severity enum.
 
 export const CONFLICT_SEVERITY_COLORS = {
   low: "#65A30D",
@@ -62,11 +55,11 @@ export const conflictStatusLabel = (status) =>
   CONFLICT_STATUS_LABELS[status] || status || "Unknown"
 export const conflictTypeLabel = (type) => CONFLICT_TYPES[type] || type
 
-/** Human list of the clash types the backend recorded. */
+// Human list of the clash types the backend recorded.
 export const conflictTypesLabel = (types = []) =>
   types.map(conflictTypeLabel).join(", ")
 
-/** Marker appearance for a conflict endpoint. Severity drives colour. */
+// Marker appearance for a conflict endpoint. Severity drives colour.
 export function conflictMarkerStyle(record, { selected = false } = {}) {
   return {
     color: conflictSeverityColor(record?.severity),
@@ -77,7 +70,7 @@ export function conflictMarkerStyle(record, { selected = false } = {}) {
   }
 }
 
-/** Vector style for the connector between two conflicting projects. */
+// Vector style for the connector between two conflicting projects.
 export function conflictLineStyle(record, { selected = false } = {}) {
   const resolved = record?.status === "resolved"
   return {

@@ -1,6 +1,4 @@
-// Citizen project detail — NOT YET BUILT.
-//
-// Registered stub route; see CitizenProjects.jsx for the convention.
+// Citizen project detail — not yet built; see CitizenProjects.jsx.
 
 import CitizenLayout from "./CitizenLayout"
 

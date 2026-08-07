@@ -20,12 +20,10 @@ const { ERROR_CODES, badRequest, conflictError, notFound, sendWriteError, server
 
 const DECIDABLE_STATUS = "pending"
 
-// Progress updates are allowed only after approval and before completion.
+// Progress applies only after approval and before completion.
 const PROGRESSABLE_STATUSES = ["approved", "active"]
 
-// Finished work is a historical record, not a draft. Editing it rewrote what
-// was delivered: moving `startDate` after completion left `actualEndDate`
-// before it, which the project analytics report as a negative average duration.
+// Finished work is a historical record, not a draft, so it is immutable.
 const TERMINAL_STATUSES = ["completed", "rejected"]
 
 
@@ -52,12 +50,9 @@ const WRITABLE_FIELDS = [
   "documents",
 ]
 
-// Shared reference validators.
 const validateDepartmentRef = (departmentId) => validateDepartmentRefShared(departmentId, "department")
-// A project manager only has to be staff — nothing reads the field, so there is
-// no narrower rule to derive. A supervisor must hold the supervisor role: the
-// progress endpoint is gated on it, so any other assignee leaves the project
-// impossible for anyone to complete.
+// A supervisor must hold the supervisor role: the progress endpoint is gated on
+// it, so any other assignee leaves the project impossible to complete.
 const validateProjectManagerRef = (userId) => validateUserRefShared(userId, "project manager", STAFF_ROLES)
 const validateSupervisorRef = (userId) => validateUserRefShared(userId, "supervisor", ["supervisor"])
 
@@ -74,16 +69,15 @@ function validateDateRange(startDate, endDate) {
   return null
 }
 
-// Fields that affect MCDM or clash detection.
+// The engines re-run only for updates that touch what they read.
 const MCDM_INPUT_FIELDS = ["mcdmInputs", "startDate", "projectType", "location"]
 const CLASH_INPUT_FIELDS = ["location", "startDate", "endDate", "projectType"]
 
-// Recompute when any relevant field is present.
 const touches = (updates, fields) => fields.some((field) => updates[field] !== undefined)
 
 // Synchronizes the derived clash state for all affected projects.
 async function syncClashState(projectIds = []) {
-  // Deduplicated, holding whatever id form the caller had so the filter casts.
+  // Deduplicated, keeping the caller's id form so the filter still casts.
   const wanted = new Map()
   for (const id of projectIds) if (id) wanted.set(String(id), id)
   if (wanted.size === 0) return new Map()
@@ -97,8 +91,7 @@ async function syncClashState(projectIds = []) {
 
   const byProject = new Map([...wanted.keys()].map((id) => [id, []]))
   for (const conflict of conflicts) {
-    // A conflict reaches here through either side, so both are credited; a side
-    // outside `wanted` is skipped rather than written blind.
+    // Both sides are credited; a side outside `wanted` is never written blind.
     for (const side of [conflict.project1, conflict.project2]) {
       byProject.get(String(side))?.push(conflict._id)
     }
@@ -149,8 +142,7 @@ async function reconcileProjectClashes(project) {
     $or: [{ project1: project._id }, { project2: project._id }],
   }).select("project1 project2").lean()
 
-  // Every project whose set of conflicts may have just changed: this one, the
-  // counterparts it now clashes with, and the counterparts it no longer does.
+  // Every project whose set of conflicts may have changed.
   const affected = [project._id, ...clashes.map((c) => c.projectId)]
 
   if (stale.length > 0) {
@@ -168,8 +160,7 @@ async function reconcileProjectClashes(project) {
 
 exports.getProjects = async (req, res) => {
   try {
-    // Same rules the single-project routes enforce, from one definition each:
-    // who may see it, and whether it has been soft-deleted.
+    // The same scope and soft-delete rules the single-project routes enforce.
     const filter = { ...NOT_SOFT_DELETED, ...projectScopeFilter(req.user) }
     const page = parsePagination(req.query)
     let q = Project.find(filter)
@@ -179,9 +170,7 @@ exports.getProjects = async (req, res) => {
       .sort("-createdAt")
     if (page.enabled) q = q.skip(page.skip).limit(page.limit)
 
-    // lean(): read-only; Project has no toJSON transform.
-    // The count is independent of the page, so it rides alongside the read
-    // rather than after it — one round trip instead of two.
+    // The count rides alongside the read: one round trip instead of two.
     const [projects, total] = await Promise.all([
       q.lean(),
       page.enabled ? Project.countDocuments(filter) : null,
@@ -197,7 +186,6 @@ exports.getProject = async (req, res) => {
       return badRequest(res, "Invalid project ID")
     }
     const project = await Project.findById(req.params.id)
-      // Match the list endpoint projection.
       .populate("officer supervisor", "fullName email department")
       .populate("department", "name code")
       .populate("projectManager", "fullName email")
@@ -276,9 +264,8 @@ exports.createProject = async (req, res) => {
         const otherProject = projectById.get(String(clash.projectId))
         if (otherProject) {
           notificationPayloads.push(buildClashDetectedPayload(req.user._id, project, otherProject))
-          // The officer already holding the ground needs telling too. Same
-          // builder, with the projects swapped so the message reads from their
-          // side. Skipped when both projects belong to the same officer.
+          // The officer already holding the ground is told too, with the
+          // projects swapped so the message reads from their side.
           const otherOfficer = otherProject.officer
           if (otherOfficer && String(otherOfficer) !== String(req.user._id)) {
             notificationPayloads.push(buildClashDetectedPayload(otherOfficer, otherProject, project))
@@ -325,16 +312,14 @@ exports.updateProject = async (req, res) => {
       }
     }
 
-    // Whitelisted, so identity, ownership, workflow status and engine-computed
-    // fields are unreachable from the body whatever the caller's role.
+    // Whitelisted, so ownership, workflow status and engine-computed fields
+    // stay unreachable from the body whatever the caller's role.
     const safeUpdates = pickWritable(req.body, WRITABLE_FIELDS)
 
     const existing = await Project.findById(req.params.id)
     if (!existing) return notFound(res, "Project not found", ERROR_CODES.PROJECT_NOT_FOUND)
 
-    // Checked before any write, so a refused edit leaves the record untouched —
-    // including the MCDM and clash recomputation further down, which would
-    // otherwise re-score finished work.
+    // Checked before any write, so a refused edit re-scores nothing either.
     if (TERMINAL_STATUSES.includes(existing.status)) {
       return conflictError(res, `A ${existing.status} project can no longer be edited`)
     }
@@ -352,7 +337,6 @@ exports.updateProject = async (req, res) => {
       runValidators: true,
     })
 
-    // Recompute derived data only when relevant fields change.
     const rescore = touches(safeUpdates, MCDM_INPUT_FIELDS)
     const redetect = touches(safeUpdates, CLASH_INPUT_FIELDS)
     let newClashes = []
@@ -371,15 +355,13 @@ exports.updateProject = async (req, res) => {
 
     await recordAudit({ req, action: "project_updated", targetType: "Project", targetId: project._id })
 
-    // Notify only for newly detected clashes.
     if (newClashes.length > 0) {
       const others = await Project.find({ _id: { $in: newClashes.map((c) => c.projectId) } })
       const payloads = []
       for (const other of others) {
         payloads.push(buildClashDetectedPayload(req.user._id, project, other))
-        // The officer already holding the ground is the one who most needs to
-        // hear that someone has moved onto it. Same builder with the projects
-        // swapped, skipped when both belong to the same officer.
+        // The officer already holding the ground is told too, with the
+        // projects swapped so the message reads from their side.
         if (other.officer && String(other.officer) !== String(req.user._id)) {
           payloads.push(buildClashDetectedPayload(other.officer, other, project))
         }
@@ -387,8 +369,7 @@ exports.updateProject = async (req, res) => {
       await createNotifications(payloads)
     }
 
-    // Supervisor assignment happens through this route. Only a change fires a
-    // notification, so re-saving the same supervisor stays silent.
+    // Only an actual change notifies, so re-saving the same supervisor is silent.
     const previousSupervisor = existing.supervisor ? String(existing.supervisor) : null
     const nextSupervisor = project.supervisor ? String(project.supervisor) : null
     if (nextSupervisor && nextSupervisor !== previousSupervisor) {
@@ -413,8 +394,8 @@ exports.approveProject = async (req, res) => {
     project.status = "approved"
     project.adminNote = req.body.note
     await project.save()
-    // Guarded because `officer` is optional on the schema: an unset one must not
-    // turn a committed approval into a 500 with no audit entry written.
+    // `officer` is optional on the schema, and an unset one must not turn a
+    // committed approval into a 500 with no audit entry written.
     if (project.officer) await notifyProjectApproved(project.officer._id, project)
     await recordAudit({ req, action: "project_approved", targetType: "Project", targetId: project._id })
     res.json(project)
@@ -436,7 +417,7 @@ exports.rejectProject = async (req, res) => {
     project.rejectionReason = req.body.reason
     project.suggestedDate = req.body.suggestedDate
     await project.save()
-    // Same guard as approve: a missing officer must not abort the trail.
+    // Same guard as approve.
     if (project.officer) await notifyProjectRejected(project.officer._id, project, req.body.suggestedDate)
     await recordAudit({ req, action: "project_rejected", targetType: "Project", targetId: project._id, details: { reason: req.body.reason } })
     res.json(project)
@@ -445,7 +426,6 @@ exports.rejectProject = async (req, res) => {
 
 exports.updateProgress = async (req, res) => {
   try {
-    // Normalize and validate progress once.
     const raw = req.body.progress
     const progress = typeof raw === "string" && raw.trim() !== "" ? Number(raw) : raw
     if (typeof progress !== "number" || !Number.isFinite(progress) || progress < 0 || progress > 100) {
@@ -461,25 +441,21 @@ exports.updateProgress = async (req, res) => {
       )
     }
 
-    // Always false given the guard above; kept so that widening
-    // PROGRESSABLE_STATUSES cannot silently start re-announcing a completion.
+    // Always false given the guard above; kept so widening
+    // PROGRESSABLE_STATUSES cannot start re-announcing a completion.
     const wasCompleted = project.status === "completed"
     project.progress = progress
     if (progress === 100) {
       project.status = "completed"
       project.actualEndDate = new Date()
     } else if (progress > 0 && project.status === "approved") {
-      // approved -> active: the one transition into `active` that the lifecycle
-      // declares but nothing implemented, so the status was unreachable and the
-      // dashboard's "active projects" figure was permanently zero. Recording
-      // real progress is what makes work in flight; going straight to 100 skips
-      // it, which is correct — the project is finished, not active.
+      // Recording real progress is what makes work in flight. Going straight
+      // to 100 skips this, correctly: the project is finished, not active.
       project.status = "active"
     }
     await project.save()
     await recordAudit({ req, action: "progress_updated", targetType: "Project", targetId: project._id, details: { progress } })
 
-    // Notify the officer on completion.
     if (!wasCompleted && project.status === "completed" && project.officer) {
       await notifyProjectCompleted(project.officer, project)
     }

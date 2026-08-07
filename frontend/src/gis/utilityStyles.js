@@ -1,12 +1,6 @@
-// Styling for the utility layer.
-//
-// Utility types are the subset of the backend Project.projectType enum that
-// describes utility infrastructure. There is no separate utility/asset model,
-// so these are the only utility categories the backend actually represents —
-// notably there is no fiber, telecom or standalone drainage asset type.
-//
-// Rendering is vector, not marker: utility assets are corridors and pipelines,
-// which is why this layer draws stored geometry rather than points.
+// Styling for the utility layer. Utility types are the subset of the backend
+// Project.projectType enum describing infrastructure; there is no separate asset
+// model. Rendering is vector, since these assets are corridors, not points.
 
 export const UTILITY_TYPES = {
   water: { label: "Water", color: "#2563EB" },
@@ -20,14 +14,12 @@ export const FALLBACK_COLOR = "#6B7280"
 export const utilityTypeLabel = (type) => UTILITY_TYPES[type]?.label || "Other"
 export const utilityTypeColor = (type) => UTILITY_TYPES[type]?.color || FALLBACK_COLOR
 
-/** True when a record's project type is utility infrastructure. */
+// True when a record's project type is utility infrastructure.
 export const isUtilityRecord = (record) =>
   !!record && Object.prototype.hasOwnProperty.call(UTILITY_TYPES, utilityTypeOf(record))
 
-/**
- * Backend projectType for a record, accepting both the adapted view model
- * (Title Case `type`) and the raw document (`projectType`).
- */
+// Backend projectType for a record, accepting both the adapted view model
+// (Title Case `type`) and the raw document (`projectType`).
 export function utilityTypeOf(record) {
   if (!record) return null
   if (record.projectType) return record.projectType
@@ -38,10 +30,8 @@ export function utilityTypeOf(record) {
   return match ? match[0] : String(label).toLowerCase()
 }
 
-/**
- * Vector style for a utility asset. Selection thickens the stroke rather than
- * recolouring it, so the utility type stays identifiable while selected.
- */
+// Vector style for a utility asset. Selection thickens the stroke rather than
+// recolouring it, so the utility type stays identifiable while selected.
 export function utilityStyle(record, { selected = false } = {}) {
   const color = utilityTypeColor(utilityTypeOf(record))
   return {

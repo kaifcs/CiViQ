@@ -11,7 +11,6 @@ import { useAuth } from '../../hooks/useAuth'
 import { ROLE_STYLES } from '../../components/uiStyles'
 import { formatDateLong, auditActionLabel } from '../../components/dashboard'
 
-// ─── Helpers ───────────────────────────────────
 function getInitials(name) {
   if (!name) return '?'
   return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
@@ -55,10 +54,8 @@ export default function AdminUserDetail() {
   const { data: projects } = useProjects()
   const { data: auditLogs } = useAuditLogs()
 
-  // `user` is null on the first render, so seeding from it once would report a
+  // `user` is null on the first render, so seeding once would report a
   // deactivated account as Active and keep the Deactivate action live.
-  // Re-seeded during render when a different user loads, rather than from an
-  // effect, which would commit an extra render every time.
   const [userStatus,   setUserStatus]   = useState('active')
   const [seededFor,    setSeededFor]    = useState(null)
   const [showConfirm,  setShowConfirm]  = useState(false)
@@ -87,14 +84,12 @@ export default function AdminUserDetail() {
     )
   }
 
-  // Projects involved
   const userProjects = user.role === 'officer'
     ? projects.filter(p => p.officerId === user.id)
     : user.role === 'supervisor'
       ? projects.filter(p => p.supervisorId === user.id)
       : []
 
-  // Recent audit actions by this user
   const userAudit = auditLogs
     .filter(a => a.userId === user.id)
     .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
@@ -111,8 +106,6 @@ export default function AdminUserDetail() {
       setUserStatus(saved.status)
       setActionDone('deactivated')
     } catch (err) {
-      // Previously a bare try/finally: a failure closed the panel silently and
-      // the account looked unchanged with no explanation.
       setActionError(normaliseError(err).message)
     } finally {
       setShowConfirm(false)
@@ -122,7 +115,6 @@ export default function AdminUserDetail() {
   return (
     <div className="flex flex-col gap-5" style={{ fontFamily: "'Inter', sans-serif" }}>
 
-      {/* Back */}
       <button
         onClick={() => navigate('/admin/users')}
         className="flex items-center gap-1.5 text-[13px] text-[#6B7280] dark:text-[#9CA3AF] hover:text-[#0F172A] dark:hover:text-[#F8FAFC] transition-colors w-fit"
@@ -133,7 +125,6 @@ export default function AdminUserDetail() {
         Back to Users
       </button>
 
-      {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-4">
           <div className="w-14 h-14 rounded-full flex items-center justify-center text-[18px] font-bold bg-[#EEF2FF] dark:bg-[#1E2260] text-[#5E6AD2] dark:text-[#9BA3F0] border-2 border-[#E0E7FF] dark:border-[#252870]">
@@ -157,7 +148,6 @@ export default function AdminUserDetail() {
           </div>
         </div>
 
-        {/* Actions */}
         <div className="flex items-center gap-2 flex-shrink-0">
           {actionDone === 'deactivated' && (
             <span className="text-[13px] text-[#6B7280] dark:text-[#9CA3AF]">Account deactivated</span>
@@ -166,9 +156,7 @@ export default function AdminUserDetail() {
             <span className="text-[13px] text-[#DC2626] dark:text-[#F87171]">{actionError}</span>
           )}
           {/* The backend exposes no password-reset endpoint, so this control
-              cannot dispatch anything. It reports that rather than showing a
-              confirmation for a message that was never sent — the same
-              treatment the settings screens already give the same gap. */}
+              reports that rather than confirming a message it never sent. */}
           <button
             type="button"
             disabled
@@ -185,7 +173,6 @@ export default function AdminUserDetail() {
         </div>
       </div>
 
-      {/* Confirm deactivate */}
       {showConfirm && (
         <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-[8px] bg-[#FEF2F2] dark:bg-[#1F0A0A] border border-[#FECACA] dark:border-[#7F1D1D]">
           <p className="text-[13px] text-[#B91C1C] dark:text-[#F87171] font-medium">
@@ -198,7 +185,6 @@ export default function AdminUserDetail() {
         </div>
       )}
 
-      {/* ROW 1: Profile info + Activity summary */}
       <div className="grid grid-cols-2 gap-4">
         <Card>
           <SectionLabel>Profile information</SectionLabel>
@@ -246,7 +232,6 @@ export default function AdminUserDetail() {
         </Card>
       </div>
 
-      {/* ROW 2: Projects involved */}
       {userProjects.length > 0 && (
         <Card>
           <SectionLabel>Projects involved</SectionLabel>

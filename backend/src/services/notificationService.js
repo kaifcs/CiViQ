@@ -24,19 +24,8 @@ function withDerivedMetadata(payload) {
   return { category, priority, ...payload }
 }
 
-// ── Link resolution ───────────────────────────────────────────────────
-// Producers name a destination (`linkTo: { kind, id }`) instead of a path,
-// because the path depends on the RECIPIENT's role — see config/notificationLinks.
-// Resolution happens here, the one place that knows both the destination and who
-// is receiving it. An explicit `link` is honoured as given, so a caller that
-// already has a path keeps working.
-
-/**
- * Turns `linkTo` into `link` for a batch of payloads.
- *
- * The recipients' roles are read in ONE query for the whole batch rather than
- * one per payload, and only when something actually needs resolving.
- */
+// Producers name a destination because the path depends on the recipient's role.
+// Roles are read in one query per batch. An explicit `link` is honoured as given.
 async function resolveLinks(payloads) {
   const needing = payloads.filter((p) => p.link === undefined && p.linkTo)
 
@@ -50,20 +39,13 @@ async function resolveLinks(payloads) {
   return payloads.map(({ linkTo, ...payload }) => {
     if (payload.link !== undefined || !linkTo) return payload
     const link = linkFor(roleById.get(String(payload.recipient)), linkTo)
-    // Left absent rather than set to a path the recipient's router would
-    // refuse; the client already renders an unlinked notification.
+    // Left absent rather than set to a path the recipient's router would refuse.
     return link === undefined ? payload : { ...payload, link }
   })
 }
 
-// ── Delivery ──────────────────────────────────────────────────────────
-// Deliver a stored notification through the enabled channels.
-
-/**
- * Resolves the recipient a single time and drives both channels from it, so
- * adding preference evaluation costs no extra query over the email lookup that
- * already existed.
- */
+// Resolves the recipient once and drives both channels from it, so preference
+// evaluation costs no extra query.
 async function deliver(notification) {
   const doc = notification.toObject ? notification.toObject() : notification
   const user = await User.findById(doc.recipient)
@@ -78,14 +60,13 @@ async function deliver(notification) {
   await deliverEmail(doc, user)
 }
 
-// ── Email delivery state machine ──────────────────────────────────────
 // Notification documents act as the email delivery queue.
 
 const MAX_EMAIL_ATTEMPTS = 4
 // Exponential-ish backoff per attempt, in milliseconds.
 const RETRY_DELAYS_MS = [60_000, 300_000, 900_000]
 
-/** Marks a notification as never-to-be-emailed without consuming an attempt. */
+// Marks a notification as never-to-be-emailed, without consuming an attempt.
 async function markSkipped(id, reason) {
   await Notification.updateOne(
     { _id: id, deliveryStatus: { $in: ["pending", "sending"] } },
@@ -93,13 +74,8 @@ async function markSkipped(id, reason) {
   )
 }
 
-/**
- * Atomically claims a notification for sending.
- *
- * The status guard is the idempotency mechanism: exactly one caller can move a
- * row out of `pending`, so repeated sweeps and concurrent instances cannot
- * produce a duplicate send or a duplicate state transition.
- */
+// The status guard is the idempotency mechanism: exactly one caller can move a
+// row out of `pending`, so concurrent sweeps cannot produce a duplicate send.
 async function claimForSend(id) {
   return Notification.findOneAndUpdate(
     { _id: id, deliveryStatus: "pending" },
@@ -108,12 +84,8 @@ async function claimForSend(id) {
   ).lean()
 }
 
-/**
- * Sends the email for one notification, recording the outcome.
- *
- * Preferences are evaluated here rather than by the caller, so a retry honours
- * an opt-out made after the notification was created.
- */
+// Preferences are evaluated here, not by the caller, so a retry honours an
+// opt-out made after the notification was created.
 async function deliverEmail(doc, user) {
   if (!emailEnabled()) {
     await markSkipped(doc._id, "email_not_configured")
@@ -156,10 +128,7 @@ async function deliverEmail(doc, user) {
   }
 }
 
-/**
- * Retries one notification that is due. Re-reads the recipient so preferences
- * and account state are current at retry time.
- */
+// Re-reads the recipient so preferences and account state are current on retry.
 async function retryEmail(notificationId) {
   const doc = await Notification.findById(notificationId).lean()
   if (!doc || doc.deliveryStatus !== "pending") return { skipped: true }
@@ -174,7 +143,7 @@ async function retryEmail(notificationId) {
   return deliverEmail(doc, user)
 }
 
-/** Notifications whose next attempt is due. */
+// Notifications whose next attempt is due.
 async function dueForRetry(limit = 25) {
   return Notification.find({
     deliveryStatus: "pending",
@@ -182,11 +151,8 @@ async function dueForRetry(limit = 25) {
   }).sort({ nextAttemptAt: 1 }).limit(limit).select("_id").lean()
 }
 
-/**
- * Fire-and-forget: business operations must not wait on delivery, and a
- * failure must never surface as a failed request. Errors are logged with the
- * same strategy the audit and notification writes already use.
- */
+// Fire-and-forget: a business operation must not wait on delivery, and a
+// delivery failure must never surface as a failed request.
 function queueDelivery(notification) {
   if (!notification) return
   Promise.resolve()
@@ -196,11 +162,8 @@ function queueDelivery(notification) {
     })
 }
 
-// ── Real-time publishing ──────────────────────────────────────────────
-// The stream carries no payload shape of its own — events reuse the stored
-// document, or an id list for operations that span several records.
-
-/** Emits a notification event; a publish failure never reaches the caller. */
+// Events reuse the stored document, or an id list for bulk operations. A
+// publish failure never reaches the caller.
 function publish(recipientId, event, payload, id) {
   try {
     return stream.publish(recipientId, event, payload, id)
@@ -326,15 +289,9 @@ async function notifyComplaintStatusChanged(officer, complaint) {
   })
 }
 
-// ── Dispatch ──────────────────────────────────────────────────────────
 // Same contract as recordAudit: a notification write must never fail the
-// business operation that triggered it. Failures are logged and swallowed, so
-// a controller can await one of these after its write without guarding it.
-//
-// Applied only to the functions a controller actually calls on that path.
-// Anything without such a caller stays unwrapped, because swallowing there
-// would hide write failures from whoever wires it up rather than protect a
-// business operation that already succeeded.
+// business operation that triggered it, so a controller can await one of these
+// after its write without guarding it.
 function dispatcher(fn, label) {
   return async (...args) => {
     try {
@@ -346,22 +303,17 @@ function dispatcher(fn, label) {
   }
 }
 
-// ── Read side ─────────────────────────────────────────────────────────
-// Every query is scoped to the recipient, so ownership is enforced by the
-// filter itself rather than by a separate check that could be forgotten.
+// Every read is scoped to the recipient, so ownership is enforced by the filter
+// itself rather than by a separate check that could be forgotten.
 
 const SORT_FIELDS = ["createdAt", "priority", "read"]
 
-/** Escapes user input before it reaches a regular expression. */
+// Escapes user input before it reaches a regular expression.
 const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 
-/**
- * Builds the recipient-scoped filter shared by list, count and detail.
- *
- * `preferences` narrows the result to the categories the user still wants in
- * the feed. Muted categories are hidden by default but never deleted — asking
- * for one explicitly, or passing includeMuted, still returns the history.
- */
+// The recipient-scoped filter shared by list, count and detail. Muted
+// categories are hidden by default but never deleted; ?includeMuted or an
+// explicit ?category still returns the history.
 function buildFilter(recipientId, query = {}, preferences) {
   const { read, type, category, priority, archived, search, includeMuted } = query
   const filter = { recipient: recipientId }
@@ -401,7 +353,7 @@ function buildFilter(recipientId, query = {}, preferences) {
   return filter
 }
 
-/** Whitelisted sort, defaulting to newest first. */
+// Whitelisted sort, defaulting to newest first.
 function buildSort(query = {}) {
   const field = SORT_FIELDS.includes(query.sortBy) ? query.sortBy : "createdAt"
   const dir = query.order === "asc" ? 1 : -1
@@ -421,10 +373,7 @@ async function countNotifications(recipientId, query = {}, preferences) {
   return Notification.countDocuments(buildFilter(recipientId, query, preferences))
 }
 
-/**
- * The badge count: unread, not archived, and only from categories the user
- * still wants in the feed — the same rules the list applies.
- */
+// The badge counts exactly what the list would show, so the two cannot disagree.
 async function getUnreadCount(recipientId, preferences) {
   return Notification.countDocuments(
     buildFilter(recipientId, { read: "false" }, preferences)
@@ -448,14 +397,8 @@ async function markRead(recipientId, id) {
   return updated
 }
 
-/**
- * Only touches unread rows, so readAt records the first time it was read.
- *
- * Scoped through buildFilter for the same reason the badge is: "mark all read"
- * must clear exactly what the user was shown. Matching on `{ read: false }`
- * alone also marked archived rows and muted categories — notifications the
- * badge never counted — so unarchiving one later showed it as already read.
- */
+// Scoped through buildFilter so this clears exactly the set the badge counts,
+// leaving archived rows and muted categories untouched.
 async function markAllRead(recipientId, preferences) {
   const result = await Notification.updateMany(
     buildFilter(recipientId, { read: "false" }, preferences),
@@ -466,28 +409,22 @@ async function markAllRead(recipientId, preferences) {
   return updated
 }
 
-// ── Lifecycle ─────────────────────────────────────────────────────────
-// Archive is reversible and keeps history; delete is final. Both are scoped to
-// the recipient by the filter itself, and both announce the ids they touched so
-// every open client converges without re-reading the list.
+// Archive is reversible and keeps history; delete is final. Both announce the
+// ids they touched, so open clients converge without re-reading the list.
 
-/** Keeps only the ids that are valid and actually belong to the recipient. */
 function validIds(ids) {
   return (Array.isArray(ids) ? ids : [])
     .filter((id) => mongoose.Types.ObjectId.isValid(id))
     .map(String)
 }
 
-/**
- * Archives or restores a set of notifications in one write.
- * Returns the ids that changed so callers can report an accurate count.
- */
+// Returns the ids that changed, so callers report an accurate count.
 async function setArchived(recipientId, ids, archived) {
   const wanted = validIds(ids)
   if (wanted.length === 0) return { ids: [], updated: 0 }
 
-  // Read first so the event carries only rows that genuinely changed state,
-  // and so ids belonging to another user are silently excluded.
+  // Read first, so the event carries only rows that changed and ids belonging
+  // to another user are silently excluded.
   const matching = await Notification.find(
     { _id: { $in: wanted }, recipient: recipientId, archived: { $ne: archived } }
   ).select("_id").lean()
@@ -504,7 +441,7 @@ async function setArchived(recipientId, ids, archived) {
   return { ids: changed, updated: changed.length }
 }
 
-/** Permanently removes notifications the recipient owns. */
+// Permanently removes notifications the recipient owns.
 async function deleteNotifications(recipientId, ids) {
   const wanted = validIds(ids)
   if (wanted.length === 0) return { ids: [], deleted: 0 }
@@ -521,17 +458,12 @@ async function deleteNotifications(recipientId, ids) {
   return { ids: owned, deleted: owned.length }
 }
 
-// ── Preferences ───────────────────────────────────────────────────────
-
-/** Current preferences, filled in with the defaults for anything unset. */
+// Current preferences, filled in with the defaults for anything unset.
 function getPreferences(user) {
   return sanitisePreferences({}, user?.notificationPreferences)
 }
 
-/**
- * Persists a preference patch and announces it, so a user's other tabs pick up
- * the change without polling. Mandatory categories cannot be switched off.
- */
+// Announced so a user's other tabs pick the change up without polling.
 async function updatePreferences(recipientId, patch, current) {
   const next = sanitisePreferences(patch, current)
   await User.updateOne({ _id: recipientId }, { notificationPreferences: next })
@@ -541,16 +473,14 @@ async function updatePreferences(recipientId, patch, current) {
 
 module.exports = {
   NOTIFICATION_TYPES,
-  // Unwrapped — errors stay visible to the caller.
-  // createNotification is the primitive the dispatchers are built from;
-  // notifyClashDetected and notifyEarlyCompletion have no caller yet, so
-  // isolating them would only hide failures from whoever wires them up.
+  // Unwrapped: these have no controller caller on a completed-write path, so
+  // swallowing here would hide failures rather than protect anything.
   createNotification,
   buildClashDetectedPayload,
   notifyClashDetected,
   notifyEarlyCompletion,
 
-  // Isolated — each is awaited by a controller after its business write.
+  // Isolated: each is awaited by a controller after its business write.
   createNotifications: dispatcher(createNotifications, "batch"),
   notifyProjectApproved: dispatcher(notifyProjectApproved, "project_approved"),
   notifyProjectRejected: dispatcher(notifyProjectRejected, "project_rejected"),

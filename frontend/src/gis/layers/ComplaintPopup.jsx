@@ -2,15 +2,7 @@ import PopupCard from "./PopupCard"
 import { formatMapDate } from "../format"
 import { complaintCategoryColor, complaintStatusColor, complaintStatusLabel } from "../complaintStyles"
 
-/**
- * Read-only complaint summary shown inside a map popup.
- *
- * Presentation only: every value arrives through `complaint`, it issues no
- * requests, holds no state, performs no navigation and exposes no actions.
- *
- * Severity is absent because the Complaint model has no such field; see the
- * note in gis/complaintStyles.js.
- */
+// Read-only complaint summary shown inside a map popup.
 export default function ComplaintPopup({ complaint }) {
   if (!complaint) return null
 

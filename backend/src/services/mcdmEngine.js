@@ -1,25 +1,22 @@
-// MCDM Engine — 7 criteria scoring
+// MCDM scoring: seven weighted criteria, each scored 1-10. The weights total
+// 1.0, so `score` lands on the same 0-10 scale and `outOf100` is x10 of it.
 const config = require("../config/staticConfig")
 const Complaint = require("../models/Complaint")
 
 async function calculateMCDM(projectData) {
   const scores = {}
   const w = config.mcdmWeights
-  // Defaulted rather than dereferenced: an absent mcdmInputs or location used
-  // to throw here, which the controller reported as a 500 even though a missing
-  // location is a rejected request. Every read below already falls back to a
-  // neutral value, so the engine now scores what it was given instead of
-  // failing; the required-field check stays with the schema, where it belongs.
+  // Defaulted rather than dereferenced: every read below falls back to a
+  // neutral value, and the required-field check belongs to the schema.
   const inputs = projectData.mcdmInputs || {}
   const location = projectData.location || {}
   const startMonth = new Date(projectData.startDate).getMonth() + 1
 
-  // Criteria 1 — Condition Severity (26%)
+  // Condition severity (26%).
   const conditionMap = { critical:10, poor:7, fair:4, good:2 }
   let c1 = conditionMap[inputs.conditionRating] || 5
   if (inputs.incidents?.includes("accidents")) c1 = Math.min(10, c1 + 2)
-  // A project with no ward has no ward complaint history to weigh; skipping the
-  // query is also what stops an absent value becoming an unfiltered count.
+  // Skipping the query also stops an absent ward becoming an unfiltered count.
   const complaints = location.ward
     ? await Complaint.countDocuments({
         "location.ward": String(location.ward),
@@ -30,14 +27,11 @@ async function calculateMCDM(projectData) {
   else if (complaints > 10) c1 = Math.min(10, c1 + 1)
   scores.conditionSeverity = c1
 
-  // Criteria 2 — Population & Facility Impact (21%)
-  // Reserved for future GIS integration.
-  // The current repository does not contain an authoritative
-  // population or facility dataset, so this criterion
-  // defaults to a neutral score.
+  // Population and facility impact (21%). No authoritative dataset exists, so
+  // this defaults to a neutral score.
   scores.populationImpact = projectData.autoDetected?.populationScore || 5
 
-  // Criteria 3 — Seasonal Compatibility (16%)
+  // Seasonal compatibility (16%).
   const { monsoon, drySeason } = config.seasonal
   let c3
   if (["road","sewage"].includes(projectData.projectType)) {
@@ -51,13 +45,13 @@ async function calculateMCDM(projectData) {
   }
   scores.seasonalCompatibility = c3
 
-  // Criteria 4 — Execution Readiness (16%)
+  // Execution readiness (16%).
   const tenderMap = { "complete":8, "in_process":5, "planning":2 }
   let c4 = tenderMap[inputs.tenderStatus] || 5
   if (inputs.contractorAssigned) c4 = Math.min(10, c4 + 2)
   scores.executionReadiness = c4
 
-  // Criteria 5 — Citizen Disruption (10%)
+  // Citizen disruption (10%), inverted: less disruption scores higher.
   const closureMap = { "full":2, "partial":6, "none":10 }
   let c5 = closureMap[inputs.roadClosure] || 6
   const utilCount = inputs.utilityDisruption?.length || 0
@@ -66,7 +60,7 @@ async function calculateMCDM(projectData) {
   if (inputs.disruptionDays > 30) c5 = Math.max(1, c5 - 2)
   scores.citizenDisruption = c5
 
-  // Criteria 6 — Infrastructure Age (8%)
+  // Infrastructure age (8%). The only criterion that reads the current year.
   const currentYear = new Date().getFullYear()
   const age = currentYear - (inputs.lastWorkYear || currentYear - 5)
   const lifecycle = config.lifecycle[projectData.projectType] || 10
@@ -74,12 +68,9 @@ async function calculateMCDM(projectData) {
   let c6 = ratio >= 1.5 ? 10 : ratio >= 1 ? 8 : ratio >= 0.5 ? 5 : 2
   scores.infrastructureAge = c6
 
-  // Criteria 7 — Economic Value (3%)
-  // Reserved for future economic analysis.
-  // Requires municipal land-use / infrastructure metadata.
+  // Economic value (3%). Requires land-use metadata that does not exist yet.
   scores.economicValue = projectData.autoDetected?.economicScore || 5
 
-  // Final weighted score
   const total = (
     scores.conditionSeverity    * w.conditionSeverity    +
     scores.populationImpact     * w.populationImpact     +

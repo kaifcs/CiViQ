@@ -52,7 +52,6 @@ export function EmptyState({ title = "Nothing here yet", hint, action }) {
   )
 }
 
-/** Renders loading/error first, then children. Keeps screens uncluttered. */
 export default function AsyncState({ loading, error, onRetry, children, label }) {
   if (loading) return <LoadingState label={label} />
   if (error) return <ErrorState error={error} onRetry={onRetry} />

@@ -46,15 +46,14 @@ export default function OfficerSettings() {
   const [pwSuccess,  setPwSuccess]  = useState(false)
 
   // /api/users is admin-only, so an officer cannot persist their own profile
-  // name. Reporting that is honest; showing "Saved" was not.
+  // name; the form reports that rather than confirming a save.
   const [nameError, setNameError] = useState('')
   function handleSaveName() {
     setNameError('Profile changes are not available yet — ask an administrator to update your details.')
     setNameSaved(false)
   }
-  // No password-change endpoint exists on the backend, so this form cannot
-  // complete. It reports that plainly rather than showing a success message
-  // for something that never happened.
+  // No password-change endpoint exists on the backend, so this form reports
+  // that plainly rather than confirming something that never ran.
   function handleChangePassword() {
     setPwError('Password changes are not available yet — ask an administrator to reset it for you.')
     setPwSuccess(false)
@@ -63,7 +62,6 @@ export default function OfficerSettings() {
   return (
     <div className="flex flex-col gap-5" style={{ fontFamily: "'Inter', sans-serif" }}>
 
-      {/* Profile */}
       <Card>
         <SL>Profile</SL>
         <div className="flex items-center gap-5 mb-6 pb-5 border-b border-[#F3F4F6] dark:border-[#27272A]">
@@ -105,7 +103,6 @@ export default function OfficerSettings() {
         </div>
       </Card>
 
-      {/* Security */}
       <Card>
         <SL>Security</SL>
         <div className="grid grid-cols-3 gap-4">
@@ -120,7 +117,6 @@ export default function OfficerSettings() {
         </div>
       </Card>
 
-      {/* Preferences */}
       <Card>
         <SL>Preferences</SL>
         <div className="flex flex-col gap-4">

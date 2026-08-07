@@ -1,9 +1,6 @@
-/**
- * Row of navigation shortcuts. Each action is a plain route jump — no business
- * logic, no requests — so any dashboard can reuse it by passing its own list.
- *
- * `actions` is [{ id, label, hint, icon, to }].
- */
+// Row of navigation shortcuts. Each action is a plain route jump — no business
+// logic, no requests — so any dashboard can reuse it by passing its own list.
+// `actions` is [{ id, label, hint, icon, to }].
 export default function QuickActions({ actions = [], onNavigate }) {
   if (actions.length === 0) return null
 

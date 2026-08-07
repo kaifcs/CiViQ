@@ -1,9 +1,5 @@
-// User administration — every route here is already restricted to admins.
-//
-// Two operations carry consequences beyond the record itself: changing a role
-// alters what the account may do immediately (because `protect` re-reads the
-// user on every request), and deactivating an account revokes access without
-// deleting the history that references it. Both notify the affected user.
+// User administration — admin only. A role change takes effect immediately,
+// because `protect` re-reads the user on every request.
 
 const mongoose = require("mongoose")
 const User = require("../models/User")
@@ -94,7 +90,7 @@ exports.updateUser = async (req, res) => {
       runValidators: true,
     }).select("-password")
 
-    // Only an actual role change notifies, so re-saving the same role is silent.
+    // Only an actual change notifies, so re-saving the same role is silent.
     if (updates.role !== undefined && updates.role !== previousRole) {
       await notifyRoleChanged(updatedUser._id, updatedUser.role)
     }

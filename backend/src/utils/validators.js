@@ -1,16 +1,12 @@
-// Input validation for the auth routes.
-//
-// Each validator returns a human-readable message describing the first problem
-// found, or null when the input is acceptable — so callers branch on a single
-// truthy check and pass the message straight to badRequest().
+// Input validation for the auth routes. Each validator returns a message for
+// the first problem found, or null, so callers branch on one truthy check.
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-// Roles allowed during admin-only registration.
-// Administrators must be promoted separately via PUT /api/users/:id.
+// Administrators must be promoted separately, so no single request both creates
+// a principal and grants it unrestricted access.
 const CREATABLE_ROLES = ["officer", "supervisor"]
 
-/** Validates an account-creation payload. Returns an error message, or null. */
 function validateRegisterInput({ fullName, email, password, role }) {
   if (!fullName || !fullName.trim()) return "Full name is required"
   if (!email || !EMAIL_REGEX.test(email)) return "A valid email address is required"
@@ -21,13 +17,8 @@ function validateRegisterInput({ fullName, email, password, role }) {
   return null
 }
 
-/**
- * Validates a login payload.
- *
- * Only presence is checked. Format rules are deliberately not applied here: a
- * rejection specific to the email would tell an attacker which half of the
- * credentials was wrong, so both failures converge on one message.
- */
+// Presence only. A format rule here would tell an attacker which half of the
+// credentials was wrong, so both failures converge on one message.
 function validateLoginInput({ email, password }) {
   if (!email || !password) return "Email and password are required"
   return null

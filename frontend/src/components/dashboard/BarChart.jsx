@@ -3,14 +3,9 @@ import { EmptyState } from '../AsyncState'
 
 const ACCENT = '#5E6AD2'
 
-/**
- * Horizontal bar chart — the charting approach already used by this codebase
- * (CSS widths, no charting library). Extracted so every dashboard renders
- * comparisons identically.
- *
- * `data` is [{ label, value, color? }]. Bars are scaled to the largest value,
- * which is computed once per data change rather than per bar.
- */
+// Horizontal bar chart drawn with CSS widths rather than a charting library.
+// `data` is [{ label, value, color? }]; bars scale to the largest value, which
+// is computed once per data change rather than per bar.
 export default function BarChart({ data = [], suffix = '', labelWidth = 72, emptyHint }) {
   const max = useMemo(
     () => data.reduce((m, d) => (Number.isFinite(d.value) && d.value > m ? d.value : m), 0),

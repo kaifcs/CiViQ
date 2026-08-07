@@ -1,7 +1,6 @@
-// User avatar: a photo when one exists, initials otherwise.
-//
-// Sizes are a fixed token set rather than free-form props, so avatars stay
-// consistent across the navbar, tables and detail panels.
+// User avatar: a photo when one exists, initials otherwise. Sizes are a fixed
+// token set rather than free-form props, so avatars stay consistent across the
+// navbar, tables and detail panels.
 const sizeConfig = {
   sm: { box: 'w-6 h-6', text: 'text-[10px]', dot: 'w-[7px] h-[7px]', dotPos: '-bottom-[1px] -right-[1px]', border: 'border-[1.5px]' },
   md: { box: 'w-8 h-8', text: 'text-[11px]', dot: 'w-[8px] h-[8px]', dotPos: '-bottom-[1px] -right-[1px]', border: 'border-[1.5px]' },

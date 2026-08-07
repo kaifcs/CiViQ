@@ -1,9 +1,6 @@
-// Conflict resolution workspace.
-//
-// Presents the two clashing projects side by side with their MCDM scores, since
-// the score is what justifies rejecting one over the other. Resolving here sets
-// the administrator's decision; where that requires a reschedule, the owning
-// officer must still respond before the conflict closes.
+// Conflict resolution workspace. The two clashing projects sit side by side with
+// their MCDM scores, since the score is what justifies rejecting one. Where the
+// decision requires a reschedule, the owning officer must still respond.
 
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
@@ -14,11 +11,9 @@ import { useAuth } from '../../hooks/useAuth'
 import { CONFLICT_STATUS_CONFIG, DEPT_STYLES, SEVERITY_CONFIG, TYPE_STYLES, scoreColor } from '../../components/uiStyles'
 import { formatDate, formatDateLong, daysSince, MCDM_CRITERIA, criterionWidth } from '../../components/dashboard'
 
-// ─── Helpers ───────────────────────────────────
 
 
 
-// ─── Small components ──────────────────────────
 function Badge({ label, className }) {
   return <span className={`inline-flex items-center text-[12px] font-medium px-2.5 py-1 rounded-full ${className}`}>{label}</span>
 }
@@ -60,7 +55,6 @@ function InfoRow({ label, value }) {
   )
 }
 
-// ─── Project Panel ─────────────────────────────
 // `score` and `breakdown` are passed in rather than derived from `isHigher`:
 // the higher-scoring side is whichever the backend would keep, not necessarily
 // project1, so the panel must not infer which figures belong to it.
@@ -69,7 +63,6 @@ function ProjectPanel({ project, score, breakdown, isHigher }) {
 
   return (
     <Card className="p-5 flex flex-col gap-4 flex-1">
-      {/* Priority label */}
       <div className="flex items-center justify-between">
         <span className={`text-[11px] font-bold uppercase tracking-[0.08em] px-2.5 py-1 rounded-full ${
           isHigher
@@ -83,7 +76,6 @@ function ProjectPanel({ project, score, breakdown, isHigher }) {
         </span>
       </div>
 
-      {/* Title + badges */}
       <div>
         <h3 className="text-[15px] font-semibold text-[#0F172A] dark:text-[#F8FAFC] leading-snug mb-2">
           {project.title}
@@ -94,7 +86,6 @@ function ProjectPanel({ project, score, breakdown, isHigher }) {
         </div>
       </div>
 
-      {/* Info rows */}
       <div>
         <InfoRow label="Start date"  value={formatDateLong(project.startDate)} />
         <InfoRow label="End date"    value={formatDateLong(project.endDate)} />
@@ -103,7 +94,6 @@ function ProjectPanel({ project, score, breakdown, isHigher }) {
         <InfoRow label="Cost"        value={project.estimatedCost ? `₹${(project.estimatedCost / 100000).toFixed(2)} L` : '—'} />
       </div>
 
-      {/* MCDM criteria bars */}
       <div>
         <p className="text-[11px] font-semibold text-[#6B7280] dark:text-[#9CA3AF] uppercase tracking-[0.06em] mb-3">
           MCDM breakdown
@@ -133,7 +123,6 @@ function ProjectPanel({ project, score, breakdown, isHigher }) {
   )
 }
 
-// ─── Admin Conflict Detail ─────────────────────
 export default function AdminConflictDetail() {
   const { id }   = useParams()
   const navigate = useNavigate()
@@ -141,10 +130,9 @@ export default function AdminConflictDetail() {
   const { data: conflict, loading, error, reload } = useConflict(id)
   const { data: projects } = useProjects()
 
-  // `conflict` is null on the first render, so seeding from it once would leave
-  // this stuck at 'unresolved' and keep the resolution panel live on a conflict
-  // the backend has already actioned — which then 409s. Re-seeded during render
-  // when a different conflict loads, rather than from an effect.
+  // `conflict` is null on the first render, so seeding once would leave this at
+  // 'unresolved' and keep the panel live on an already-actioned conflict.
+  // Re-seeded during render rather than from an effect that costs a render.
   const [resolutionStatus, setResolutionStatus] = useState('unresolved')
   const [seededFor,        setSeededFor]        = useState(null)
   const [actionDone,       setActionDone]       = useState(null)
@@ -181,11 +169,9 @@ export default function AdminConflictDetail() {
   const days     = daysSince(conflict.detectedAt)
   const canAct   = resolutionStatus === 'unresolved' && !actionDone
 
-  // `reject_lower` defers whichever project scores lower — which may be either
-  // side. The adapter resolves that from the scores using the backend's own
-  // rule; the two sides are named from it so the recommendation, the priority
-  // labels and the confirm button all describe the project that will actually
-  // be deferred.
+  // `reject_lower` defers whichever project scores lower, which may be either
+  // side; the adapter resolves that using the backend's own rule. Both sides are
+  // named from it so recommendation, labels and button describe one project.
   const aIsHigher = conflict.higherPriorityId === conflict.projectAId
   const keep = aIsHigher
     ? { project: projectA, title: conflict.projectATitle, dept: conflict.projectADept, score: conflict.projectAScore, breakdown: conflict.projectABreakdown }
@@ -204,8 +190,8 @@ export default function AdminConflictDetail() {
       setActionDone('approve_both')
       setActiveOption(null)
     } catch (err) {
-      // The panel stays open so the admin can retry, but the reason is now
-      // shown: an already-actioned conflict returns 409, which was silent.
+      // The panel stays open so the admin can retry, and the reason is shown:
+      // an already-actioned conflict returns 409.
       setResolveError(normaliseError(err).message)
     }
   }
@@ -223,7 +209,6 @@ export default function AdminConflictDetail() {
     }
   }
 
-  // Timeline bar widths
   const allDates = [
     projectA?.startDate, projectA?.endDate,
     projectB?.startDate, projectB?.endDate,
@@ -246,7 +231,6 @@ export default function AdminConflictDetail() {
   return (
     <div className="flex flex-col gap-5" style={{ fontFamily: "'Inter', sans-serif" }}>
 
-      {/* ── Back ── */}
       <button
         onClick={() => navigate('/admin/conflicts')}
         className="flex items-center gap-1.5 text-[13px] text-[#6B7280] dark:text-[#9CA3AF] hover:text-[#0F172A] dark:hover:text-[#F8FAFC] transition-colors w-fit"
@@ -257,7 +241,6 @@ export default function AdminConflictDetail() {
         Back to Conflicts
       </button>
 
-      {/* ── Header ── */}
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 flex-wrap mb-2">
@@ -272,13 +255,11 @@ export default function AdminConflictDetail() {
         </div>
       </div>
 
-      {/* ══ ROW 1: Two project panels ══ */}
       <div className="grid grid-cols-2 gap-4">
         <ProjectPanel project={keep.project}  score={keep.score}  breakdown={keep.breakdown}  isHigher={true}  />
         <ProjectPanel project={defer.project} score={defer.score} breakdown={defer.breakdown} isHigher={false} />
       </div>
 
-      {/* ══ ROW 2: Map placeholder ══ */}
       <Card className="p-5">
         <SectionLabel>Overlap location</SectionLabel>
         <div
@@ -298,11 +279,9 @@ export default function AdminConflictDetail() {
         </div>
       </Card>
 
-      {/* ══ ROW 3: Timeline ══ */}
       <Card className="p-5">
         <SectionLabel>Timeline overlap</SectionLabel>
         <div className="flex flex-col gap-4">
-          {/* Legend */}
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-sm bg-[#5E6AD2]" />
@@ -314,9 +293,7 @@ export default function AdminConflictDetail() {
             </div>
           </div>
 
-          {/* Bar track */}
           <div className="relative" style={{ height: '56px' }}>
-            {/* Project A bar */}
             {projectA && (
               <div
                 className="absolute h-5 rounded-full top-0 flex items-center px-2"
@@ -325,7 +302,6 @@ export default function AdminConflictDetail() {
                 <span className="text-[10px] font-semibold text-white truncate">{formatDate(projectA.startDate)}</span>
               </div>
             )}
-            {/* Project B bar */}
             {projectB && (
               <div
                 className="absolute h-5 rounded-full bottom-0 flex items-center px-2"
@@ -336,7 +312,6 @@ export default function AdminConflictDetail() {
             )}
           </div>
 
-          {/* Date labels */}
           <div className="flex items-center justify-between">
             <span className="text-[11px] text-[#9CA3AF] dark:text-[#6B7280]">{hasTimeline ? formatDate(minDate.toISOString()) : '—'}</span>
             <span className="text-[12px] font-medium text-[#DC2626] dark:text-[#FCA5A5]">
@@ -347,7 +322,6 @@ export default function AdminConflictDetail() {
         </div>
       </Card>
 
-      {/* ══ ROW 4: Resolution History (if previously actioned) ══ */}
       {conflict.adminNote && (
         <Card className="p-5">
           <SectionLabel>Resolution history</SectionLabel>
@@ -375,7 +349,6 @@ export default function AdminConflictDetail() {
         </Card>
       )}
 
-      {/* ══ ROW 5: Admin Actions ══ */}
       <Card className="p-5">
         <SectionLabel>Resolution actions</SectionLabel>
 
@@ -383,7 +356,6 @@ export default function AdminConflictDetail() {
           <p className="text-[13px] text-[#DC2626] dark:text-[#F87171] mb-3">{resolveError}</p>
         )}
 
-        {/* Already actioned */}
         {actionDone === 'approve_both' && (
           <div className="flex items-center gap-2 text-[#15803D] dark:text-[#4ADE80]">
             <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
@@ -397,17 +369,14 @@ export default function AdminConflictDetail() {
           </div>
         )}
 
-        {/* Read-only state for conflicts already actioned on the server */}
         {!canAct && !actionDone && (
           <p className="text-[13px] text-[#9CA3AF] dark:text-[#6B7280]">
             This conflict has already been {resolutionStatus === 'resolved' ? 'resolved' : 'actioned'}. No further action required.
           </p>
         )}
 
-        {/* Action options */}
         {canAct && (
           <div className="flex flex-col gap-4">
-            {/* System recommendation */}
             <div className="flex items-start gap-3 px-4 py-3 rounded-[8px] bg-[#EEF2FF] dark:bg-[#131629] border border-[#C7D2FE] dark:border-[#252870]">
               <svg width="15" height="15" fill="none" viewBox="0 0 24 24" className="text-[#5E6AD2] flex-shrink-0 mt-0.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
@@ -418,7 +387,6 @@ export default function AdminConflictDetail() {
               </p>
             </div>
 
-            {/* Option buttons */}
             <div className="grid grid-cols-2 gap-3">
               <button
                 onClick={() => setActiveOption(activeOption === 'approve_both' ? null : 'approve_both')}
@@ -444,7 +412,6 @@ export default function AdminConflictDetail() {
               </button>
             </div>
 
-            {/* Option 1 — Approve Both input */}
             {activeOption === 'approve_both' && (
               <div className="flex flex-col gap-3 p-4 rounded-[8px] bg-[#F8FAFC] dark:bg-[#18181B] border border-[#E5E5E5] dark:border-[#27272A]">
                 <p className="text-[13px] font-semibold text-[#0F172A] dark:text-[#F8FAFC]">Coordination note</p>
@@ -468,7 +435,6 @@ export default function AdminConflictDetail() {
               </div>
             )}
 
-            {/* Option 2 — Reject One input */}
             {activeOption === 'reject_one' && (
               <div className="flex flex-col gap-3 p-4 rounded-[8px] bg-[#FEF2F2] dark:bg-[#1F0A0A] border border-[#FECACA] dark:border-[#7F1D1D]">
                 <p className="text-[13px] font-semibold text-[#0F172A] dark:text-[#F8FAFC]">Rejection reason</p>

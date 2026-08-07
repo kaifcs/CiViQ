@@ -5,11 +5,8 @@ import { useNotificationCenter } from "../../hooks/useNotificationCenter"
 
 const RECENT_LIMIT = 5
 
-/**
- * The panel behind the navbar bell. Open/close stays with the Navbar so its
- * icon row and outside-click handling are untouched; this owns only the
- * contents, which come from the shared notification state.
- */
+// The panel behind the navbar bell. The Navbar owns open/close state; this owns
+// only the contents, which come from the shared notification state.
 export default function NotificationDropdown({ onClose, centerPath }) {
   const navigate = useNavigate()
   const { data, loading, error, reload, unreadCount, markRead, markAllRead } = useNotificationCenter()

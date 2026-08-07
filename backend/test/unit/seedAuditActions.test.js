@@ -1,13 +1,8 @@
-// Seeded audit rows must use the vocabulary the application actually emits.
-//
-// They drifted to UPPERCASE names — LOGIN, PROJECT_CREATED, USER_CREATED,
-// ROLE_CHANGED and the rest — none of which any controller writes. The audit
-// screen keys its labels and its `?action=` filter on the real lowercase
-// strings, so seeded rows rendered as raw uppercase and no filter value could
-// ever match them.
-//
-// Read as TEXT, not imported: seed/index.js runs on load and DELETES every
-// collection in the database named by MONGODB_URI.
+// Seeded audit rows must use the vocabulary the controllers actually emit, or
+// the audit screen's labels and `?action=` filter can never match them.
+
+// Read as TEXT, not imported: seed/index.js seeds on load, and that empties
+// every collection in the database MONGODB_URI names.
 
 const test = require("node:test")
 const assert = require("node:assert/strict")
@@ -17,7 +12,7 @@ const path = require("node:path")
 const SRC = path.join(__dirname, "..", "..", "src")
 const SEED = readFileSync(path.join(SRC, "seed", "index.js"), "utf8")
 
-/** Every action string passed to recordAudit anywhere in the controllers. */
+// Every action string passed to recordAudit anywhere in the controllers.
 function emittedActions() {
   const dir = path.join(SRC, "controllers")
   const actions = new Set()
@@ -28,7 +23,7 @@ function emittedActions() {
   return actions
 }
 
-/** Action strings in the seeder's audit-log fixtures. */
+// Action strings in the seeder's audit-log fixtures.
 function seededActions() {
   const block = SEED.split("function seedAuditLogs")[1]?.split("\n}")[0] ?? ""
   return [...block.matchAll(/\baction:\s*"([^"]+)"/g)]

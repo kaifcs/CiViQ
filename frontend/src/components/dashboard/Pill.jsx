@@ -1,10 +1,5 @@
-/**
- * Neutral chip for table cells and badges.
- *
- * Distinct from components/Badge.jsx, which renders a fixed set of known
- * variants with its own labels; this takes arbitrary text and an optional
- * colour, which is what the dashboard tables need.
- */
+// Neutral chip for table cells and badges: arbitrary text plus an optional
+// colour, rather than the fixed variant set the status badges use.
 export default function Pill({ children, color, className = '' }) {
   if (color) {
     return (

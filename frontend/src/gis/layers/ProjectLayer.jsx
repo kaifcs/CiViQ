@@ -3,14 +3,9 @@ import ProjectPopup from "./ProjectPopup"
 import { projectMarkerStyle } from "../projectStyles"
 import { LAYER_PANES } from "../config"
 
-/**
- * Project markers on the map. Deliberately thin: it binds project styling and
- * the project popup to the generic MarkerLayer and adds no behaviour of its
- * own, which is what keeps marker rendering free of project business rules.
- *
- * Accepts the adapted project view models the screens already hold, so no
- * additional fetching happens here.
- */
+// Project markers on the map. Thin by design: it binds project styling and the
+// project popup to the generic MarkerLayer, which keeps marker rendering free
+// of project business rules.
 export default function ProjectLayer({
   projects = [],
   selectedId = null,

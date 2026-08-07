@@ -1,9 +1,6 @@
-// Leaflet icon builders. Kept apart from the layer components so any future
-// layer (complaints, departments, conflicts) reuses the same marker vocabulary.
-//
-// Icons are divIcons with inline styles rather than image markers: it needs no
-// image assets, sidesteps Leaflet's well-known bundler icon-path problem, and
-// matches the dot language the City Map screens already use.
+// Leaflet icon builders, kept apart from the layer components so every layer
+// reuses the same marker vocabulary. divIcons with inline styles need no image
+// assets and sidestep Leaflet's bundler icon-path problem.
 
 import L from "leaflet"
 
@@ -12,10 +9,8 @@ const escapeHtml = (value) =>
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
   })[c])
 
-/**
- * Circular marker in the supplied colour. `selected` adds a halo instead of
- * changing hue, so the status colour stays readable while selected.
- */
+// Circular marker in the supplied colour. `selected` adds a halo instead of
+// changing hue, so the status colour stays readable while selected.
 export function createDotIcon({ color, size = 14, selected = false }) {
   const ring = selected ? `0 0 0 4px ${color}59` : "0 1px 3px rgba(0,0,0,0.35)"
 
@@ -31,14 +26,9 @@ export function createDotIcon({ color, size = 14, selected = false }) {
   })
 }
 
-/**
- * Rounded-square marker carrying a single-path SVG glyph. The square silhouette
- * distinguishes glyph layers from the round dot markers at a glance, which is
- * what keeps two layers legible on the same map.
- *
- * `glyph` is 24x24 path data; `muted` dims the marker for records that no
- * longer need attention.
- */
+// Rounded-square marker carrying a single-path SVG glyph. The square silhouette
+// distinguishes glyph layers from the round dot markers at a glance. `glyph` is
+// 24x24 path data; `muted` dims records that no longer need attention.
 export function createGlyphIcon({ color, size = 22, glyph, selected = false, muted = false }) {
   const ring = selected ? `0 0 0 4px ${color}59` : "0 1px 3px rgba(0,0,0,0.35)"
   const inner = Math.round(size * 0.62)
@@ -59,10 +49,8 @@ export function createGlyphIcon({ color, size = 22, glyph, selected = false, mut
   })
 }
 
-/**
- * Cluster badge sized by how many markers it swallows. Rendered in the brand
- * accent so a cluster never reads as a status colour.
- */
+// Cluster badge sized by how many markers it swallows. Rendered in the brand
+// accent so a cluster never reads as a status colour.
 export function createClusterIcon(count, { accent = "#5E6AD2" } = {}) {
   const size = count < 10 ? 32 : count < 100 ? 38 : 44
 

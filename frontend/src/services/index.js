@@ -11,7 +11,6 @@ import {
 export { normaliseError, readPagination, TOKEN_KEY, USER_KEY, PROJECT_TYPE_VALUE }
 export { openNotificationStream } from "./notificationStream"
 
-// ── Auth ──────────────────────────────────────────────────────────────
 export const authApi = {
   async login(email, password) {
     const { data } = await apiClient.post("/auth/login", { email, password })
@@ -30,13 +29,12 @@ export const authApi = {
   },
 }
 
-// ── Departments ───────────────────────────────────────────────────────
 export const departmentsApi = {
   async list() {
     const { data } = await apiClient.get("/departments")
     return (data.departments || []).map(adaptDepartment)
   },
-  /** Raw records — needed to build the id -> {code,name} index for adapters. */
+  // Raw records — needed to build the id -> {code,name} index for adapters.
   async listRaw() {
     const { data } = await apiClient.get("/departments")
     return data.departments || []
@@ -59,7 +57,6 @@ export const departmentsApi = {
   },
 }
 
-// ── Users ─────────────────────────────────────────────────────────────
 export const usersApi = {
   async list(deptMap) {
     const { data } = await apiClient.get("/users")
@@ -79,9 +76,8 @@ export const usersApi = {
   },
 }
 
-// ── Projects ──────────────────────────────────────────────────────────
 export const projectsApi = {
-  /** `params` is optional; pass { page, limit } to use backend pagination. */
+  // `params` is optional; pass { page, limit } to use backend pagination.
   async list(deptMap, params) {
     const { data } = await apiClient.get("/projects", { params })
     return (data || []).map((p) => adaptProject(p, deptMap))
@@ -90,7 +86,7 @@ export const projectsApi = {
     const { data } = await apiClient.get(`/projects/${id}`)
     return adaptProject(data, deptMap)
   },
-  /** payload must already be in BACKEND shape (see buildProjectPayload). */
+  // payload must already be in BACKEND shape (see buildProjectPayload).
   async create(payload, deptMap) {
     const { data } = await apiClient.post("/projects", payload)
     return { project: adaptProject(data.project, deptMap), mcdm: data.mcdm, clashesDetected: data.clashesDetected }
@@ -117,7 +113,7 @@ export const projectsApi = {
   },
 }
 
-/** Translate the project wizard's flat form state into the backend schema. */
+// Translate the project wizard's flat form state into the backend schema.
 export function buildProjectPayload(form) {
   return {
     title: form.title,
@@ -151,9 +147,8 @@ export function buildProjectPayload(form) {
   }
 }
 
-// ── Conflicts ─────────────────────────────────────────────────────────
 export const conflictsApi = {
-  /** `params` is optional; pass { page, limit } to use backend pagination. */
+  // `params` is optional; pass { page, limit } to use backend pagination.
   async list(deptMap, params) {
     const { data } = await apiClient.get("/conflicts", { params })
     return (data || []).map((c) => adaptConflict(c, deptMap))
@@ -172,7 +167,6 @@ export const conflictsApi = {
   },
 }
 
-// ── Complaints ────────────────────────────────────────────────────────
 export const complaintsApi = {
   async list(params, deptMap) {
     const { data } = await apiClient.get("/complaints", { params })
@@ -182,13 +176,8 @@ export const complaintsApi = {
     const { data } = await apiClient.get(`/complaints/${idOrCnr}`)
     return adaptComplaint(data, deptMap)
   },
-  /**
-   * City-wide figures, counted server-side.
-   *
-   * The public list is capped at 200 records, so anything that needs a true
-   * total, average or monthly series reads it from here rather than counting a
-   * downloaded array — which would silently report the cap as the city total.
-   */
+  // City-wide figures counted server-side. The public list is capped at 200
+  // records, so counting a downloaded array would report the cap as the total.
   async stats(params) {
     const { data } = await apiClient.get("/complaints/stats", { params })
     return data
@@ -211,7 +200,6 @@ export const complaintsApi = {
   },
 }
 
-// ── Notifications ─────────────────────────────────────────────────────
 export const notificationsApi = {
   async list(params) {
     const { data } = await apiClient.get("/notifications", { params })
@@ -241,7 +229,6 @@ export const notificationsApi = {
     return data
   },
 
-  // ── Lifecycle ──
   async archive(ids) {
     const { data } = await apiClient.patch("/notifications/bulk-archive", { ids })
     return data
@@ -255,7 +242,6 @@ export const notificationsApi = {
     return data
   },
 
-  // ── Preferences ──
   async getPreferences() {
     const { data } = await apiClient.get("/notifications/preferences")
     return data?.preferences || null
@@ -266,7 +252,6 @@ export const notificationsApi = {
   },
 }
 
-// ── Audit ─────────────────────────────────────────────────────────────
 export const auditApi = {
   async list(deptMap, params = {}) {
     const { data } = await apiClient.get("/audit", { params })
@@ -278,7 +263,6 @@ export const auditApi = {
   },
 }
 
-// ── Dashboard ─────────────────────────────────────────────────────────
 export const dashboardApi = {
   async summary(params) {
     const { data } = await apiClient.get("/dashboard/summary", { params })

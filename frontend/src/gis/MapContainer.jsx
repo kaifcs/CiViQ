@@ -12,17 +12,9 @@ import {
 } from './config'
 import { toLatLngTuple, toBoundsTuple, isValidBounds } from './coordinates'
 
-/**
- * Reusable map surface: owns initialisation, teardown, resize and view
- * synchronisation, and exposes the instance to children through MapContext.
- * Carries no knowledge of projects, complaints or conflicts — layers compose
- * on top as children.
- *
- * Children are expected to be layer components that read the instance via
- * useMap(), attach to it and render null; the host div belongs to Leaflet.
- * `options` applies at construction only — use center/zoom/bounds to drive the
- * view afterwards.
- */
+// Reusable map surface: owns initialisation, teardown, resize and view
+// synchronisation, exposing the instance to children through MapContext.
+// `options` applies at construction only — use center/zoom/bounds afterwards.
 export default function MapContainer({
   center = DEFAULT_CENTER,
   zoom = DEFAULT_ZOOM,
@@ -64,10 +56,8 @@ export default function MapContainer({
   }, [])
 
   // View is synchronised after creation so center/zoom/bounds stay reactive
-  // without tearing the instance down. The first application is instant —
-  // animating from the default centre on mount reads as a glitch — and every
-  // later change flies, which is what makes fit-bounds and zoom-to-selection
-  // legible as movement rather than a jump cut.
+  // without tearing the instance down. The first application is instant, since
+  // animating from the default centre reads as a glitch; later ones fly.
   useEffect(() => {
     if (!map) return
 

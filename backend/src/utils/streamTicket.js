@@ -1,11 +1,6 @@
-// Short-lived, single-use credentials for the SSE stream.
-//
-// EventSource cannot set an Authorization header, so something has to travel in
-// the URL. A ticket keeps that exposure to 30 seconds and one use, instead of
-// the session-length JWT the stream previously accepted.
-//
-// Signed with the existing JWT_SECRET through the existing token helpers — no
-// parallel signing key and no parallel verification path.
+// Short-lived, single-use credentials for the SSE stream. EventSource cannot set
+// an Authorization header, so a ticket travels in the URL instead of a
+// session-length JWT, keeping that exposure to 30 seconds and one use.
 
 const crypto = require("crypto")
 const jwt = require("jsonwebtoken")
@@ -15,8 +10,7 @@ const { isRedisEnabled, getPublisher } = require("../config/redis")
 const TICKET_TTL_SECONDS = 30
 const TICKET_TYPE = "sse"
 
-// Consumed ticket ids, held only until they would have expired anyway. Bounded
-// by the ticket lifetime rather than by traffic.
+// Replay ledger, bounded by ticket lifetime rather than by traffic.
 const consumed = new Map()
 
 function sweepConsumed() {
@@ -26,7 +20,7 @@ function sweepConsumed() {
   }
 }
 
-/** Issues a ticket for an already-authenticated user. */
+// The caller must have authenticated the user already.
 function issueTicket(userId) {
   const jti = crypto.randomBytes(16).toString("hex")
   const token = jwt.sign(
@@ -37,10 +31,8 @@ function issueTicket(userId) {
   return { ticket: token, expiresIn: TICKET_TTL_SECONDS }
 }
 
-/**
- * Verifies and consumes a ticket. Returns the user id, or null when the ticket
- * is invalid, expired, of the wrong type, or already used.
- */
+// Returns the user id, or null when the ticket is invalid, expired, of the
+// wrong type, or already used.
 async function consumeTicket(ticket) {
   if (!ticket) return null
   let payload
@@ -50,8 +42,7 @@ async function consumeTicket(ticket) {
     return null
   }
 
-  // A session JWT must not be usable here: it carries no `typ`, so presenting
-  // one on the stream is rejected exactly like any other invalid ticket.
+  // A session JWT carries no `typ`, so it is refused like any invalid ticket.
   if (payload?.typ !== TICKET_TYPE || !payload.jti || !payload.id) return null
 
   if (isRedisEnabled()) {
@@ -69,7 +60,7 @@ async function consumeTicket(ticket) {
   return payload.id
 }
 
-/** Test and diagnostics helper; no route exposes it. */
+// Diagnostics only; no route exposes it.
 const consumedCount = () => consumed.size
 
 module.exports = { issueTicket, consumeTicket, consumedCount, TICKET_TTL_SECONDS }

@@ -1,18 +1,6 @@
 // A detected collision between two projects, and the record of its resolution.
-//
-// Created by services/clashDetection when two works overlap geographically,
-// in time, and in incompatible work types. The pair is unordered — project1 and
-// project2 carry no precedence — so callers searching for an existing conflict
-// must test both orderings.
-//
-// Resolution is two-sided and each side is stored separately: an administrator
-// decides (adminResolution), and where that requires the owning officer to move
-// their dates, the officer answers (officerResponse). Keeping them apart is
-// what lets the trail show who decided what, rather than a single overwritten
-// outcome.
-//
-// Severity mirrors the configured conflict matrix: "incompatible" works cannot
-// coexist, "conditional" ones can with coordination.
+// The pair is unordered, so a lookup must test both orderings. The two
+// resolution sides are stored apart so the trail shows who decided what.
 
 const mongoose = require("mongoose")
 
@@ -42,12 +30,12 @@ const conflictSchema = new mongoose.Schema({
     respondedAt:  { type: Date },
   },
   suggestedDate:   { type: Date },
-  // Whether re-running clash detection after the reschedule came back clean.
+  // Whether clash detection came back clean after the reschedule.
   recheckPassed:   { type: Boolean },
   rescheduledProject: { type: mongoose.Schema.Types.ObjectId, ref: "Project", default: null },
 }, { timestamps: true })
 
-// Finding whether a given pair already has a conflict, before creating another.
+// Pair lookup, to avoid stacking duplicate rows for one collision.
 conflictSchema.index({ project1: 1, project2: 1 })
 conflictSchema.index({ createdAt: -1 })
 

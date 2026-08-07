@@ -1,13 +1,9 @@
-// Clash detection — the spatial, temporal and work-type rules.
-//
-// This is the domain core: it decides whether two pieces of municipal work
-// collide. Its internals are not exported, so the rules are exercised the way
-// the application uses them — by placing real projects at known distances and
-// dates and asserting which pairs come back.
-//
-// Every fixture distance is chosen against the configured buffers rather than
-// guessed, so a change to those buffers surfaces here instead of silently
-// altering what the city is told.
+// Clash detection — the spatial, temporal and work-type rules that decide
+// whether two municipal works collide. Internals are not exported, so the rules
+// are exercised by placing real projects at known distances and dates.
+
+// Fixture distances are derived from the configured buffers rather than guessed,
+// so a change to those buffers surfaces here.
 
 const test = require("node:test")
 const assert = require("node:assert/strict")
@@ -37,10 +33,8 @@ test("getSuggestedStartDate clears the blocking project by its configured buffer
   assert.ok(suggested > endDate, "the suggestion must fall after the blocking project ends")
 })
 
-// All coarse projectType enum values now have a direct key in bufferDays, so
-// no type falls through to the 7-day fallback. This test was previously pinning
-// broken behaviour (road and electricity returned 7 instead of their configured
-// values). It now asserts the corrected state.
+// Every coarse projectType has a direct key in bufferDays, so no type falls
+// through to the 7-day default.
 test("every coarse project type resolves its configured buffer without falling back", () => {
   const endDate = new Date("2025-06-01T00:00:00.000Z")
   const types = Object.keys(config.bufferDays)
@@ -94,7 +88,7 @@ test("clash detection", async (t) => {
   })
 
   // The three independent reasons a pair does NOT clash. Each is asserted on
-  // its own so a regression names the rule that broke.
+  // its own, so a failure names the rule that broke.
   await t.test("compatible work types do not clash even when co-located", async () => {
     await clearCollections()
     await Project.create(projectDoc({ metres: 5, projectType: "parks" }))
@@ -165,8 +159,8 @@ test("clash detection", async (t) => {
     assert.equal(clashes.filter((c) => c.severity === "conditional").length, 1)
   })
 
-  // Regression — S4. The candidate query was narrowed to a lean projection.
-  // Every field the caller consumes must still be present and correctly typed.
+  // The candidate query uses a lean projection, which must still carry every
+  // field the three checks read, present and correctly typed.
   await t.test("regression: clash records keep their full shape after the S4 lean projection", async () => {
     await clearCollections()
     const other = await Project.create(projectDoc({ metres: 10, projectType: "road" }))

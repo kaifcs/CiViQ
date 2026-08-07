@@ -5,17 +5,9 @@ import { useMap } from "../useMap"
 import { geometryOf } from "../gisService"
 import { isGeometry, isFeature, isFeatureCollection } from "../geojson"
 
-/**
- * Generic vector layer for records that carry stored GeoJSON geometry —
- * corridors, pipelines, service areas. The counterpart to MarkerLayer: same
- * contract, different primitive.
- *
- * Renders ONLY geometry the backend actually stores. `pointGeometry` is false
- * by default, so a record whose only location is a centre point is skipped
- * rather than drawn as an invented line or area.
- *
- * Renders null; all output goes onto the Leaflet map from useMap().
- */
+// Generic vector layer for records carrying stored GeoJSON geometry — corridors,
+// pipelines, service areas. The counterpart to MarkerLayer. `pointGeometry` is
+// false by default, so a record with only a centre point is skipped.
 export default function GeoJSONLayer({
   records = [],
   getGeometry = geometryOf,

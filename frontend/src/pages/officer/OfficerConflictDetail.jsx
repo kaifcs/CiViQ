@@ -1,8 +1,6 @@
-// Conflict detail from the officer's side.
-//
-// The opposing project may arrive as a bare id when this officer is not
-// authorised to see it; the adapters render that as details-unavailable rather
-// than hiding the conflict.
+// Conflict detail from the officer's side. The opposing project may arrive as a
+// bare id when this officer is not authorised to see it; the adapters render
+// that as details-unavailable rather than hiding the conflict.
 
 import { useNavigate, useParams } from 'react-router-dom'
 import { useConflict, useProjects } from '../../hooks/useResources'
@@ -19,8 +17,7 @@ function InfoRow({ label, value }) {
 }
 
 // `score` and `breakdown` are passed in rather than derived from `isHigher`:
-// the higher-scoring side is whichever the backend would keep, not necessarily
-// project1.
+// the higher-scoring side is whichever the backend would keep, not project1.
 function ProjectPanel({ project, score, breakdown, isHigher }) {
   if (!project) return null
   return (
@@ -110,13 +107,11 @@ export default function OfficerConflictDetail() {
 
   return (
     <div className="flex flex-col gap-5" style={{ fontFamily: "'Inter', sans-serif" }}>
-      {/* Back */}
       <button onClick={() => navigate('/officer/conflicts')} className="flex items-center gap-1.5 text-[13px] text-[#6B7280] dark:text-[#9CA3AF] hover:text-[#0F172A] dark:hover:text-[#F8FAFC] transition-colors w-fit">
         <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
         Back to Conflicts
       </button>
 
-      {/* Header */}
       <div>
         <div className="flex items-center gap-2 flex-wrap mb-2">
           <span className={`inline-flex items-center text-[12px] font-medium px-2.5 py-1 rounded-full ${severity.bg} ${severity.color}`}>{severity.text}</span>
@@ -129,13 +124,11 @@ export default function OfficerConflictDetail() {
         <p className="text-[13px] text-[#6B7280] dark:text-[#9CA3AF] mt-1">{conflict.overlapDescription}</p>
       </div>
 
-      {/* View-only notice */}
       <div className="flex items-center gap-2 px-4 py-3 rounded-[8px] bg-[#EEF2FF] dark:bg-[#131629] border border-[#C7D2FE] dark:border-[#252870]">
         <svg width="14" height="14" fill="none" viewBox="0 0 24 24" className="text-[#5E6AD2] flex-shrink-0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
         <p className="text-[13px] text-[#4338CA] dark:text-[#818CF8]">View only. Clash resolution is handled by the Admin. You will be notified when a decision is made.</p>
       </div>
 
-      {/* System recommendation */}
       <Card className="p-5">
         <SL>System recommendation</SL>
         <p className="text-[13px] text-[#0F172A] dark:text-[#F8FAFC]">
@@ -143,13 +136,11 @@ export default function OfficerConflictDetail() {
         </p>
       </Card>
 
-      {/* Two project panels */}
       <div className="grid grid-cols-2 gap-4">
         <ProjectPanel project={keep.project}  score={keep.score}  breakdown={keep.breakdown}  isHigher={true}  />
         <ProjectPanel project={defer.project} score={defer.score} breakdown={defer.breakdown} isHigher={false} />
       </div>
 
-      {/* Map placeholder */}
       <Card className="p-5">
         <SL>Overlap location</SL>
         <div className="rounded-[8px] flex flex-col items-center justify-center bg-[#F8FAFC] dark:bg-[#18181B] border border-[#E5E5E5] dark:border-[#27272A]" style={{ height: '160px' }}>
@@ -159,7 +150,6 @@ export default function OfficerConflictDetail() {
         </div>
       </Card>
 
-      {/* Timeline */}
       <Card className="p-5">
         <SL>Timeline overlap</SL>
         <div className="flex flex-col gap-4">
@@ -179,7 +169,6 @@ export default function OfficerConflictDetail() {
         </div>
       </Card>
 
-      {/* Resolution history */}
       {conflict.adminNote && (
         <Card className="p-5">
           <SL>Resolution history</SL>

@@ -1,7 +1,5 @@
-// The officer's own project register.
-//
-// Scoped server-side to projects this officer owns; the screen never filters by
-// owner itself.
+// The officer's own project register, scoped server-side to projects this
+// officer owns; the screen never filters by owner itself.
 
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -10,7 +8,6 @@ import AsyncState from '../../components/AsyncState'
 import { PROJECT_STATUS_CONFIG, TYPE_STYLES } from '../../components/uiStyles'
 import { formatDate } from '../../components/dashboard'
 
-// Measured against the real clock. The status exclusions below are unchanged.
 function isThisMonth(dateStr) {
   const d = new Date(dateStr), now = new Date()
   return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
@@ -56,8 +53,7 @@ export default function OfficerProjects() {
   const [filterTime, setFilterTime]   = useState('')
 
   // GET /api/projects is already officer-scoped by the backend. The empty-array
-  // fallback lives inside the memo so it cannot produce a fresh identity on
-  // every render.
+  // fallback lives inside the memo so it cannot produce a fresh identity.
   const filtered = useMemo(() => (projects || []).filter(p => {
     if (search && !p.title.toLowerCase().includes(search.toLowerCase())) return false
     if (filterType   && p.type !== filterType)     return false
@@ -75,7 +71,6 @@ export default function OfficerProjects() {
     <AsyncState loading={loading} error={error} onRetry={reload} label="Loading projects...">
     <div className="flex flex-col gap-4 h-full" style={{ fontFamily: "'Inter', sans-serif" }}>
 
-      {/* Search + filters + new project */}
       <div className="flex flex-col gap-3 flex-shrink-0">
         <div className="flex items-center gap-3">
           <div className="relative flex-1">
@@ -119,7 +114,6 @@ export default function OfficerProjects() {
         </div>
       </div>
 
-      {/* Project list */}
       <div className="flex flex-col gap-2 flex-1 overflow-y-auto">
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center gap-3">
@@ -135,7 +129,6 @@ export default function OfficerProjects() {
               className="flex items-center gap-5 px-5 py-4 bg-[#FFFFFF] dark:bg-[#1C1C1F] border border-[#E5E5E5] dark:border-[#27272A] rounded-[8px] cursor-pointer transition-all hover:border-[#5E6AD2]/40 hover:bg-[#FAFAFA] dark:hover:bg-[#252529]"
               style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}
             >
-              {/* Title */}
               <div className="flex-1 min-w-0">
                 {p.hasClash && (
                   <div className="flex items-center gap-1 mb-1">
@@ -148,10 +141,8 @@ export default function OfficerProjects() {
                 <p className="text-[14px] font-semibold text-[#0F172A] dark:text-[#F8FAFC] truncate">{p.title}</p>
                 <p className="text-[12px] text-[#6B7280] dark:text-[#9CA3AF] mt-0.5">{p.departmentFull}</p>
               </div>
-              {/* Type badge */}
               <span className={`inline-flex items-center text-[12px] font-medium px-2.5 py-1 rounded-full flex-shrink-0 ${TYPE_STYLES[p.type] || TYPE_STYLES.Other}`}>{p.type}</span>
               <VDivider />
-              {/* Status */}
               <div className="flex-shrink-0 w-[110px] flex justify-center">
                 <span className={`inline-flex items-center gap-1.5 text-[13px] font-semibold px-3 py-1 rounded-full ${st.bg} ${st.color}`}>
                   <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: st.dot }} />
@@ -159,7 +150,6 @@ export default function OfficerProjects() {
                 </span>
               </div>
               <VDivider />
-              {/* Timeline + MCDM */}
               <div className="flex items-center gap-6 flex-shrink-0">
                 <div className="flex flex-col items-end gap-0.5">
                   <span className="text-[11px] font-semibold text-[#9CA3AF] dark:text-[#6B7280] uppercase tracking-wide">Timeline</span>

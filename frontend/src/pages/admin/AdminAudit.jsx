@@ -1,7 +1,5 @@
-// Audit trail viewer — administrator only.
-//
-// Read-only by construction: the API exposes no way to edit or delete an entry,
-// so this screen has no write path.
+// Audit trail viewer — administrator only. Read-only by construction: the API
+// exposes no way to edit or delete an entry, so this screen has no write path.
 
 import { useState, useMemo } from 'react'
 import { useAuditLogs, useUsers, useDepartmentOptions } from '../../hooks/useResources'
@@ -9,7 +7,6 @@ import AsyncState from '../../components/AsyncState'
 import { DEPT_STYLES, ROLE_STYLES } from '../../components/uiStyles'
 import { auditActionLabel, AUDIT_ACTION_OPTIONS, toCsv, downloadCsv } from '../../components/dashboard'
 
-// ─── Helpers ───────────────────────────────────
 function formatDateTime(dateStr) {
   if (!dateStr) return '—'
   const d = new Date(dateStr)
@@ -39,10 +36,7 @@ function FilterSelect({ label, value, onChange, options }) {
   )
 }
 
-// Columns for the export, in the order the file should read. The shared
-// toCsv/downloadCsv pair replaces a local copy that wrapped every cell in
-// quotes without doubling embedded ones — so a rejection reason containing a
-// quote (which the reject modal accepts as free text) corrupted the row.
+// Columns for the export, in the order the file should read.
 const CSV_COLUMNS = [
   { key: 'userName', header: 'User' },
   { key: 'userRole', header: 'Role' },
@@ -98,7 +92,6 @@ export default function AdminAudit() {
     <AsyncState loading={loading} error={error} onRetry={reload} label="Loading audit log...">
     <div className="flex flex-col gap-4 h-full" style={{ fontFamily: "'Inter', sans-serif" }}>
 
-      {/* ── Filter bar + Export ── */}
       <div className="flex items-center gap-3 flex-wrap flex-shrink-0">
         <FilterSelect label="User" value={filterUser} onChange={setFilterUser}
           options={users.map(u => ({ value: u.id, label: u.name }))}
@@ -130,7 +123,6 @@ export default function AdminAudit() {
         </div>
       </div>
 
-      {/* ── Log entries ── */}
       <div className="flex flex-col gap-2 flex-1 overflow-y-auto">
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
@@ -148,7 +140,6 @@ export default function AdminAudit() {
               }`}
               style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}
             >
-              {/* Avatar + name */}
               <div className="flex items-center gap-3 flex-shrink-0 w-[180px] min-w-0">
                 <div className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-[11px] font-semibold bg-[#EEF2FF] dark:bg-[#1E2260] text-[#5E6AD2] dark:text-[#9BA3F0] border border-[#E0E7FF] dark:border-[#252870]">
                   {getInitials(log.userName)}
@@ -163,7 +154,6 @@ export default function AdminAudit() {
 
               <VDivider />
 
-              {/* Action + resource */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <p className="text-[13px] font-medium text-[#0F172A] dark:text-[#F8FAFC]">
@@ -182,7 +172,6 @@ export default function AdminAudit() {
 
               <VDivider />
 
-              {/* Department */}
               <div className="flex-shrink-0 w-[80px] flex justify-center">
                 {log.department ? (
                   <span className={`inline-flex items-center text-[11px] font-medium px-2 py-0.5 rounded-full ${DEPT_STYLES[log.department] || ''}`}>
@@ -195,7 +184,6 @@ export default function AdminAudit() {
 
               <VDivider />
 
-              {/* Timestamp */}
               <div className="flex-shrink-0 text-right">
                 <p className="text-[12px] font-medium text-[#0F172A] dark:text-[#F8FAFC]">
                   {formatDateTime(log.timestamp)}

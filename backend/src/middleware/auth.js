@@ -4,7 +4,8 @@ const User = require("../models/User")
 const { verifyToken } = require("../utils/token")
 const { forbidden, unauthorized } = require("../utils/apiResponse")
 
-/** Authenticates the request and attaches the current user to req.user. */
+// The user is re-read on every request rather than trusted from the token, so a
+// deactivated account or a role change takes effect immediately.
 exports.protect = async (req, res, next) => {
   let token
 
@@ -38,7 +39,8 @@ exports.protect = async (req, res, next) => {
   }
 }
 
-/** Restricts access to the specified roles. */
+// Coarse-grained by design: whether a role may use an endpoint at all, never
+// whether a user may touch a specific record. See middleware/ownership.
 exports.authorize = (...roles) => (req, res, next) => {
   if (!req.user) {
     return unauthorized(res, "User not authenticated")
@@ -51,7 +53,8 @@ exports.authorize = (...roles) => (req, res, next) => {
   next()
 }
 
-/** Authenticates if possible, otherwise continues as a guest. */
+// Authenticates if possible, otherwise continues as a guest. The public
+// complaint reads use this to decide how much of the payload to disclose.
 exports.optionalAuth = async (req, res, next) => {
   let token
 

@@ -1,10 +1,6 @@
-// Optional Redis connection used to fan notification events across instances.
-//
-// Redis is an enhancement, never a requirement: a single-instance deployment
-// with no Redis behaves exactly as it did before N6. The connection is attempted
-// once with a bounded retry budget — an unreachable server disables Redis for
-// the lifetime of the process rather than reconnecting forever and filling the
-// logs.
+// Optional Redis connection, used to fan notification events across instances.
+// The retry budget is bounded: an unreachable server disables Redis for the
+// lifetime of the process rather than reconnecting forever and filling the logs.
 
 const { createClient } = require("redis")
 const { logger } = require("../utils/logger")
@@ -33,24 +29,20 @@ function build() {
     url: url(),
     socket: {
       connectTimeout: CONNECT_TIMEOUT_MS,
-      // Returning an Error stops node-redis retrying, which is what keeps a
-      // missing Redis from becoming a log flood.
+      // Returning an Error stops node-redis retrying.
       reconnectStrategy: (retries) =>
         retries >= MAX_ATTEMPTS ? new Error("redis unavailable") : Math.min(200 * (retries + 1), 1000),
     },
   })
 }
 
-/**
- * Connects the publish/subscribe pair. Resolves to false when Redis is not
- * reachable, and callers fall back to local-only delivery.
- */
+// Resolves false when Redis is unreachable; callers fall back to local delivery.
 async function connectRedis() {
   if (enabled) return true
   try {
     publisher = build()
     subscriber = publisher.duplicate()
-    // Without a handler node-redis emits unhandled 'error' events on failure.
+    // node-redis emits unhandled 'error' events on failure without these.
     publisher.on("error", () => {})
     subscriber.on("error", () => {})
 

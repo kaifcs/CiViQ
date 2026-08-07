@@ -1,12 +1,6 @@
 // Top bar of the dashboard shell: page title, theme toggle, notification bell
-// and the account menu.
-//
-// The unread badge reads the shared notification state rather than counting
-// what the dropdown happens to hold, so the number matches the Notification
-// Center exactly and no second request is made.
-//
-// Icons are inlined as SVG components rather than imported from an icon
-// package, which is why this file is long: it carries no runtime dependency.
+// and account menu. The unread badge reads the shared notification state rather
+// than the dropdown's contents, so it matches the Notification Center exactly.
 
 import { useState } from "react";
 import Avatar from "./Avatar";
@@ -125,7 +119,6 @@ export default function Navbar({
           {darkMode ? <SunIcon /> : <MoonIcon />}
         </IconBtn>
 
-        {/* Bell */}
         <div className="relative">
           <IconBtn
             onClick={() => {
@@ -158,7 +151,6 @@ export default function Navbar({
 
         <div className="w-px h-5 bg-[#E2E8F0] dark:bg-[#1E293B]" />
 
-        {/* Profile */}
         <div className="relative">
           <button
             onClick={() => {

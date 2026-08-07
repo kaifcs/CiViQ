@@ -7,11 +7,9 @@ const COLUMNS = {
   7: 'grid-cols-2 lg:grid-cols-4 xl:grid-cols-7',
 }
 
-/**
- * Responsive row of KPI cards. `stats` is [{ label, value, sub, danger }];
- * `danger` turns the value red only when it is a non-zero count, so an empty
- * queue never reads as an alert.
- */
+// Responsive row of KPI cards. `stats` is [{ label, value, sub, danger }];
+// `danger` turns the value red only when it is a non-zero count, so an empty
+// queue never reads as an alert.
 export default function StatGrid({ stats = [], columns = 7 }) {
   return (
     <div className={`grid gap-3 ${COLUMNS[columns] || COLUMNS[7]}`}>

@@ -16,11 +16,8 @@ function parsePagination(query = {}) {
   return { enabled: true, page, limit, skip: (page - 1) * limit }
 }
 
-/**
- * Pagination travels in headers because several list endpoints return a bare
- * array; moving it into the body would be a breaking change. Every list
- * endpoint reports the same set.
- */
+// Pagination travels in headers because several list endpoints return a bare
+// array; moving it into the body would break every existing consumer.
 function setPaginationHeaders(res, total, { page, limit }) {
   const totalPages = Math.max(1, Math.ceil(total / limit))
   res.set("X-Total-Count", String(total))

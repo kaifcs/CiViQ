@@ -2,12 +2,7 @@ import PopupCard from "./PopupCard"
 import { projectStatusColor, projectStatusLabel } from "../projectStyles"
 import { utilityTypeColor, utilityTypeLabel, utilityTypeOf } from "../utilityStyles"
 
-/**
- * Read-only summary of a utility asset.
- *
- * Presentation only: every value arrives through props, it issues no requests,
- * holds no state, performs no navigation and exposes no actions.
- */
+// Read-only summary of a utility asset shown inside a map popup.
 export default function UtilityPopup({ asset }) {
   if (!asset) return null
 
