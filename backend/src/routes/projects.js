@@ -2,6 +2,12 @@ const router = require("express").Router()
 const c = require("../controllers/projectsController")
 const { protect, authorize } = require("../middleware/auth")
 const { requireProjectAccess } = require("../middleware/ownership")
+
+// Public transparency portal — no session, registered ahead of `protect` so it
+// stays reachable by an unauthenticated citizen. Must precede "/:id" below.
+router.get("/public",     c.getPublicProjects)
+router.get("/public/:id", c.getPublicProject)
+
 router.use(protect)
 
 // Single-project routes carry `requireProjectAccess` for officer/supervisor

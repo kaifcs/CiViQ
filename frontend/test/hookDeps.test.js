@@ -13,9 +13,9 @@ const USE_RESOURCES = join(SRC, "hooks", "useResources.js")
 
 // Hooks that forward their argument into the useApi dependency array.
 const GUARDED = [
-  "useProjects", "useProject",
+  "useProjects", "useProject", "usePublicProjects", "usePublicProject",
   "useConflicts", "useConflict",
-  "useComplaints", "useComplaint", "useComplaintStats", "useTrackedComplaints",
+  "useComplaints", "useComplaint",
   "useUser", "useAuditLogs",
   "useDashboardSummary", "useDashboardProjects", "useDashboardConflicts",
   "useDashboardComplaints", "useDashboardDepartments", "useDashboardActivity",

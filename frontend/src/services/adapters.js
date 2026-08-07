@@ -149,6 +149,32 @@ export function adaptProject(p, deptMap) {
 }
 
 
+// Normalize the public project response for the Citizen UI.
+export function adaptPublicProject(p) {
+  if (!p) return null
+  const loc = p.location || {}
+  const coords = loc.centerCoords || {}
+  return {
+    id: p.id,
+    title: p.title,
+    description: p.description,
+    department: p.department?.code || null,
+    departmentFull: p.department?.name || null,
+    type: PROJECT_TYPE_LABEL[p.projectType] || "Other",
+    status: p.status,
+    progress: p.progress ?? 0,
+    ward: loc.ward || null,
+    zone: loc.zone || null,
+    address: loc.address || null,
+    city: loc.city || null,
+    centerLat: coords.lat ?? null,
+    centerLng: coords.lng ?? null,
+    startDate: p.startDate,
+    endDate: p.endDate,
+    actualEndDate: p.actualEndDate || null,
+  }
+}
+
 // Kept local to the adapter so services stay free of GIS imports; returns null
 // for absent or out-of-range coordinates rather than a partial object.
 function normalizeCoords(coords) {

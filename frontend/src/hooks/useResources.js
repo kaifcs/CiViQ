@@ -7,8 +7,22 @@ import { useAuth } from "./useAuth"
 import { useNotificationCenter } from "./useNotificationCenter"
 import {
   projectsApi, conflictsApi, complaintsApi, usersApi,
-  auditApi, dashboardApi, departmentsApi,
+  auditApi, dashboardApi, departmentsApi, publicProjectsApi,
 } from "../services"
+
+// The citizen transparency portal. Unauthenticated, so unlike useProjects()
+// this needs no department index — the public payload already carries names.
+export function usePublicProjects(params) {
+  return useApi(
+    useCallback(() => publicProjectsApi.list(params), [params]),
+    [params],
+    { initialData: [] }
+  )
+}
+
+export function usePublicProject(id) {
+  return useApi(useCallback(() => publicProjectsApi.get(id), [id]), [id], { skip: !id })
+}
 
 export function useProjects(params) {
   const { deptMap } = useAuth()
@@ -50,30 +64,6 @@ export function useComplaints(params) {
 export function useComplaint(id) {
   const { deptMap } = useAuth()
   return useApi(useCallback(() => complaintsApi.get(id, deptMap), [id, deptMap]), [id, deptMap], { skip: !id })
-}
-
-// City-wide complaint figures from GET /api/complaints/stats. Counted in the
-// database rather than derived from useComplaints(), whose list is capped at 200
-// records server-side and would report that cap as the city total.
-export function useComplaintStats(params) {
-  return useApi(useCallback(() => complaintsApi.stats(params), [params]), [params])
-}
-
-// The complaints a citizen is tracking. Reports are anonymous, so there is no
-// "my complaints" endpoint — each device-local CNR is fetched on its own, and
-// one that no longer resolves is dropped rather than failing the whole list.
-export function useTrackedComplaints(cnrs) {
-  const { deptMap } = useAuth()
-  return useApi(
-    useCallback(async () => {
-      const found = await Promise.all(
-        (cnrs || []).map((cnr) => complaintsApi.get(cnr, deptMap).catch(() => null))
-      )
-      return found.filter(Boolean)
-    }, [cnrs, deptMap]),
-    [cnrs, deptMap],
-    { initialData: [] }
-  )
 }
 
 export function useUsers() {

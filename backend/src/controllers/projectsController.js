@@ -16,9 +16,16 @@ const {
   STAFF_ROLES,
 } = require("../utils/refValidators")
 const { pickWritable } = require("../utils/writableFields")
+const { serialisePublicProject, serialisePublicProjects } = require("../utils/serializers")
 const { ERROR_CODES, badRequest, conflictError, notFound, sendWriteError, serverError } = require("../utils/apiResponse")
 
 const DECIDABLE_STATUS = "pending"
+
+// What the unauthenticated transparency portal may see: work the city has
+// committed to, in progress, finished, or rescheduled. Pending is still under
+// internal review and rejected never happened, so neither is public.
+const PUBLIC_PROJECT_STATUSES = ["approved", "active", "completed", "rescheduled"]
+const publicProjectFilter = { ...NOT_SOFT_DELETED, status: { $in: PUBLIC_PROJECT_STATUSES } }
 
 // Progress applies only after approval and before completion.
 const PROGRESSABLE_STATUSES = ["approved", "active"]
@@ -157,6 +164,37 @@ async function reconcileProjectClashes(project) {
   return created
 }
 
+
+// GET /api/projects/public — the citizen transparency portal's project list.
+// No auth: filtered to publicly-visible statuses and shaped by
+// serialisePublicProject so internal fields never reach the response.
+exports.getPublicProjects = async (req, res) => {
+  try {
+    const page = parsePagination(req.query)
+    let q = Project.find(publicProjectFilter).populate("department", "name code").sort("-createdAt")
+    if (page.enabled) q = q.skip(page.skip).limit(page.limit)
+
+    const [projects, total] = await Promise.all([
+      q.lean(),
+      page.enabled ? Project.countDocuments(publicProjectFilter) : null,
+    ])
+    if (page.enabled) setPaginationHeaders(res, total, page)
+    res.json(serialisePublicProjects(projects))
+  } catch (err) { serverError(res, err, "projectsController:") }
+}
+
+// GET /api/projects/public/:id — single project for the transparency portal.
+exports.getPublicProject = async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return badRequest(res, "Invalid project ID")
+    }
+    const project = await Project.findOne({ _id: req.params.id, ...publicProjectFilter })
+      .populate("department", "name code")
+    if (!project) return notFound(res, "Project not found", ERROR_CODES.PROJECT_NOT_FOUND)
+    res.json(serialisePublicProject(project))
+  } catch (err) { serverError(res, err, "projectsController:") }
+}
 
 exports.getProjects = async (req, res) => {
   try {

@@ -5,7 +5,7 @@ import apiClient, { normaliseError, readPagination, TOKEN_KEY, USER_KEY } from "
 import {
   adaptUser, adaptProject, adaptConflict, adaptComplaint,
   adaptAuditLog, adaptNotification, adaptDepartment, departmentIndex,
-  PROJECT_TYPE_VALUE,
+  adaptPublicProject, PROJECT_TYPE_VALUE,
 } from "./adapters"
 
 export { normaliseError, readPagination, TOKEN_KEY, USER_KEY, PROJECT_TYPE_VALUE }
@@ -110,6 +110,19 @@ export const projectsApi = {
   async setStatus(id, isActive, deptMap) {
     const { data } = await apiClient.patch(`/projects/${id}/status`, { isActive })
     return adaptProject(data, deptMap)
+  },
+}
+
+// The citizen transparency portal — GET /projects/public needs no session and
+// returns only the fields a resident may see.
+export const publicProjectsApi = {
+  async list(params) {
+    const { data } = await apiClient.get("/projects/public", { params })
+    return (data || []).map(adaptPublicProject)
+  },
+  async get(id) {
+    const { data } = await apiClient.get(`/projects/public/${id}`)
+    return adaptPublicProject(data)
   },
 }
 

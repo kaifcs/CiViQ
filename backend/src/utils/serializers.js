@@ -48,4 +48,37 @@ const serialiseConflicts = (conflicts, user) =>
 const serialiseComplaints = (complaints, user) =>
   (complaints || []).map((c) => serialiseComplaint(c, user))
 
-module.exports = { serialiseConflict, serialiseConflicts, redactProjectRef, serialiseComplaint, serialiseComplaints }
+// Whitelist the fields exposed by the public project API.
+function serialisePublicProject(project) {
+  if (!project) return project
+  const doc = project.toObject ? project.toObject() : project
+  const dept = doc.department && typeof doc.department === "object" ? doc.department : null
+  const loc = doc.location || {}
+  return {
+    id: doc._id,
+    title: doc.title,
+    description: doc.description,
+    department: dept ? { code: dept.code, name: dept.name } : null,
+    projectType: doc.projectType,
+    status: doc.status,
+    progress: doc.progress,
+    startDate: doc.startDate,
+    endDate: doc.endDate,
+    actualEndDate: doc.actualEndDate || null,
+    location: {
+      ward: loc.ward || null,
+      zone: loc.zone || null,
+      address: loc.address || null,
+      city: loc.city || null,
+      state: loc.state || null,
+      centerCoords: loc.centerCoords || null,
+    },
+  }
+}
+
+const serialisePublicProjects = (projects) => (projects || []).map(serialisePublicProject)
+
+module.exports = {
+  serialiseConflict, serialiseConflicts, redactProjectRef, serialiseComplaint, serialiseComplaints,
+  serialisePublicProject, serialisePublicProjects,
+}

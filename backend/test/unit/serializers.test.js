@@ -6,7 +6,7 @@ const test = require("node:test")
 const assert = require("node:assert/strict")
 const { asUser, oid } = require("../helpers/fixtures")
 const {
-  redactProjectRef, serialiseConflict, serialiseConflicts,
+  redactProjectRef, serialiseConflict, serialiseConflicts, serialisePublicProject,
 } = require("../../src/utils/serializers")
 
 const populatedProject = (overrides = {}) => ({
@@ -111,6 +111,52 @@ test("serialiseConflicts maps a list and tolerates an empty or absent one", () =
 
   assert.deepEqual(serialiseConflicts([], asUser("admin")), [])
   assert.deepEqual(serialiseConflicts(null, asUser("admin")), [])
+})
+
+// The transparency portal's payload is whitelisted, so it is pinned to
+// exactly what a citizen may see — nothing staff-only slips through.
+test("serialisePublicProject exposes only the public fields", () => {
+  const project = {
+    _id: oid(),
+    title: "Sector 5 resurfacing",
+    description: "Resurfacing works",
+    department: { _id: oid(), code: "PWD", name: "Public Works" },
+    projectType: "road",
+    status: "active",
+    progress: 40,
+    startDate: new Date("2025-01-01"),
+    endDate: new Date("2025-06-01"),
+    location: { ward: "Ward-1", address: "Main Rd", centerCoords: { lat: 28.6, lng: 77.4 } },
+    officer: oid(),
+    supervisor: oid(),
+    mcdmScore: 87.5,
+    mcdmBreakdown: { conditionSeverity: 8 },
+    hasClash: true,
+    adminNote: "internal note",
+    rejectionReason: null,
+    tenderNumber: "T-100",
+    contractorName: "Acme",
+    createdBy: oid(),
+  }
+  const result = serialisePublicProject(project)
+  assert.equal(result.title, "Sector 5 resurfacing")
+  assert.equal(result.department.code, "PWD")
+  assert.equal(result.location.ward, "Ward-1")
+  for (const field of [
+    "officer", "supervisor", "mcdmScore", "mcdmBreakdown", "hasClash",
+    "adminNote", "rejectionReason", "tenderNumber", "contractorName", "createdBy", "projectId",
+  ]) {
+    assert.equal(result[field], undefined, `${field} leaked into the public payload`)
+  }
+})
+
+test("serialisePublicProject accepts a hydrated document and tolerates a null input", () => {
+  const plain = { _id: oid(), title: "x", location: {} }
+  const hydrated = { ...plain, toObject: () => ({ ...plain }) }
+  const result = serialisePublicProject(hydrated)
+  assert.equal(result.toObject, undefined)
+  assert.equal(result.title, "x")
+  assert.equal(serialisePublicProject(null), null)
 })
 
 test("the source conflict is not mutated by redaction", () => {

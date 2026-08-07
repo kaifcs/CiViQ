@@ -224,6 +224,36 @@ test("API regression", async (t) => {
     assert.equal(res.body.error.code, "PROJECT_NOT_FOUND")
   })
 
+  await t.test("the public project portal needs no token and hides internal fields", async () => {
+    const pending = await Project.create(projectDoc({
+      officer: officerA._id, department: department._id, createdBy: officerA._id, status: "pending",
+    }))
+
+    const list = await call("/projects/public")
+    assert.equal(list.status, 200, "reachable without a session")
+    assert.equal(list.body.length, 2, "both active fixtures, and no more")
+    assert.ok(list.body.every((p) => String(p.id) !== String(pending._id)), "a pending project is not yet public")
+
+    const [p] = list.body
+    assert.equal(p.officer, undefined, "officer identity is internal")
+    assert.equal(p.supervisor, undefined, "supervisor identity is internal")
+    assert.equal(p.mcdmScore, undefined, "the scoring model is internal")
+    assert.equal(p.hasClash, undefined, "conflict state is internal")
+    assert.ok(p.title && p.status && p.location, "public fields are present")
+
+    const detail = await call(`/projects/public/${ownedByA._id}`)
+    assert.equal(detail.status, 200)
+    assert.equal(String(detail.body.id), String(ownedByA._id))
+    assert.equal(detail.body.officer, undefined)
+
+    const hiddenDetail = await call(`/projects/public/${pending._id}`)
+    assert.equal(hiddenDetail.status, 404, "a non-public project is not reachable by id either")
+
+    // Later tests in this file count all projects; this fixture is local to
+    // this test and must not shift those totals.
+    await Project.findByIdAndDelete(pending._id)
+  })
+
   await t.test("an officer cannot reach an admin-only route", async () => {
     const res = await call("/users", { token: tokens.officerA })
     assert.equal(res.status, 403)

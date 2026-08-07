@@ -8,7 +8,7 @@ import assert from "node:assert/strict"
 import {
   UNAVAILABLE_FIELDS, PROJECT_TYPE_VALUE, initialsOf, roleLabel, departmentIndex,
   adaptUser, adaptProject, adaptConflict, adaptComplaint, adaptNotification,
-  adaptDepartment, adaptAuditLog,
+  adaptDepartment, adaptAuditLog, adaptPublicProject,
 } from "../src/services/adapters.js"
 
 const DEPARTMENTS = [
@@ -20,12 +20,37 @@ const deptMap = departmentIndex(DEPARTMENTS)
 test("every adapter maps absent input to null rather than throwing", () => {
   const adapters = {
     adaptUser, adaptProject, adaptConflict, adaptComplaint,
-    adaptNotification, adaptDepartment, adaptAuditLog,
+    adaptNotification, adaptDepartment, adaptAuditLog, adaptPublicProject,
   }
   for (const [name, adapt] of Object.entries(adapters)) {
     assert.equal(adapt(null, deptMap), null, `${name}(null)`)
     assert.equal(adapt(undefined, deptMap), null, `${name}(undefined)`)
   }
+})
+
+// The public portal's own view model: the fields the citizen screens read,
+// resolved from the whitelisted payload GET /projects/public returns.
+test("adaptPublicProject reshapes the public payload into the citizen view model", () => {
+  const result = adaptPublicProject({
+    id: "p1",
+    title: "Sector 5 resurfacing",
+    description: "Resurfacing works",
+    department: { code: "PWD", name: "Public Works" },
+    projectType: "road",
+    status: "active",
+    progress: 40,
+    startDate: "2025-01-01",
+    endDate: "2025-06-01",
+    actualEndDate: null,
+    location: { ward: "Ward-1", address: "Main Rd", city: "Ghaziabad", centerCoords: { lat: 28.6, lng: 77.4 } },
+  })
+  assert.equal(result.department, "PWD")
+  assert.equal(result.type, "Road")
+  assert.equal(result.ward, "Ward-1")
+  assert.equal(result.centerLat, 28.6)
+  assert.equal(result.centerLng, 77.4)
+  assert.equal(result.officer, undefined, "the public payload carries no officer to adapt")
+  assert.equal(result.mcdmScore, undefined, "the public payload carries no score to adapt")
 })
 
 test("initials handle one, several and absent names", () => {
