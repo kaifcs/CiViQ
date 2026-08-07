@@ -1,6 +1,6 @@
 // Shared shell for the public read-only Citizen portal.
 
-import { useNavigate, useLocation } from "react-router-dom"
+import { Link, NavLink } from "react-router-dom"
 
 function CiviqLogoIcon({ size = 28 }) {
   return (
@@ -35,33 +35,45 @@ function CiviqWordmark({ size = 28 }) {
   )
 }
 
-// The only two routes left in the public portal — Report and Track went with
-// the complaint workflow they served.
+// Public navigation.
 const navLinks = [
   { label: "Home", path: "/home" },
   { label: "Projects", path: "/projects" },
 ]
 
 function CitizenHeader() {
-  const navigate = useNavigate()
-  const location = useLocation()
   return (
     <header className="bg-white border-b border-[#E5E5E5] sticky top-0 z-50">
       <div className="max-w-[1200px] mx-auto px-6 h-16 flex items-center justify-between">
-        <button onClick={() => navigate("/home")} className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
+        <Link to="/home" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
           <CiviqLogoIcon size={28} />
           <CiviqWordmark size={28} />
-        </button>
+        </Link>
         <span className="hidden md:block text-[12px] font-medium text-[#9CA3AF] uppercase tracking-[0.06em]">Ghaziabad Municipal Corporation</span>
         <nav className="flex items-center gap-1">
-          {navLinks.map(link => {
-            const active = location.pathname === link.path
-            return (
-              <button key={link.path} onClick={() => navigate(link.path)} className={["px-3 py-1.5 rounded-[6px] text-[14px] transition-all duration-150", active ? "bg-[#EBEBEB] text-[#0F172A] font-semibold" : "text-[#6B7280] hover:bg-[#F3F3F3] hover:text-[#0F172A] font-normal"].join(" ")}>
-                {link.label}
-              </button>
-            )
-          })}
+          {navLinks.map((link) => (
+            <NavLink
+              key={link.path}
+              to={link.path}
+              end={link.path === "/home"}
+              className={({ isActive }) =>
+                [
+                  "px-3 py-1.5 rounded-[6px] text-[14px] transition-all duration-150",
+                  isActive
+                    ? "bg-[#EBEBEB] text-[#0F172A] font-semibold"
+                    : "text-[#6B7280] hover:bg-[#F3F3F3] hover:text-[#0F172A] font-normal",
+                ].join(" ")
+              }
+            >
+              {link.label}
+            </NavLink>
+          ))}
+          <Link
+            to="/login"
+            className="ml-2 px-3 py-1.5 rounded-[6px] text-[14px] font-medium text-[#5E6AD2] border border-[#5E6AD2]/30 hover:bg-[#EEF2FF] transition-all duration-150"
+          >
+            Staff Login
+          </Link>
         </nav>
       </div>
     </header>
@@ -69,7 +81,6 @@ function CitizenHeader() {
 }
 
 function CitizenFooter() {
-  const navigate = useNavigate()
   const year = new Date().getFullYear()
   return (
     <footer className="bg-white border-t border-[#E5E5E5] mt-auto">
@@ -78,13 +89,6 @@ function CitizenFooter() {
           <div>
             <p className="text-[13px] font-semibold text-[#0D2145]">CIVIQ</p>
             <p className="text-[11px] text-[#9CA3AF]">Plan together. Build once.</p>
-          </div>
-          <div className="flex items-center gap-6">
-            {navLinks.map((link) => (
-              <button key={link.path} onClick={() => navigate(link.path)} className="text-[13px] text-[#6B7280] hover:text-[#0F172A] transition-colors">
-                {link.label}
-              </button>
-            ))}
           </div>
           <p className="text-[12px] text-[#9CA3AF]">© {year} Ghaziabad Municipal Corporation</p>
         </div>

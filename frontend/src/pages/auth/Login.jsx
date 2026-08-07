@@ -2,7 +2,7 @@
 // a wrong password, so nothing here can distinguish them either.
 
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { USER_KEY } from '../../services'
 
@@ -221,7 +221,7 @@ const handleSubmit = async () => {
 
         <div style={{ position: 'relative', zIndex: 10, padding: '0 52px 40px' }}>
           <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.2)', margin: 0 }}>
-            © 2025 CIVIQ · Ghaziabad Municipal Corporation
+            © 2026 CIVIQ · Ghaziabad Municipal Corporation
           </p>
         </div>
       </div>
@@ -346,7 +346,19 @@ const handleSubmit = async () => {
 
           </div>
 
-          <p style={{ textAlign: 'center', fontSize: '13px', color: '#9CA3AF', marginTop: '36px', lineHeight: 1.6 }}>
+          {/* Secondary action: back to the public portal, not another sign-in path. */}
+          <div style={{ textAlign: 'center', marginTop: '20px' }}>
+            <Link
+              to="/"
+              style={{ fontSize: '13px', color: '#6B7280', textDecoration: 'none', fontWeight: 500 }}
+              onMouseEnter={e => { e.currentTarget.style.color = '#5E6AD2' }}
+              onMouseLeave={e => { e.currentTarget.style.color = '#6B7280' }}
+            >
+              ← Back to Public Portal
+            </Link>
+          </div>
+
+          <p style={{ textAlign: 'center', fontSize: '13px', color: '#9CA3AF', marginTop: '16px', lineHeight: 1.6 }}>
             Having trouble signing in?{' '}
             <span style={{ color: '#6B7280', fontWeight: 500 }}>Contact your system administrator.</span>
           </p>

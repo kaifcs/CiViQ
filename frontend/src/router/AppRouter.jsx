@@ -156,7 +156,7 @@ export default function AppRouter() {
     <BrowserRouter>
       <Suspense fallback={<LoadingState label="Loading..." />}>
       <Routes>
-        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="/" element={<CitizenHome />} />
         <Route path="/login" element={<Login />} />
 
         <Route path="/admin/dashboard" element={<RoleRoute role="admin"><AdminLayout activeItem="dashboard"><AdminDashboard /></AdminLayout></RoleRoute>} />
