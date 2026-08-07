@@ -96,7 +96,7 @@ Interactive documentation is served by the backend itself:
 - `GET /api/docs.json` — OpenAPI 3.0.3 document
 - `GET /api/health` — liveness, database state and subsystem diagnostics
 
-46 paths / 56 operations across auth, departments, users, projects, conflicts,
+47 paths / 57 operations across auth, departments, users, projects, conflicts,
 complaints, notifications, audit and dashboard. Authentication is Bearer JWT;
 authorization is role-based (`admin`, `officer`, `supervisor`, `citizen`) and,
 for projects, ownership-scoped.

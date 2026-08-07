@@ -422,6 +422,10 @@ async function getComplaintAnalytics(query = {}) {
           },
         ],
         monthly: monthlyStage("createdAt"),
+        // Resolutions per month, keyed on updatedAt for the same reason
+        // `resolution` above is: Complaint has no resolvedAt, and updatedAt is
+        // the closest stored signal for when a resolved complaint was actioned.
+        resolvedMonthly: [{ $match: { status: "resolved" } }, ...monthlyStage("updatedAt")],
         unassigned: [{ $match: { assignedOfficer: null } }, { $count: "n" }],
         byDepartment: [
           { $group: { _id: "$assignedDepartment", count: { $sum: 1 } } },
@@ -461,6 +465,7 @@ async function getComplaintAnalytics(query = {}) {
     byDepartment: agg.byDepartment,
     byWard: agg.byWard,
     monthly: agg.monthly,
+    resolvedMonthly: agg.resolvedMonthly,
     averages: {
       resolutionDays: agg.resolution[0] ? agg.resolution[0].avgDays : null,
       resolvedCount: agg.resolution[0] ? agg.resolution[0].count : 0,

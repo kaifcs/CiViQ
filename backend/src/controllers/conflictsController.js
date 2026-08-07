@@ -14,7 +14,33 @@ const { ERROR_CODES, badRequest, conflictError, forbidden, notFound, serverError
 const RESOLUTION_ACTIONS = Conflict.schema.path("adminResolution.action").enumValues
 const RESPONSE_ACTIONS = Conflict.schema.path("officerResponse.action").enumValues
 
+// Conflict resolution writes Project.status directly, so it must enforce
+// workflow preconditions itself.
+
+// Finished projects are immutable.
 const TERMINAL_STATUSES = ["completed", "rejected"]
+
+// A rescheduled project is awaiting the officer's decision.
+// Another conflict must not rewrite its status.
+const AWAITING_OFFICER_STATUS = "rescheduled"
+
+// Already-authorized projects keep their current workflow state.
+// Never reset active work back to approved.
+const ALREADY_AUTHORISED_STATUSES = ["approved", "active"]
+
+/**
+ * Returns an error message if this project's status cannot be changed
+ * by conflict resolution; otherwise returns null.
+ */
+function blocksResolution(project, verb) {
+  if (TERMINAL_STATUSES.includes(project.status)) {
+    return `A ${project.status} project cannot be ${verb} (project: ${project.title})`
+  }
+  if (project.status === AWAITING_OFFICER_STATUS) {
+    return `"${project.title}" is awaiting its officer's response to an earlier reschedule and cannot be ${verb} until they have answered`
+  }
+  return null
+}
 
 const CONFLICT_POPULATE = {
   path: "project1 project2",
@@ -98,15 +124,21 @@ exports.resolveConflict = async (req, res) => {
     const pending = []
 
     if (action === "approve_both") {
-      const settled = [p1, p2].find((p) => TERMINAL_STATUSES.includes(p.status))
-      if (settled) {
-        return conflictError(res, `A ${settled.status} project cannot be approved (project: ${settled.title})`)
+      // Both sides are checked before either is written, so a refusal leaves
+      // the pair exactly as it was.
+      for (const p of [p1, p2]) {
+        const refusal = blocksResolution(p, "approved")
+        if (refusal) return conflictError(res, refusal)
       }
 
       conflict.status = "resolved_both"
-      await Project.findByIdAndUpdate(conflict.project1, { status: "approved" })
-      await Project.findByIdAndUpdate(conflict.project2, { status: "approved" })
+
+      // Only a project still awaiting a decision is moved. One that is already
+      // authorised keeps the position it has reached, and its officer is not
+      // told again about an approval they already have.
       for (const p of [p1, p2]) {
+        if (ALREADY_AUTHORISED_STATUSES.includes(p.status)) continue
+        await Project.findByIdAndUpdate(p._id, { status: "approved" })
         if (p.officer) pending.push(() => notifyProjectApproved(p.officer, p))
       }
     } else if (action === "reject_lower") {
@@ -115,9 +147,10 @@ exports.resolveConflict = async (req, res) => {
       const lower = s1 < s2 ? p1 : p2
       const higher = s1 >= s2 ? p1 : p2
 
-      if (TERMINAL_STATUSES.includes(lower.status)) {
-        return conflictError(res, `A ${lower.status} project cannot be rescheduled (project: ${lower.title})`)
-      }
+      // Scoped to the loser: `reject_lower` never rewrites the winner — it only
+      // reads its endDate — so a finished winner must not block the deferral.
+      const refusal = blocksResolution(lower, "rescheduled")
+      if (refusal) return conflictError(res, refusal)
 
       const suggested = getSuggestedStartDate(higher)
       lower.status = "rescheduled"

@@ -148,9 +148,19 @@ arrive as no-ops.
 request, and an `alive` ref blocks updates after unmount.
 
 `useResources` exposes `useProjects`, `useProject`, `useConflicts`, `useConflict`,
-`useComplaints`, `useComplaint`, `useUsers`, `useUser`, `useAuditLogs`,
-`useDepartments`, `useNotifications`, the six `useDashboard*` hooks, and
-`useCombined`.
+`useComplaints`, `useComplaint`, `useComplaintStats`, `useTrackedComplaints`,
+`useUsers`, `useUser`, `useAuditLogs`, `useDepartments`, `useNotifications`, the
+six `useDashboard*` hooks, and `useCombined`.
+
+`useComplaintStats` and `useTrackedComplaints` exist because `GET /api/complaints`
+is capped at 200 records server-side. Counting that array would report the cap as
+the city total, and filtering it for a resident's own reports would lose any
+older than the cap — so city-wide figures come from `GET /api/complaints/stats`
+and tracked reports are resolved one CNR at a time through
+`GET /api/complaints/:cnr`.
+
+Any hook here that takes an argument must be listed in `test/hookDeps.test.js`,
+which fails the build if a new one is neither guarded nor explicitly exempt.
 
 `useNotifications` reads the shared notification state instead of issuing its own
 request, keeping the `{ data, loading, error, reload }` shape the other hooks

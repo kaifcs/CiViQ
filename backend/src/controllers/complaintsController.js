@@ -10,6 +10,7 @@
 
 const mongoose = require("mongoose")
 const Complaint = require("../models/Complaint")
+const analytics = require("../services/analyticsService")
 const { validateDepartmentRef, validateUserRef, STAFF_ROLES } = require("../utils/refValidators")
 const { recordAudit } = require("../services/auditService")
 const { notifyComplaintAssigned, notifyComplaintStatusChanged } = require("../services/notificationService")
@@ -20,6 +21,18 @@ const { ERROR_CODES, badRequest, notFound, sendWriteError, serverError } = requi
 
 const COMPLAINT_STATUSES = Complaint.schema.path("status").enumValues
 const ISSUE_TYPES = Complaint.schema.path("issueType").enumValues
+
+// Ceiling on an unpaginated read, as the audit trail already applies. This is
+// the one PUBLIC list in the API, so without it an anonymous caller could pull
+// the whole collection in a single request — and the payload would keep growing
+// with the collection for ever. Callers that need more page through ?page/?limit;
+// callers that need city-wide figures use GET /stats, which counts in the
+// database instead of shipping the rows.
+const MAX_UNPAGINATED = 200
+
+// Filters GET /stats will honour. See getComplaintStats for why `department`
+// is not among them.
+const PUBLIC_STAT_FILTERS = ["from", "to", "ward", "status", "complaintStatus"]
 
 // What a REPORTER may supply. POST /api/complaints carries no `protect` — it is
 // the public intake a resident uses without an account — so this list is
@@ -132,11 +145,54 @@ exports.getComplaints = async (req, res) => {
 
     const page = parsePagination(req.query)
     let q = Complaint.find(filter).sort("-createdAt")
-    if (page.enabled) q = q.skip(page.skip).limit(page.limit)
+    q = page.enabled ? q.skip(page.skip).limit(page.limit) : q.limit(MAX_UNPAGINATED)
 
-    const complaints = await q.lean()
-    if (page.enabled) setPaginationHeaders(res, await Complaint.countDocuments(filter), page)
+    // The count rides alongside the read rather than after it — one round trip
+    // instead of two, as projectsController.getProjects already does.
+    const [complaints, total] = await Promise.all([q.lean(), Complaint.countDocuments(filter)])
+
+    if (page.enabled) setPaginationHeaders(res, total, page)
+    // Always reported, so a caller can tell a capped read from a complete one.
+    else res.set("X-Total-Count", String(total))
+
     res.json(serialiseComplaints(complaints, req.user))
+  } catch (err) { serverError(res, err, "complaintsController:") }
+}
+
+// GET /api/complaints/stats — public.
+//
+// City-wide figures the citizen dashboard reports. Every one is derived by
+// analyticsService, the same module the admin dashboard reads, so the two
+// cannot disagree about the same number — and the page no longer has to
+// download every complaint to count them.
+exports.getComplaintStats = async (req, res) => {
+  try {
+    // Only filters that are safe to expose are forwarded. `department` is
+    // deliberately absent: `assignedDepartment` is redacted for an
+    // unauthenticated caller, and a per-department count would hand it back.
+    const query = {}
+    for (const key of PUBLIC_STAT_FILTERS) {
+      if (req.query[key] !== undefined) query[key] = req.query[key]
+    }
+
+    const stats = await analytics.getComplaintAnalytics(query)
+    if (stats?.error) return badRequest(res, stats.error)
+
+    // Whitelisted rather than blacklisted, the same rule the write paths use,
+    // so a field added to the analytics payload later is not published here by
+    // accident. `byDepartment` and `unassigned` describe internal allocation
+    // and are the two the redacted list does not disclose.
+    res.json({
+      total: stats.total,
+      open: stats.open,
+      closed: stats.closed,
+      byStatus: stats.byStatus,
+      byIssueType: stats.byIssueType,
+      byWard: stats.byWard,
+      monthly: stats.monthly,
+      resolvedMonthly: stats.resolvedMonthly,
+      averages: stats.averages,
+    })
   } catch (err) { serverError(res, err, "complaintsController:") }
 }
 

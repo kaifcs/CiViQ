@@ -390,7 +390,8 @@ module.exports = {
     put: {
       tags: ["Conflicts"], summary: "Resolve a conflict (admin)",
       description:
-        "`approve_both` approves both projects. `reject_lower` defers whichever project has the LOWER mcdmScore, sets its suggested start date, records `rescheduledProject`, and moves the conflict to `awaiting_officer`. " +
+        "`approve_both` authorises both projects to proceed: one still awaiting a decision moves to `approved` and its officer is notified, while one that is already `approved` or `active` keeps the position it has reached — an in-flight project is not rolled back, and its officer is not told again about an approval they already hold. " +
+        "`reject_lower` defers whichever project has the LOWER mcdmScore, sets its suggested start date, records `rescheduledProject`, and moves the conflict to `awaiting_officer`. " +
         "Supplying `overrideCategory` marks the audit entry as an override. Only a conflict in `pending` status can be resolved.",
       parameters: [param$("IdParam")],
       requestBody: body({
@@ -406,7 +407,7 @@ module.exports = {
         200: { description: "Resolved.", ...json(ref("Conflict")) },
         400: res$("Validation"),
         404: { description: "Conflict not found, or one/both referenced projects no longer exist.", ...json(ref("PlainError")) },
-        409: { description: "Refused. Either the conflict has already been actioned, or the resolution would rewrite a project that is already `completed` or `rejected` — `approve_both` refuses when either project is finished, `reject_lower` when the deferred (lower-scoring) one is. A finished winner does not block `reject_lower`, because it is not rewritten.", ...json(ref("PlainError")) },
+        409: { description: "Refused, and nothing is written. Either the conflict has already been actioned, or the resolution would rewrite a project it may not move: one already `completed` or `rejected`, or one in `rescheduled` — that status means another conflict has deferred it and is still awaiting its officer's answer, so rewriting it here would strand that conflict while the project proceeded on the dates that caused it. Retry once the officer has responded. Each guard is scoped to the project the chosen action actually writes: `approve_both` checks both sides, `reject_lower` only the deferred (lower-scoring) one, so a finished winner does not block it.", ...json(ref("PlainError")) },
         ...PLAIN_GUARDS,
       },
     },
@@ -435,7 +436,9 @@ module.exports = {
   "/api/complaints": {
     get: {
       tags: ["Complaints"], summary: "List / search complaints (PUBLIC — no authentication)",
-      description: "Intentionally unauthenticated — this is the public citizen view. Every complaint is returned regardless of caller, but the DOCUMENT IS REDACTED for an unauthenticated one: `assignedOfficer`, `assignedDepartment`, `photoUrl`, `resolutionNote`, `location.coords` and `location.address` are omitted. `location.ward` is kept, so aggregate views still work. An authenticated caller of any role receives the full document.",
+      description:
+        "Intentionally unauthenticated — this is the public citizen view. Every complaint matching the filters is returned regardless of caller, but the DOCUMENT IS REDACTED for an unauthenticated one: `assignedOfficer`, `assignedDepartment`, `photoUrl`, `resolutionNote`, `location.coords` and `location.address` are omitted. `location.ward` is kept. An authenticated caller of any role receives the full document.\n\n" +
+        "**Capped at 200 records without `?page`/`?limit`**, the same ceiling the audit trail applies, so this public endpoint cannot be used to pull an unbounded collection in one request. `X-Total-Count` is sent on every response — paginated or not — so a truncated read is never silent: compare it against the array length. Page through for more, or use `GET /api/complaints/stats` for city-wide figures, which counts in the database rather than shipping the rows.",
       security: [],
       parameters: [
         { name: "status", in: "query", schema: { type: "string", enum: ["submitted", "acknowledged", "in_progress", "resolved"] }, description: "Must be one of the listed values; anything else returns 400." },
@@ -463,6 +466,41 @@ module.exports = {
         example: { issueType: "pothole", description: "Large pothole near the school gate", location: { address: "MG Road", ward: "Ward 12", coords: { lat: 28.67, lng: 77.45 } } },
       }),
       responses: { 201: { description: "Created.", ...json(ref("Complaint")) }, 400: res$("Validation"), 409: res$("ConflictErr"), 429: res$("RateLimited"), 500: res$("ServerError") },
+    },
+  },
+  "/api/complaints/stats": {
+    get: {
+      tags: ["Complaints"], summary: "City-wide complaint figures (PUBLIC — no authentication)",
+      description:
+        "Aggregated counts for the public citizen dashboard, computed in the database by `analyticsService` — the same module `GET /api/dashboard/complaints` reads, so the citizen and admin views cannot report different numbers for the same thing.\n\n" +
+        "This exists so the public page does not have to download every complaint to count them. It discloses strictly less than the list endpoint it replaces: every figure summarises `status`, `issueType`, `location.ward` and timestamps, all of which `GET /api/complaints` already returns in full.\n\n" +
+        "`byDepartment` and `unassigned` are deliberately NOT included, and `?department` is not honoured — `assignedDepartment` is redacted for an unauthenticated caller, so a per-department count would hand it back.",
+      security: [],
+      parameters: [
+        param$("FilterFrom"), param$("FilterTo"), param$("FilterWard"),
+        { name: "status", in: "query", schema: { type: "string", enum: ["submitted", "acknowledged", "in_progress", "resolved"] } },
+        param$("FilterComplaintStatus"),
+      ],
+      responses: {
+        200: {
+          description: "Aggregated, read-only.",
+          ...json({
+            type: "object",
+            properties: {
+              total: { type: "integer" },
+              open: { type: "integer", description: "Any status other than resolved." },
+              closed: { type: "integer", description: "status === resolved." },
+              byStatus: { type: "object", additionalProperties: { type: "integer" } },
+              byIssueType: { type: "object", additionalProperties: { type: "integer" } },
+              byWard: { type: "array", items: { type: "object", properties: { ward: { type: "string" }, count: { type: "integer" } } } },
+              monthly: { type: "array", items: { type: "object", properties: { period: { type: "string", example: "2026-02" }, count: { type: "integer" } } }, description: "Complaints filed per month, by createdAt." },
+              resolvedMonthly: { type: "array", items: { type: "object", properties: { period: { type: "string", example: "2026-02" }, count: { type: "integer" } } }, description: "Complaints resolved per month. Keyed on updatedAt: Complaint has no resolvedAt, and updatedAt is the closest stored signal for when a resolved complaint was actioned." },
+              averages: { type: "object", properties: { resolutionDays: { type: "number", nullable: true }, resolvedCount: { type: "integer" } } },
+            },
+          }),
+        },
+        400: res$("Validation"), 429: res$("RateLimited"), 500: res$("ServerError"),
+      },
     },
   },
   "/api/complaints/{id}": {

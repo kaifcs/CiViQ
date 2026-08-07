@@ -52,6 +52,44 @@ export function useComplaint(id) {
   return useApi(useCallback(() => complaintsApi.get(id, deptMap), [id, deptMap]), [id, deptMap], { skip: !id })
 }
 
+/**
+ * City-wide complaint figures from GET /api/complaints/stats.
+ *
+ * Public, and counted in the database. Screens use this rather than deriving
+ * totals from useComplaints(): that list is capped at 200 records server-side,
+ * so counting it would report the cap as the city total once the collection
+ * grows past it.
+ */
+export function useComplaintStats(params) {
+  return useApi(useCallback(() => complaintsApi.stats(params), [params]), [params])
+}
+
+/**
+ * The complaints a citizen is tracking, resolved one CNR at a time.
+ *
+ * Reports are anonymous, so there is no "my complaints" endpoint — the CNR
+ * watchlist is device-local (useCnrWatchlist). Each reference is fetched
+ * through GET /api/complaints/:cnr, which accepts a CNR directly. Filtering the
+ * public list instead would only ever find complaints inside its 200-record
+ * cap, so an older report would appear to have vanished.
+ *
+ * A reference that no longer resolves is dropped rather than failing the whole
+ * list, so one bad entry cannot empty the table.
+ */
+export function useTrackedComplaints(cnrs) {
+  const { deptMap } = useAuth()
+  return useApi(
+    useCallback(async () => {
+      const found = await Promise.all(
+        (cnrs || []).map((cnr) => complaintsApi.get(cnr, deptMap).catch(() => null))
+      )
+      return found.filter(Boolean)
+    }, [cnrs, deptMap]),
+    [cnrs, deptMap],
+    { initialData: [] }
+  )
+}
+
 export function useUsers() {
   const { deptMap } = useAuth()
   return useApi(useCallback(() => usersApi.list(deptMap), [deptMap]), [deptMap], { initialData: [] })

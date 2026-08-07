@@ -4,7 +4,7 @@ Base path: `/api`. Machine-readable specification: OpenAPI 3.0.3 at
 `GET /api/docs.json`, with Swagger UI at `GET /api/docs`. Both are
 unauthenticated.
 
-The specification declares 46 paths and 56 operations.
+The specification declares 47 paths and 57 operations.
 
 ## Authentication
 
@@ -77,7 +77,15 @@ return the document or a bare array.
 ## Common conventions
 
 **Pagination** is opt-in on list endpoints via `?page` and `?limit`. Default
-limit 25, maximum 200. Without either parameter the full list is returned.
+limit 25, maximum 200. Without either parameter the full list is returned,
+except where an endpoint caps an unpaginated read:
+
+| Endpoint | Cap without `?page`/`?limit` |
+|---|---|
+| `GET /api/complaints` | 200 — it is public, so it cannot be left unbounded |
+| `GET /api/audit` | 200 — the trail grows without bound |
+| `GET /api/notifications` | 50 — the default feed |
+
 Metadata travels in headers:
 
 | Header | Meaning |
@@ -306,13 +314,27 @@ Same redaction as the list.
 
 Only a `pending` conflict can be resolved; otherwise 409 `CONFLICT`.
 
-Resolution rewrites project status, so it is refused with 409 when that would
-overwrite finished work: `approve_both` when either project is already
-`completed` or `rejected`, and `reject_lower` when the deferred (lower-scoring)
-one is. A finished winner does not block `reject_lower` — it is never rewritten,
-only its `endDate` is read for the suggested date.
+Resolution writes `Project.status` directly, so it does not pass through the
+preconditions the project routes enforce. The equivalent ones are applied here,
+and a refusal writes nothing at all — neither project, nor the conflict.
 
-`approve_both` sets both projects to `approved` and notifies both officers.
+| Refused when | Why |
+|---|---|
+| Either project is `completed` or `rejected` | Finished work is a historical record |
+| Either project is `rescheduled` | Another conflict has deferred it and is still awaiting that officer's answer. Rewriting it here would strand the earlier conflict — it would keep pointing at a deferral the project no longer carries while the project proceeded on the dates that caused it. Retry once the officer has responded. |
+
+Each guard is scoped to the project the chosen action actually writes:
+`approve_both` checks both sides, `reject_lower` only the deferred
+(lower-scoring) one — so a finished winner does not block `reject_lower`, whose
+`endDate` is merely read for the suggested date.
+
+`approve_both` authorises both projects to proceed. A project still awaiting a
+decision moves to `approved` and its officer is notified; one that is already
+`approved` or `active` keeps the position it has reached. In-flight work is
+therefore never rolled back — resetting an `active` project to `approved` would
+leave `progress` intact on a record marked as not yet begun, and drop it out of
+the `projects.active` figure `GET /api/dashboard/summary` reports.
+
 `reject_lower` sets the lower-`mcdmScore` project to `rescheduled` with a
 `suggestedDate` derived from the winning project's end date plus its configured
 buffer, moves the conflict to `awaiting_officer`, records `rescheduledProject`
@@ -360,6 +382,55 @@ still work. An authenticated caller of any role receives the full document.
 | `from`, `to` | `createdAt` range |
 | `search` | Case-insensitive across `cnrId`, `description`, `location.address`, `location.ward`; input is escaped before use as a regular expression |
 | `page`, `limit` | Pagination |
+
+**Capped at 200 records without `?page`/`?limit`.** This is the one public list
+in the API, so it cannot be left unbounded — an anonymous caller would otherwise
+receive the whole collection in a single response, growing with it for ever.
+
+`X-Total-Count` is sent on **every** response, paginated or not, so truncation is
+never silent: compare it against the array length. Page through for more
+records, or use [`GET /api/complaints/stats`](#get-apicomplaintsstats) for
+city-wide figures, which counts in the database rather than shipping the rows.
+
+### GET /api/complaints/stats
+**public**
+
+City-wide complaint figures for the public citizen dashboard, computed by
+`analyticsService` — the same module `GET /api/dashboard/complaints` reads, so
+the citizen and admin views cannot report different numbers for the same thing.
+
+```json
+{
+  "total": 1200, "open": 900, "closed": 300,
+  "byStatus": { "submitted": 900, "acknowledged": 0, "in_progress": 0, "resolved": 300 },
+  "byIssueType": { "pothole": 600, "drainage": 600, "streetlight": 0, "water_leak": 0, "garbage": 0, "other": 0 },
+  "byWard": [{ "ward": "Ward 12", "count": 60 }],
+  "monthly": [{ "period": "2026-01", "count": 744 }],
+  "resolvedMonthly": [{ "period": "2026-01", "count": 186 }],
+  "averages": { "resolutionDays": 5, "resolvedCount": 300 }
+}
+```
+
+This exists so the public page does not have to download every complaint to
+count them, and it discloses **strictly less** than the list endpoint it
+replaces: every figure summarises `status`, `issueType`, `location.ward` and
+timestamps, all of which `GET /api/complaints` already returns in full.
+
+`monthly` is keyed on `createdAt`; `resolvedMonthly` on `updatedAt`, for the same
+reason `averages.resolutionDays` is — Complaint has no `resolvedAt`, and
+`updatedAt` is the closest stored signal for when a resolved complaint was
+actioned.
+
+| Query | Effect |
+|---|---|
+| `from`, `to` | `createdAt` range |
+| `ward` | Exact `location.ward` |
+| `status`, `complaintStatus` | Complaint status |
+
+`byDepartment` and `unassigned` are deliberately **not** included, and
+`?department` is **not** honoured: `assignedDepartment` is redacted for an
+unauthenticated caller on the list, so a per-department count would hand it back.
+An unparseable `from`/`to` returns 400 rather than being ignored.
 
 ### GET /api/complaints/:id
 **public**

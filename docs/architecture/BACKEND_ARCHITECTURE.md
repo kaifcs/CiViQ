@@ -77,7 +77,7 @@ otherwise. The id is echoed on the response.
 | `authController` | `/api/auth` | Uniform failure message for unknown email and wrong password |
 | `projectsController` | `/api/projects` | Orchestrates MCDM, clash detection, notifications and audit on create |
 | `conflictsController` | `/api/conflicts` | Two-stage resolution; every response passes through `serialiseConflict` |
-| `complaintsController` | `/api/complaints` | Whitelisted writable fields; `:id` accepts an ObjectId or a CNR ID |
+| `complaintsController` | `/api/complaints` | Whitelisted writable fields; `:id` accepts an ObjectId or a CNR ID; unpaginated reads capped at 200 records because the list is public; `/stats` delegates to `analyticsService` |
 | `usersController` | `/api/users` | Admin only; role change and deactivation notify the affected user |
 | `departmentController` | `/api/departments` | Admin writes, authenticated reads |
 | `notificationsController` | `/api/notifications` | Recipient-scoped; bulk operations capped at 200 ids |

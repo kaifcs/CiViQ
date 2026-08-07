@@ -31,7 +31,7 @@ const USE_RESOURCES = join(SRC, "hooks", "useResources.js")
 const GUARDED = [
   "useProjects", "useProject",
   "useConflicts", "useConflict",
-  "useComplaints", "useComplaint",
+  "useComplaints", "useComplaint", "useComplaintStats", "useTrackedComplaints",
   "useUser", "useAuditLogs",
   "useDashboardSummary", "useDashboardProjects", "useDashboardConflicts",
   "useDashboardComplaints", "useDashboardDepartments", "useDashboardActivity",

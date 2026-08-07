@@ -121,8 +121,9 @@ not exist, so an id cannot be probed for existence.
 | `POST /api/auth/login` | — | — | — |
 | `POST /api/auth/logout` | yes | any | — |
 | `GET /api/auth/me` | yes | any | — |
-| `GET /api/complaints` | — | — | — |
-| `GET /api/complaints/:id` | — | — | — |
+| `GET /api/complaints` | — | — | payload redaction |
+| `GET /api/complaints/stats` | — | — | aggregate only |
+| `GET /api/complaints/:id` | — | — | payload redaction |
 | `POST /api/complaints` | — | — | — |
 | `PUT /api/complaints/:id` | yes | admin, officer, supervisor | — |
 | `PATCH /api/complaints/:id/status` | yes | admin, officer, supervisor | — |
@@ -153,18 +154,27 @@ unrestricted by that rule; adding one would be redundant.
 
 ## Complaints are unauthenticated for read and create
 
-`GET /api/complaints`, `GET /api/complaints/:id` and `POST /api/complaints`
-carry no `protect`. This supports the public citizen flow: a resident submits a
-report and tracks it by its `cnrId` without an account.
+`GET /api/complaints`, `GET /api/complaints/stats`, `GET /api/complaints/:id` and
+`POST /api/complaints` carry no `protect`. This supports the public citizen
+flow: a resident submits a report and tracks it by its `cnrId` without an
+account.
 
 The consequences are visible in the implementation:
 
-- Any caller can list and search every complaint, including `description` and
+- Any caller can list and search complaints, including `description` and
   `location.ward`. The payload is shaped for them, though: an unauthenticated
   caller never receives `assignedOfficer`, `assignedDepartment`, `photoUrl`,
   `resolutionNote`, `location.coords` or `location.address`, so the public view
   exposes neither the reporter's exact whereabouts nor the internal workload.
-  See *Complaint payload redaction* below.
+  See *Complaint payload redaction* below. The list is also **capped at 200
+  records** without `?page`/`?limit`, so being public does not make it a way to
+  pull an unbounded collection in one request.
+- `GET /stats` returns city-wide counts only — no documents. It is what the
+  public dashboard reads instead of counting a downloaded table, and it
+  discloses strictly less than the list: every figure summarises `status`,
+  `issueType`, `location.ward` and timestamps, which the list already returns in
+  full. `byDepartment` and `unassigned` are omitted and `?department` is not
+  honoured, because `assignedDepartment` is one of the redacted fields.
 - `POST` accepts only what a reporter supplies — `issueType`, `description`,
   `location` and `photoUrl`. `status`, `assignedDepartment` and
   `assignedOfficer` are server-owned: a complaint always begins `submitted` and

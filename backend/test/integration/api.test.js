@@ -540,8 +540,7 @@ test("API regression", async (t) => {
     assert.ok(finished.actualEndDate, "completion must still stamp actualEndDate")
   })
 
-  // Prevents conflict resolution from modifying completed or rejected projects.
-  // Preserves terminal project states and avoids bypassing workflow safeguards.
+  // Finished projects are immutable during conflict resolution.
   const scratchConflicts = []
   const conflictFor = async (a, b) => {
     const conflict = await Conflict.create({
@@ -617,6 +616,125 @@ test("API regression", async (t) => {
     assert.equal((await Conflict.findById(conflict._id).lean()).status, "awaiting_officer")
   })
 
+  // Regression — F-1. Conflict resolution writes Project.status directly, so it
+  // must enforce the same lifecycle invariants.
+
+  await t.test("regression: approve_both does not roll in-flight work back to approved (F-1)", async (st) => {
+    st.after(dropScratch)
+
+    // Active work must stay active; never reset it back to approved.
+    const live = await scratchProject("active", { progress: 55 })
+    const waiting = await scratchProject("pending")
+    const conflict = await conflictFor(live, waiting)
+
+    const res = await call(`/conflicts/${conflict._id}/resolve`, {
+      token: tokens.admin, method: "PUT", body: { action: "approve_both" },
+    })
+    assert.equal(res.status, 200, "an in-flight project must not block the resolution")
+
+    const after = await Project.findById(live._id).lean()
+    assert.equal(after.status, "active", "in-flight work was rolled back to approved")
+    assert.equal(after.progress, 55, "progress must survive the resolution")
+
+    assert.equal((await Project.findById(waiting._id).lean()).status, "approved",
+      "the project that WAS awaiting a decision must still be approved")
+    assert.equal((await Conflict.findById(conflict._id).lean()).status, "resolved_both")
+  })
+
+  await t.test("regression: a project awaiting an officer reschedule cannot be re-approved by another conflict (F-1)", async (st) => {
+    st.after(dropScratch)
+
+    // When one conflict defers a project, a second conflict cannot undo that
+    // deferral by re-approving the same project.
+    const deferred = await scratchProject("pending", { mcdmScore: 3 })
+    const winner = await scratchProject("pending", { mcdmScore: 9 })
+    const third = await scratchProject("pending", { mcdmScore: 5 })
+
+    const first = await conflictFor(deferred, winner)
+    const second = await conflictFor(deferred, third)
+
+    const deferral = await call(`/conflicts/${first._id}/resolve`, {
+      token: tokens.admin, method: "PUT", body: { action: "reject_lower" },
+    })
+    assert.equal(deferral.status, 200)
+    assert.equal((await Project.findById(deferred._id).lean()).status, "rescheduled")
+    assert.equal((await Conflict.findById(first._id).lean()).status, "awaiting_officer")
+
+    const res = await call(`/conflicts/${second._id}/resolve`, {
+      token: tokens.admin, method: "PUT", body: { action: "approve_both" },
+    })
+    assert.equal(res.status, 409, "a deferred project was approved out from under an open reschedule")
+    assert.equal(res.body.error.code, "CONFLICT")
+    assert.match(res.body.message, /awaiting its officer's response/,
+      "the refusal must say why, not just that it failed")
+
+    assert.equal((await Project.findById(deferred._id).lean()).status, "rescheduled",
+      "the deferral was overwritten")
+    assert.equal((await Project.findById(third._id).lean()).status, "pending",
+      "a refused call still wrote the other project")
+    assert.equal((await Conflict.findById(first._id).lean()).status, "awaiting_officer",
+      "the earlier conflict must still be awaiting its answer")
+    assert.equal((await Conflict.findById(second._id).lean()).status, "pending",
+      "the conflict was actioned despite the refusal")
+  })
+
+  await t.test("regression: reject_lower cannot overwrite an open deferral (F-1)", async (st) => {
+    st.after(dropScratch)
+
+    // Never replace an active reschedule with another.
+    const deferred = await scratchProject("pending", { mcdmScore: 2 })
+    const winner = await scratchProject("pending", { mcdmScore: 9 })
+    const third = await scratchProject("pending", { mcdmScore: 8 })
+
+    const first = await conflictFor(deferred, winner)
+    const second = await conflictFor(deferred, third)
+
+    assert.equal((await call(`/conflicts/${first._id}/resolve`, {
+      token: tokens.admin, method: "PUT", body: { action: "reject_lower" },
+    })).status, 200)
+
+    const originalDate = String((await Project.findById(deferred._id).lean()).suggestedDate)
+
+    const res = await call(`/conflicts/${second._id}/resolve`, {
+      token: tokens.admin, method: "PUT", body: { action: "reject_lower" },
+    })
+    assert.equal(res.status, 409, "an open deferral was replaced by a second one")
+
+    const after = await Project.findById(deferred._id).lean()
+    assert.equal(after.status, "rescheduled")
+    assert.equal(String(after.suggestedDate), originalDate, "the officer's suggested date changed under them")
+    assert.equal((await Conflict.findById(second._id).lean()).status, "pending")
+  })
+
+  // Once the officer responds, the project becomes eligible again.
+  await t.test("a conflict can be resolved once the officer has answered the earlier one (F-1)", async (st) => {
+    st.after(dropScratch)
+
+    const deferred = await scratchProject("pending", { mcdmScore: 3 })
+    const winner = await scratchProject("pending", { mcdmScore: 9 })
+    const third = await scratchProject("pending", { mcdmScore: 5 })
+
+    const first = await conflictFor(deferred, winner)
+    const second = await conflictFor(deferred, third)
+
+    assert.equal((await call(`/conflicts/${first._id}/resolve`, {
+      token: tokens.admin, method: "PUT", body: { action: "reject_lower" },
+    })).status, 200)
+
+    const answered = await call(`/conflicts/${first._id}/respond`, {
+      token: tokens.officerA, method: "PUT", body: { action: "accept" },
+    })
+    assert.equal(answered.status, 200, "the owning officer must be able to answer")
+    assert.equal((await Project.findById(deferred._id).lean()).status, "pending")
+
+    const res = await call(`/conflicts/${second._id}/resolve`, {
+      token: tokens.admin, method: "PUT", body: { action: "approve_both" },
+    })
+    assert.equal(res.status, 200, "the guard outlived the reschedule it was protecting")
+    assert.equal((await Project.findById(deferred._id).lean()).status, "approved")
+    assert.equal((await Conflict.findById(second._id).lean()).status, "resolved_both")
+  })
+
   const postedProjects = []
   const postProject = async (body) => {
     const res = await call("/projects", { token: tokens.officerA, method: "POST", body })
@@ -639,6 +757,95 @@ test("API regression", async (t) => {
     ...over,
   })
 
+  // Regression — F-2. Denormalized clash state must stay synchronized with the
+  // Conflict collection on both projects.
+  const dropClashFixtures = async (projectIds) => {
+    await Conflict.deleteMany({
+      $or: [{ project1: { $in: projectIds } }, { project2: { $in: projectIds } }],
+    })
+    await dropPostedProjects()
+    await dropScratchProjects()
+  }
+
+  await t.test("regression: a detected clash is recorded on both projects, not only the one being saved (F-2)", async (st) => {
+    const here = { ward: "Ward-77", centerCoords: { lat: 28.77, lng: 77.77 } }
+    const incumbent = await scratchProject("approved", {
+      officer: officerB._id, createdBy: officerB._id, ward: here.ward,
+      location: { centerCoords: here.centerCoords },
+      startDate: new Date("2026-01-01"), endDate: new Date("2026-06-01"),
+    })
+    st.after(() => dropClashFixtures([incumbent._id]))
+
+    assert.equal(incumbent.hasClash, false, "precondition: the incumbent starts clash-free")
+
+    const res = await postProject(projectBody({
+      title: "New work on occupied ground", location: here,
+      startDate: "2026-02-01", endDate: "2026-05-01",
+    }))
+    assert.equal(res.status, 201)
+    assert.equal(res.body.clashesDetected, 1, "precondition: the collision must be detected")
+
+    const pair = await Conflict.findOne({
+      $or: [
+        { project1: incumbent._id, project2: res.body.project._id },
+        { project1: res.body.project._id, project2: incumbent._id },
+      ],
+    }).lean()
+    assert.ok(pair, "precondition: a conflict row must exist for the pair")
+
+    const created = await Project.findById(res.body.project._id).lean()
+    assert.equal(created.hasClash, true)
+    assert.deepEqual(created.clashes.map(String), [String(pair._id)])
+
+    const other = await Project.findById(incumbent._id).lean()
+    assert.equal(other.hasClash, true,
+      "the incumbent shows no clash although a conflict row names it")
+    assert.deepEqual(other.clashes.map(String), [String(pair._id)],
+      "the incumbent's clashes array never learned about the conflict")
+
+    // What was persisted for the new project must match what was returned.
+    assert.equal(res.body.project.hasClash, true)
+    assert.equal(res.body.project.clashes.length, 1)
+  })
+
+  await t.test("regression: clearing a clash clears it on the counterpart too (F-2)", async (st) => {
+    const here = { ward: "Ward-78", centerCoords: { lat: 28.78, lng: 77.78 } }
+    const co_located = (title) => scratchProject("approved", {
+      title, ward: here.ward, location: { centerCoords: here.centerCoords },
+      startDate: new Date("2026-01-01"), endDate: new Date("2026-06-01"),
+    })
+    const stayer = await co_located("Stays put")
+    const mover = await co_located("Moves away")
+    st.after(() => dropClashFixtures([stayer._id, mover._id]))
+
+    // Reconciling the mover records the pair on both sides.
+    assert.equal((await call(`/projects/${mover._id}`, {
+      token: tokens.officerA, method: "PUT",
+      body: { location: { ward: here.ward, centerCoords: here.centerCoords } },
+    })).status, 200)
+    assert.equal((await Project.findById(stayer._id).lean()).hasClash, true,
+      "precondition: both sides must be flagged before the move")
+
+    // Moving it off the ground deletes the pending row — which is the mover's
+    // doing, so the stayer is the side with no other reason to be revisited.
+    assert.equal((await call(`/projects/${mover._id}`, {
+      token: tokens.officerA, method: "PUT",
+      body: { location: { ward: "Ward-96", centerCoords: { lat: 28.96, lng: 77.96 } } },
+    })).status, 200)
+    assert.equal(await Conflict.countDocuments({
+      $or: [{ project1: stayer._id }, { project2: stayer._id }],
+    }), 0, "precondition: the pending conflict must have been deleted")
+
+    const after = await Project.findById(stayer._id).lean()
+    assert.equal(after.clashes.length, 0)
+    assert.equal(after.hasClash, false,
+      "the counterpart kept a clash warning that no conflict row supports")
+
+    const moved = await Project.findById(mover._id).lean()
+    assert.equal(moved.hasClash, false)
+    assert.equal(moved.clashes.length, 0)
+  })
+
   await t.test("regression: a project supervisor must hold the supervisor role", async (st) => {
     st.after(dropPostedProjects)
 
@@ -651,12 +858,7 @@ test("API regression", async (t) => {
     }
   })
 
-  // Same root cause, milder consequence. `projectManager` has no reader, so
-  // there is no narrower rule than "must be staff"; `assignedOfficer` is the
-  // one that mattered — a citizen assignee cannot move a complaint's status
-  // (that route is admin/officer/supervisor only) and would be sent the
-  // assignment notification, which quotes the CNR and issue type, despite being
-  // a member of the public.
+  // Regression. Project managers and assigned officers must always be staff.
   await t.test("regression: a project manager must be staff", async (st) => {
     st.after(dropPostedProjects)
 
@@ -759,11 +961,7 @@ test("API regression", async (t) => {
     assert.equal((await Conflict.findById(conflict._id).lean()).status, "resolved_both")
   })
 
-  // Regression — P2-3. POST /api/complaints is the public intake and carries no
-  // `protect`, but it shared one writable-field list with the role-gated update
-  // path. An unauthenticated caller could therefore file a complaint already
-  // marked resolved and already attributed to a named officer, fabricating the
-  // resolution counts shown on the public citizen page and the admin dashboard.
+  // Regression — P2-3. Public complaint creation must not accept workflow or assignment fields.
   await t.test("regression: an anonymous report cannot set workflow state (P2-3)", async () => {
     const Complaint = require("../../src/models/Complaint")
     const report = {
@@ -811,6 +1009,107 @@ test("API regression", async (t) => {
     assert.equal(anonymous.status, 401, "assignment must stay authenticated")
   })
 
+  // Regression — F-3. GET /api/complaints is the one public list in the API and
+  // applied no ceiling when neither ?page nor ?limit was given, so an anonymous
+  // caller received the entire collection — a payload that grows without bound.
+  await t.test("regression: the public complaint list is capped, and says so (F-3)", async (st) => {
+    const Complaint = require("../../src/models/Complaint")
+    const bulk = []
+    for (let i = 0; i < 250; i++) {
+      bulk.push({
+        cnrId: `CNR-9${String(i).padStart(5, "0")}`,
+        issueType: i % 2 ? "pothole" : "drainage",
+        description: `Bulk report ${i}`,
+        location: { address: `Road ${i}`, ward: `Ward-${i % 5}`, coords: { lat: 28.6, lng: 77.4 } },
+        status: i % 4 === 0 ? "resolved" : "submitted",
+        createdAt: new Date(Date.UTC(2026, 0, 1) + i * 60_000),
+        updatedAt: new Date(Date.UTC(2026, 0, 2) + i * 60_000),
+      })
+    }
+    // Raw driver: these need fixed cnrIds, and the pre-save hook derives one
+    // from a document count, which would collide across 250 sequential creates.
+    await Complaint.collection.insertMany(bulk)
+    st.after(() => Complaint.deleteMany({ cnrId: { $regex: /^CNR-9/ } }))
+
+    const total = await Complaint.countDocuments()
+    assert.ok(total > 200, "precondition: more complaints than the cap")
+
+    const res = await call("/complaints")
+    assert.equal(res.status, 200, "the public list must stay public")
+    assert.equal(res.body.length, 200, "an unpaginated public read returned an unbounded row set")
+
+    // Truncation must never be silent: the true total is always reported, so a
+    // client can compare it against what it received.
+    assert.equal(res.headers.get("x-total-count"), String(total),
+      "X-Total-Count must be sent even when unpaginated")
+
+    // Newest first, as before — the cap keeps the most recent window.
+    for (let i = 1; i < res.body.length; i++) {
+      assert.ok(new Date(res.body[i - 1].createdAt) >= new Date(res.body[i].createdAt),
+        "the capped read must still be newest-first")
+    }
+
+    // Pagination still reaches past the cap.
+    const paged = await call("/complaints?page=2&limit=200")
+    assert.equal(paged.status, 200)
+    assert.equal(paged.headers.get("x-total-count"), String(total))
+    assert.ok(paged.body.length > 0, "a caller that needs more must be able to page")
+  })
+
+  await t.test("GET /api/complaints/stats reports city-wide figures without authentication (F-3)", async (st) => {
+    const Complaint = require("../../src/models/Complaint")
+    await Complaint.deleteMany({})
+    await Complaint.collection.insertMany([
+      { cnrId: "CNR-800001", issueType: "pothole", description: "a", location: { ward: "Ward-A", coords: { lat: 28.6, lng: 77.4 } }, status: "resolved", assignedDepartment: String(department._id), createdAt: new Date(Date.UTC(2026, 0, 1)), updatedAt: new Date(Date.UTC(2026, 0, 11)) },
+      { cnrId: "CNR-800002", issueType: "pothole", description: "b", location: { ward: "Ward-A", coords: { lat: 28.6, lng: 77.4 } }, status: "submitted", assignedDepartment: String(department._id), createdAt: new Date(Date.UTC(2026, 1, 1)), updatedAt: new Date(Date.UTC(2026, 1, 1)) },
+      { cnrId: "CNR-800003", issueType: "garbage", description: "c", location: { ward: "Ward-B", coords: { lat: 28.6, lng: 77.4 } }, status: "in_progress", createdAt: new Date(Date.UTC(2026, 1, 2)), updatedAt: new Date(Date.UTC(2026, 1, 2)) },
+    ])
+    st.after(() => Complaint.deleteMany({}))
+
+    const res = await call("/complaints/stats")
+    assert.equal(res.status, 200, "the citizen dashboard's figures must be reachable without a session")
+
+    // The figures the public page reports, counted in the database rather than
+    // derived from a downloaded table.
+    assert.equal(res.body.total, 3)
+    assert.equal(res.body.open, 2)
+    assert.equal(res.body.closed, 1)
+    assert.equal(res.body.byStatus.resolved, 1)
+    assert.equal(res.body.byIssueType.pothole, 2)
+    assert.deepEqual(res.body.byWard.find((w) => w.ward === "Ward-A"), { ward: "Ward-A", count: 2 })
+    assert.equal(res.body.averages.resolvedCount, 1)
+    assert.equal(Math.round(res.body.averages.resolutionDays), 10)
+
+    // Both series, keyed as documented: filed by createdAt, resolved by updatedAt.
+    assert.deepEqual(res.body.monthly, [{ period: "2026-01", count: 1 }, { period: "2026-02", count: 2 }])
+    assert.deepEqual(res.body.resolvedMonthly, [{ period: "2026-01", count: 1 }])
+
+    // Internal allocation is not published, and cannot be recovered by asking:
+    // `assignedDepartment` is redacted for an anonymous caller on the list, so a
+    // per-department count here would hand it straight back.
+    assert.equal("byDepartment" in res.body, false, "department allocation was published")
+    assert.equal("unassigned" in res.body, false, "unassigned workload was published")
+
+    const filtered = await call(`/complaints/stats?department=${department._id}`)
+    assert.equal(filtered.status, 200)
+    assert.equal(filtered.body.total, 3, "?department must be ignored, not honoured")
+
+    // Filters that ARE safe still work.
+    const byWard = await call("/complaints/stats?ward=Ward-B")
+    assert.equal(byWard.body.total, 1)
+    const bad = await call("/complaints/stats?from=not-a-date")
+    assert.equal(bad.status, 400, "an unparseable filter must be reported, not ignored")
+  })
+
+  // `/stats` is registered before `/:id`, which accepts a CNR as well as an
+  // ObjectId — without that ordering it would be looked up as a tracking
+  // reference and answered with 404.
+  await t.test("the stats route is not captured by the CNR lookup (F-3)", async () => {
+    const res = await call("/complaints/stats")
+    assert.equal(res.status, 200)
+    assert.equal(typeof res.body.total, "number", "the response was the complaint lookup, not the aggregate")
+  })
+
   // ── Contract (S1) ───────────────────────────────────────────────────
 
   await t.test("errors carry the standard envelope with a machine-readable code", async () => {
@@ -850,8 +1149,7 @@ test("API regression", async (t) => {
     assert.equal(paged.headers.get("x-has-previous"), "false")
   })
 
-  // Regression — S4. The paginated count now runs alongside the read; the
-  // headers must still describe the caller's own scope, not the whole table.
+  // Regression — S4. Pagination metadata must respect the caller's scope.
   await t.test("regression: paginated totals respect the caller's scope (S4 parallel count)", async () => {
     const res = await call("/projects?page=1&limit=10", { token: tokens.officerA })
     assert.equal(res.headers.get("x-total-count"), "1",

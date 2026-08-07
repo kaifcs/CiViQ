@@ -5,16 +5,27 @@
 import { useCallback, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import CitizenLayout from "./CitizenLayout"
-import { useComplaints } from "../../hooks/useResources"
+import { useComplaintStats, useTrackedComplaints } from "../../hooks/useResources"
 import { useCnrWatchlist, normalise } from "../../hooks/useCnrWatchlist"
+import { complaintsApi } from "../../services"
 import AsyncState from "../../components/AsyncState"
 import {
   DashboardSection, BarChart, TrendChart, DashboardTable, QuickActions, StatGrid,
-  ActionIcon, formatDateLong, monthlySeries, COMPLAINT_STATUS_LABELS,
+  ActionIcon, formatDateLong, COMPLAINT_STATUS_LABELS,
 } from "../../components/dashboard"
 
 // ─── Helpers ───────────────────────────────────
-const DAY = 86400000
+
+// A { period, count } series from the API, in the { label, value } shape the
+// charts read. The series is already grouped and sorted by the database.
+const toSeries = (rows = []) => rows.map((r) => ({ label: r.period, value: r.count }))
+
+// A { key: count } bucket map, likewise.
+const toBars = (buckets = {}) =>
+  Object.entries(buckets)
+    .filter(([, count]) => count > 0)
+    .map(([label, value]) => ({ label, value }))
+    .sort((a, b) => b.value - a.value)
 
 // The only per-status coloured chip in the app, so it stays local rather than
 // pushing a citizen-specific tone map into the shared Pill.
@@ -37,62 +48,50 @@ export default function CitizenHome() {
   const { cnrs, add, remove } = useCnrWatchlist()
   const [entry, setEntry] = useState("")
   const [entryError, setEntryError] = useState("")
+  const [checking, setChecking] = useState(false)
 
-  // GET /api/complaints is the only endpoint open to an unauthenticated
-  // citizen. One request powers every widget on this page: the city-wide
-  // aggregates, both charts, and the citizen's own tracked complaints.
-  const { data: complaints, loading, error, reload } = useComplaints()
+  // Two public reads, each answering the question it is actually suited to.
+  //
+  // City-wide figures are COUNTED in the database rather than derived from a
+  // downloaded table: GET /api/complaints is capped at 200 records, so counting
+  // it would report that cap as the city total once the collection grows past
+  // it — and every average and chart with it.
+  const { data: city, loading, error, reload } = useComplaintStats()
 
-  const all = useMemo(() => complaints || [], [complaints])
+  // The citizen's own reports are resolved by CNR, so they are found whatever
+  // their age and wherever they fall relative to that cap.
+  const { data: tracked, loading: loadingMine, error: mineError, reload: reloadMine } =
+    useTrackedComplaints(cnrs)
 
-  const mine = useMemo(() => {
-    const wanted = new Set(cnrs)
-    return all
-      .filter((c) => wanted.has(c.cnrId))
-      .sort((a, b) => new Date(b.filedAt) - new Date(a.filedAt))
-  }, [all, cnrs])
+  const mine = useMemo(
+    () => [...(tracked || [])].sort((a, b) => new Date(b.filedAt) - new Date(a.filedAt)),
+    [tracked]
+  )
 
   const myOpen = useMemo(() => mine.filter((c) => c.status !== "resolved"), [mine])
   const myResolved = useMemo(() => mine.filter((c) => c.status === "resolved"), [mine])
 
-  // Complaint carries no resolvedAt; the adapter derives it from updatedAt on
-  // resolved records, so this is the elapsed time the backend can actually
-  // support.
+  // Complaint carries no resolvedAt, so the backend derives this from updatedAt
+  // on resolved records — the elapsed time it can actually support.
   const avgResolutionDays = useMemo(() => {
-    const resolved = all.filter((c) => c.status === "resolved" && c.filedAt && c.resolvedAt)
-    if (resolved.length === 0) return null
-    const total = resolved.reduce((s, c) => s + (new Date(c.resolvedAt) - new Date(c.filedAt)), 0)
-    return Math.max(0, Math.round(total / resolved.length / DAY))
-  }, [all])
-
-  const cityOpen = useMemo(() => all.filter((c) => c.status !== "resolved").length, [all])
-  const cityResolved = useMemo(() => all.filter((c) => c.status === "resolved").length, [all])
+    const days = city?.averages?.resolutionDays
+    return Number.isFinite(days) ? Math.max(0, Math.round(days)) : null
+  }, [city])
 
   const stats = useMemo(() => [
     { label: "My Complaints",   value: mine.length,        sub: cnrs.length ? `${cnrs.length} tracked` : "None tracked yet" },
     { label: "Open",            value: myOpen.length,      sub: "Awaiting resolution", danger: true },
     { label: "Resolved",        value: myResolved.length,  sub: "Closed by the city" },
     { label: "Avg Resolution",  value: avgResolutionDays === null ? "—" : `${avgResolutionDays}d`, sub: "City-wide average" },
-    { label: "City Reports",    value: all.length,         sub: "All citizens" },
-    { label: "Open City-wide",  value: cityOpen,           sub: "Being worked on" },
-    { label: "Resolved City-wide", value: cityResolved,    sub: "Completed" },
-  ], [mine, myOpen, myResolved, avgResolutionDays, all, cityOpen, cityResolved, cnrs])
+    { label: "City Reports",    value: city?.total ?? 0,   sub: "All citizens" },
+    { label: "Open City-wide",  value: city?.open ?? 0,    sub: "Being worked on" },
+    { label: "Resolved City-wide", value: city?.closed ?? 0, sub: "Completed" },
+  ], [mine, myOpen, myResolved, avgResolutionDays, city, cnrs])
 
-  // ── Charts ── city-wide, from the same single request
-  const complaintHistory = useMemo(() => monthlySeries(all, (c) => c.filedAt), [all])
-
-  const resolutionTrend = useMemo(
-    () => monthlySeries(all.filter((c) => c.status === "resolved" && c.resolvedAt), (c) => c.resolvedAt),
-    [all]
-  )
-
-  const byIssueType = useMemo(() => {
-    const counts = new Map()
-    for (const c of all) counts.set(c.issueType, (counts.get(c.issueType) || 0) + 1)
-    return [...counts.entries()]
-      .map(([label, value]) => ({ label, value }))
-      .sort((a, b) => b.value - a.value)
-  }, [all])
+  // ── Charts ── city-wide, grouped and sorted by the aggregation pipeline
+  const complaintHistory = useMemo(() => toSeries(city?.monthly), [city])
+  const resolutionTrend = useMemo(() => toSeries(city?.resolvedMonthly), [city])
+  const byIssueType = useMemo(() => toBars(city?.byIssueType), [city])
 
   const go = useCallback((to) => navigate(to), [navigate])
 
@@ -105,18 +104,40 @@ export default function CitizenHome() {
       icon: <ActionIcon d={<><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></>} /> },
   ], [])
 
-  function handleAdd(e) {
+  // Confirms the reference against the API rather than against a downloaded
+  // list. GET /api/complaints/:cnr accepts a CNR directly, so a real complaint
+  // is found however old it is; searching the capped list told a resident their
+  // own report did not exist as soon as 200 newer ones had been filed.
+  async function handleAdd(e) {
     e.preventDefault()
     const cnr = normalise(entry)
     if (!cnr) {
       setEntryError("Enter a CNR like CNR-100001")
       return
     }
-    if (!all.some((c) => c.cnrId === cnr)) {
-      setEntryError(`No complaint found for ${cnr}`)
+    if (cnrs.includes(cnr)) {
+      setEntryError(`${cnr} is already being tracked`)
       return
     }
+
+    setChecking(true)
+    try {
+      await complaintsApi.get(cnr)
+    } catch (err) {
+      // 404 is the answer to the question asked; anything else is a fault and
+      // must not be reported as "no such complaint".
+      setEntryError(
+        err?.response?.status === 404
+          ? `No complaint found for ${cnr}`
+          : "Could not check that CNR just now. Please try again."
+      )
+      return
+    } finally {
+      setChecking(false)
+    }
+
     add(cnr)
+    reloadMine()
     setEntry("")
     setEntryError("")
   }
@@ -154,9 +175,10 @@ export default function CitizenHome() {
                   />
                   <button
                     type="submit"
-                    className="h-8 px-3 text-[12px] font-medium rounded-[6px] bg-[#5E6AD2] text-white hover:bg-[#4A56C1] transition-colors"
+                    disabled={checking}
+                    className="h-8 px-3 text-[12px] font-medium rounded-[6px] bg-[#5E6AD2] text-white hover:bg-[#4A56C1] disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
                   >
-                    Track
+                    {checking ? "Checking…" : "Track"}
                   </button>
                 </form>
               }
@@ -167,9 +189,9 @@ export default function CitizenHome() {
                 you receive when reporting.
               </p>
               <DashboardTable
-                loading={loading}
-                error={error}
-                onRetry={reload}
+                loading={loadingMine}
+                error={mineError}
+                onRetry={reloadMine}
                 rows={mine}
                 emptyTitle="No complaints tracked yet"
                 emptyHint="File a complaint, then add its CNR above to follow its progress."

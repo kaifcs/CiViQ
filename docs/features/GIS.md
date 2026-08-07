@@ -137,7 +137,23 @@ reaching this point means all three tests matched. `distance` is rounded to
 whole metres.
 
 The caller creates a `Conflict` per clash, reusing an existing one for the same
-pair when present, and pushes it onto `project.clashes`.
+pair when present.
+
+`Project.hasClash` and `Project.clashes` are then rewritten from the Conflict
+collection for **both** projects in every pair touched, never accumulated at the
+call site:
+
+```
+clashes  === the Conflict rows referencing this project
+hasClash === clashes.length > 0
+```
+
+Deriving them is what keeps the two sides of a pair in agreement. Accumulating
+let them drift in both directions: a collision was recorded against the project
+being saved but never against its counterpart, so the officer already holding
+the ground saw no clash on their own project; and when a stale `pending` row was
+later deleted, the counterpart's `clashes` was pulled but its `hasClash` was
+not, leaving a warning nothing could clear.
 
 ## Buffer periods
 

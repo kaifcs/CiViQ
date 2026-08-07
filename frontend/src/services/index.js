@@ -182,6 +182,17 @@ export const complaintsApi = {
     const { data } = await apiClient.get(`/complaints/${idOrCnr}`)
     return adaptComplaint(data, deptMap)
   },
+  /**
+   * City-wide figures, counted server-side.
+   *
+   * The public list is capped at 200 records, so anything that needs a true
+   * total, average or monthly series reads it from here rather than counting a
+   * downloaded array — which would silently report the cap as the city total.
+   */
+  async stats(params) {
+    const { data } = await apiClient.get("/complaints/stats", { params })
+    return data
+  },
   async create(payload, deptMap) {
     const { data } = await apiClient.post("/complaints", payload)
     return adaptComplaint(data, deptMap)

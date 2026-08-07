@@ -3,6 +3,12 @@ const c = require("../controllers/complaintsController")
 const { protect, authorize, optionalAuth } = require("../middleware/auth")
 
 router.get("/",        optionalAuth, c.getComplaints)
+
+// Registered before "/:id" so it can never be captured as one. That route
+// accepts a CNR as well as an ObjectId, so "stats" would otherwise be looked up
+// as a tracking reference and answered with 404.
+router.get("/stats",   c.getComplaintStats)
+
 router.get("/:id",     optionalAuth, c.getComplaint)
 router.post("/",       c.createComplaint)
 

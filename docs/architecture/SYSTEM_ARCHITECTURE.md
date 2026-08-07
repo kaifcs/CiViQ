@@ -81,8 +81,9 @@ Detail: [AUTHORIZATION.md](../features/AUTHORIZATION.md).
 4. `Project.create` persists the record; a pre-save hook assigns `projectId`
 5. `services/clashDetection.detectClashes` selects candidates and applies the
    geographic, temporal and work-type tests
-6. For each clash a `Conflict` is created or reused, pushed onto
-   `project.clashes`, and `hasClash` is set
+6. For each clash a `Conflict` is created or reused, then `hasClash` and
+   `clashes` are rewritten on **both** projects from the Conflict collection —
+   so the project already holding the ground records the collision too
 7. `services/notificationService.createNotifications` notifies the submitting
    officer and, where different, the officer owning the clashing project
 8. `services/auditService.recordAudit` records `project_created`

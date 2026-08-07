@@ -81,31 +81,42 @@ const CLASH_INPUT_FIELDS = ["location", "startDate", "endDate", "projectType"]
 // Recompute when any relevant field is present.
 const touches = (updates, fields) => fields.some((field) => updates[field] !== undefined)
 
-/**
- * Brings a project's clash state back in line with reality after its geometry,
- * dates or work type changed, and reports the pairs that are newly in conflict.
- *
- * Mutates `hasClash` and `clashes` on the passed document but does NOT save it;
- * the caller persists once, together with any other recomputed state.
- *
- * Three rules, in order:
- *
- *   1. A pair that already has a Conflict row reuses it. The lookup tests both
- *      orderings because the pair is unordered (models/Conflict), which is what
- *      stops a repeated update from stacking duplicate rows for one collision.
- *   2. A pair with no row gets one, and is returned so the caller can notify.
- *   3. A `pending` conflict this re-run no longer finds is deleted. Only
- *      `pending` — that status means the row is a purely engine-derived fact
- *      that nothing human has touched, exactly like `hasClash` itself, and it
- *      is now false. `awaiting_officer` and both `resolved_*` states record a
- *      decision an administrator or officer actually made, so they are left
- *      untouched however the project moves afterwards.
- *
- * Stale rows are matched by their project references rather than by the
- * project's own `clashes` array: that array only ever holds the conflicts the
- * project itself detected, so a collision recorded by the OTHER side would
- * otherwise be missed and linger forever.
- */
+// Synchronizes the derived clash state for all affected projects.
+async function syncClashState(projectIds = []) {
+  // Deduplicated, holding whatever id form the caller had so the filter casts.
+  const wanted = new Map()
+  for (const id of projectIds) if (id) wanted.set(String(id), id)
+  if (wanted.size === 0) return new Map()
+
+  const ids = [...wanted.values()]
+  const conflicts = await Conflict.find({
+    $or: [{ project1: { $in: ids } }, { project2: { $in: ids } }],
+  })
+    .select("project1 project2")
+    .lean()
+
+  const byProject = new Map([...wanted.keys()].map((id) => [id, []]))
+  for (const conflict of conflicts) {
+    // A conflict reaches here through either side, so both are credited; a side
+    // outside `wanted` is skipped rather than written blind.
+    for (const side of [conflict.project1, conflict.project2]) {
+      byProject.get(String(side))?.push(conflict._id)
+    }
+  }
+
+  await Project.bulkWrite(
+    [...byProject].map(([id, clashes]) => ({
+      updateOne: {
+        filter: { _id: wanted.get(id) },
+        update: { $set: { clashes, hasClash: clashes.length > 0 } },
+      },
+    }))
+  )
+
+  return byProject
+}
+
+// Recomputes clash state after project updates.
 async function reconcileProjectClashes(project) {
   const clashes = await detectClashes(project)
 
@@ -131,25 +142,25 @@ async function reconcileProjectClashes(project) {
     currentIds.push(conflict._id)
   }
 
+  // A deleted conflict affects both linked projects.
   const stale = await Conflict.find({
     status: "pending",
     _id: { $nin: currentIds },
     $or: [{ project1: project._id }, { project2: project._id }],
-  }).select("_id").lean()
+  }).select("project1 project2").lean()
+
+  // Every project whose set of conflicts may have just changed: this one, the
+  // counterparts it now clashes with, and the counterparts it no longer does.
+  const affected = [project._id, ...clashes.map((c) => c.projectId)]
 
   if (stale.length > 0) {
-    const staleIds = stale.map((c) => c._id)
-    await Conflict.deleteMany({ _id: { $in: staleIds }, status: "pending" })
-    // The other side of a pair can hold the same reference; clearing it there
-    // too keeps `clashes` from pointing at a row that no longer exists.
-    await Project.updateMany(
-      { clashes: { $in: staleIds } },
-      { $pull: { clashes: { $in: staleIds } } }
-    )
+    await Conflict.deleteMany({ _id: { $in: stale.map((c) => c._id) }, status: "pending" })
+    for (const c of stale) affected.push(c.project1, c.project2)
   }
 
-  project.clashes = currentIds
-  project.hasClash = currentIds.length > 0
+  const synced = await syncClashState(affected)
+  project.clashes = synced.get(String(project._id)) || []
+  project.hasClash = project.clashes.length > 0
 
   return created
 }
@@ -242,8 +253,6 @@ exports.createProject = async (req, res) => {
 
     const clashes = await detectClashes(project)
     if (clashes.length > 0) {
-      project.hasClash = true
-
       const clashProjects = await Project.find({ _id: { $in: clashes.map((c) => c.projectId) } })
       const projectById = new Map(clashProjects.map((p) => [String(p._id), p]))
 
@@ -263,7 +272,6 @@ exports.createProject = async (req, res) => {
             severity: clash.severity,
           })
         }
-        project.clashes.push(conflict._id)
 
         const otherProject = projectById.get(String(clash.projectId))
         if (otherProject) {
@@ -278,8 +286,12 @@ exports.createProject = async (req, res) => {
         }
       }
 
+      // Synchronize clash state for both projects.
+      const synced = await syncClashState([project._id, ...clashes.map((c) => c.projectId)])
+      project.clashes = synced.get(String(project._id)) || []
+      project.hasClash = project.clashes.length > 0
+
       await createNotifications(notificationPayloads)
-      await project.save()
     }
 
     await recordAudit({ req, action: "project_created", targetType: "Project", targetId: project._id })

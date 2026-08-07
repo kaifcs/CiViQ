@@ -99,6 +99,12 @@ const projectSchema = new mongoose.Schema({
     type: String,
   }],
 
+  // A denormalisation of the Conflict collection, which stays authoritative:
+  //   clashes  === the Conflict rows referencing this project
+  //   hasClash === clashes.length > 0
+  // Both sides of a pair are rewritten together (projectsController
+  // .syncClashState), so a project always records a collision the other side
+  // detected — and loses it when the row goes.
   hasClash:   { type: Boolean, default: false },
   clashes:    [{ type: mongoose.Schema.Types.ObjectId, ref: "Conflict" }],
 
