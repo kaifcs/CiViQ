@@ -47,7 +47,7 @@ Both halves expose the same four scripts, and `check` is what CI runs.
 |---|---|---|
 | `npm run lint` | ESLint | ESLint |
 | `npm run build` | syntax check | Vite production build |
-| `npm test` | 207 tests | 41 tests |
+| `npm test` | 210 tests | 41 tests |
 | `npm run check` | lint + build + test | lint + build + test |
 | `npm run test:coverage` | with coverage report | with coverage report |
 
@@ -112,7 +112,7 @@ Interactive documentation is served by the backend itself:
 - `GET /api/docs.json` — OpenAPI 3.0.3 document
 - `GET /api/health` — liveness, database state and subsystem diagnostics
 
-49 paths / 59 operations across auth, departments, users, projects, conflicts,
+51 paths / 61 operations across auth, departments, users, projects, conflicts,
 complaints, notifications, audit and dashboard. Authentication is Bearer JWT;
 authorization is role-based (`admin`, `officer`, `supervisor`, `citizen`) and,
 for projects, ownership-scoped. `GET /api/projects/public` and

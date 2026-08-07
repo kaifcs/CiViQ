@@ -146,6 +146,47 @@ module.exports = {
       },
     },
   },
+  "/api/auth/profile": {
+    put: {
+      tags: ["Auth"], summary: "Update the caller's own profile (auth)",
+      description:
+        "Self-service, distinct from the admin-only `PUT /api/users/{id}`: always scoped to the authenticated caller, and the writable set is narrower — `role`, `department`, `isActive` and `email` cannot be reached here at all, so there is no path from this endpoint to a privilege change. " +
+        "Writes are recorded as a `profile_updated` audit entry.",
+      requestBody: body({
+        type: "object",
+        properties: { fullName: { type: "string" }, phone: { type: "string" }, avatar: { type: "string" } },
+        example: { fullName: "Anil Sharma", phone: "9876543210" },
+      }),
+      responses: {
+        200: { description: "Updated.", ...json(envelope("user", ref("User"))) },
+        400: res$("EnvValidation"),
+        ...ENV_GUARDS,
+      },
+    },
+  },
+  "/api/auth/password": {
+    put: {
+      tags: ["Auth"], summary: "Change the caller's own password (auth)",
+      description:
+        "Requires the current password; a wrong one returns 400, not 401, so a typo does not trip the client's global logout-on-401 handling. " +
+        "`newPassword` follows the same policy as registration (minimum 8 characters). `confirmPassword`, if supplied, must match `newPassword`. " +
+        "The session token remains valid afterwards — it is a stateless JWT carrying only the user id, not a password fingerprint, so there is no server-side session to revoke. Recorded as a `password_changed` audit entry. Shares `/api/auth/login`'s rate-control budget.",
+      requestBody: body({
+        type: "object", required: ["currentPassword", "newPassword"],
+        properties: {
+          currentPassword: { type: "string" },
+          newPassword: { type: "string", minLength: 8 },
+          confirmPassword: { type: "string" },
+        },
+        example: { currentPassword: "OldPass123", newPassword: "NewPass456", confirmPassword: "NewPass456" },
+      }),
+      responses: {
+        200: { description: "Changed.", ...json({ type: "object", properties: { success: { type: "boolean" }, message: { type: "string" } } }) },
+        400: errEx("Current password is incorrect"),
+        ...ENV_GUARDS,
+      },
+    },
+  },
 
   "/api/departments": {
     get: {

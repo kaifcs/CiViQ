@@ -78,9 +78,10 @@ app.use(
 )
 
 // Stricter budget to slow credential stuffing. Successful logins do not count,
-// and /auth/me is outside it so ordinary page loads are unaffected.
+// and /auth/me is outside it so ordinary page loads are unaffected. Password
+// change also verifies a secret, so it shares the same budget.
 app.use(
-  ["/api/auth/login", "/api/auth/register"],
+  ["/api/auth/login", "/api/auth/register", "/api/auth/password"],
   rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 20,

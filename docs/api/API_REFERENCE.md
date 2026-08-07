@@ -4,7 +4,7 @@ Base path: `/api`. Machine-readable specification: OpenAPI 3.0.3 at
 `GET /api/docs.json`, with Swagger UI at `GET /api/docs`. Both are
 unauthenticated.
 
-The specification declares 49 paths and 59 operations.
+The specification declares 51 paths and 61 operations.
 
 ## Authentication
 
@@ -102,10 +102,10 @@ Metadata travels in headers:
 generated.
 
 **Rate limiting.** 300 requests per 15 minutes across `/api`, 20 **failed**
-attempts per 15 minutes on `/api/auth/login` and `/api/auth/register`, and 30
-per minute on `/api/notifications/stream`. Exceeding any of them returns 429
-`RATE_LIMITED`. Successful sign-ins do not consume the credential budget, and
-`/api/auth/me` is outside it.
+attempts per 15 minutes on `/api/auth/login`, `/api/auth/register` and
+`/api/auth/password`, and 30 per minute on `/api/notifications/stream`.
+Exceeding any of them returns 429 `RATE_LIMITED`. Successful sign-ins do not
+consume the credential budget, and `/api/auth/me` is outside it.
 
 ---
 
@@ -178,6 +178,36 @@ event; the client discards the token. Nothing is invalidated server-side.
 **auth**
 
 Returns `{ success, user }` for the authenticated caller.
+
+### PUT /api/auth/profile
+**auth**
+
+Self-service profile update, always scoped to the caller — distinct from the
+admin-only `PUT /api/users/:id`, which can edit any account. Writable:
+`fullName`, `phone`, `avatar`. `role`, `department`, `isActive` and `email`
+are not reachable through this endpoint at all, so there is no path from a
+self-service update to a privilege change.
+
+Returns `{ success, user }` with the updated record. Records a
+`profile_updated` audit entry.
+
+### PUT /api/auth/password
+**auth**
+
+Body `{ currentPassword, newPassword, confirmPassword? }`. The current
+password is verified before the change is applied; a wrong one returns
+**400**, not 401 — this is a validation failure of an already-authenticated
+request, and a 401 here would trip the frontend's global logout-on-401
+handling for a simple typo. `newPassword` follows the same policy as
+registration (minimum 8 characters); a supplied `confirmPassword` must match
+it.
+
+Returns `{ success, message }`. Records a `password_changed` audit entry.
+Shares `/api/auth/login`'s rate-control budget, since it also verifies a
+secret. The session token remains valid afterwards: it is a stateless JWT
+carrying only the user id, not a password fingerprint, so there is no
+server-side session to revoke — the same limitation that already applies to
+`/api/auth/logout`.
 
 ---
 

@@ -121,6 +121,8 @@ not exist, so an id cannot be probed for existence.
 | `POST /api/auth/login` | — | — | — |
 | `POST /api/auth/logout` | yes | any | — |
 | `GET /api/auth/me` | yes | any | — |
+| `PUT /api/auth/profile` | yes | any | scoped to caller |
+| `PUT /api/auth/password` | yes | any | scoped to caller |
 | `GET /api/complaints` | — | — | payload redaction |
 | `GET /api/complaints/stats` | — | — | aggregate only |
 | `GET /api/complaints/:id` | — | — | payload redaction |

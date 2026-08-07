@@ -26,6 +26,7 @@ test("API regression", async (t) => {
   const Project = require("../../src/models/Project")
   const Department = require("../../src/models/Department")
   const Conflict = require("../../src/models/Conflict")
+  const AuditLog = require("../../src/models/AuditLog")
 
   const server = await listen(app)
   const base = `http://127.0.0.1:${server.address().port}/api`
@@ -160,6 +161,117 @@ test("API regression", async (t) => {
     assert.equal(JSON.stringify(me.body).includes('"password"'), false)
   })
 
+
+  await t.test("self-service profile update changes only the caller's own writable fields", async () => {
+    const res = await call("/auth/profile", {
+      token: tokens.officerA, method: "PUT",
+      body: { fullName: "Officer A Renamed", phone: "9999999999", role: "admin", isActive: false, department: "x" },
+    })
+    assert.equal(res.status, 200)
+    assert.equal(res.body.user.fullName, "Officer A Renamed")
+    assert.equal(res.body.user.phone, "9999999999")
+
+    const reloaded = await User.findById(officerA._id)
+    assert.equal(reloaded.fullName, "Officer A Renamed", "the write actually persisted")
+    assert.equal(reloaded.role, "officer", "role is not reachable through this endpoint")
+    assert.equal(reloaded.isActive, true, "isActive is not reachable through this endpoint")
+
+    const entry = await AuditLog.findOne({ action: "profile_updated", targetId: officerA._id }).sort("-createdAt")
+    assert.ok(entry, "the profile update was audited")
+    assert.equal(String(entry.performedBy), String(officerA._id))
+  })
+
+  await t.test("a caller cannot reach another account through the profile endpoint", async () => {
+    const res = await call("/auth/profile", {
+      token: tokens.officerB, method: "PUT", body: { fullName: "Hijacked" },
+    })
+    assert.equal(res.status, 200)
+    const untouchedA = await User.findById(officerA._id)
+    assert.notEqual(untouchedA.fullName, "Hijacked", "officerB's write must not reach officerA's record")
+    const changedB = await User.findById(officerB._id)
+    assert.equal(changedB.fullName, "Hijacked", "officerB's own record is the one that changed")
+  })
+
+  await t.test("profile update rejects an empty name and requires no session at all anonymously", async () => {
+    const empty = await call("/auth/profile", { token: tokens.officerA, method: "PUT", body: { fullName: "   " } })
+    assert.equal(empty.status, 400)
+
+    const anon = await call("/auth/profile", { method: "PUT", body: { fullName: "x" } })
+    assert.equal(anon.status, 401)
+  })
+
+  // End-to-end: every surface that can report a user's name must agree with
+  // MongoDB, not with whatever the client happened to hold in memory.
+  await t.test("a profile update is consistent across the database, /me, login and the audit trail", async () => {
+    const put = await call("/auth/profile", {
+      token: tokens.officerB, method: "PUT", body: { fullName: "Consistent Name" },
+    })
+    assert.equal(put.status, 200)
+
+    const inDb = await User.findById(officerB._id)
+    assert.equal(inDb.fullName, "Consistent Name", "MongoDB is the source of truth")
+
+    const me = await call("/auth/me", { token: tokens.officerB })
+    assert.equal(me.status, 200)
+    assert.equal(me.body.user.fullName, "Consistent Name", "GET /me re-reads the same record")
+
+    // A fresh login re-derives the session from scratch, independent of
+    // whatever the previous session held — proves nothing is cached.
+    const freshLogin = await call("/auth/login", { method: "POST", body: { email: "officer-b@s5.test", password: PASSWORD } })
+    assert.equal(freshLogin.status, 200)
+    assert.equal(freshLogin.body.user.fullName, "Consistent Name")
+
+    const entry = await AuditLog.findOne({ action: "profile_updated", targetId: officerB._id })
+      .populate("performedBy", "fullName")
+      .sort("-createdAt")
+    assert.equal(entry.performedBy.fullName, "Consistent Name", "the audit trail resolves the current name, not a snapshot")
+  })
+
+  await t.test("changing a password requires the correct current one and enforces the length policy", async () => {
+    const wrongCurrent = await call("/auth/password", {
+      token: tokens.supervisor, method: "PUT",
+      body: { currentPassword: "not-the-password", newPassword: "NewPassword123" },
+    })
+    // 400, not 401: the session is valid, and a 401 here would trip the
+    // frontend's global logout-on-401 handling for a mere typo.
+    assert.equal(wrongCurrent.status, 400)
+
+    const tooShort = await call("/auth/password", {
+      token: tokens.supervisor, method: "PUT",
+      body: { currentPassword: PASSWORD, newPassword: "short" },
+    })
+    assert.equal(tooShort.status, 400)
+
+    const mismatch = await call("/auth/password", {
+      token: tokens.supervisor, method: "PUT",
+      body: { currentPassword: PASSWORD, newPassword: "NewPassword123", confirmPassword: "Different123" },
+    })
+    assert.equal(mismatch.status, 400)
+  })
+
+  await t.test("a successful password change is audited, hashed, and the old password stops working", async () => {
+    const res = await call("/auth/password", {
+      token: tokens.supervisor, method: "PUT",
+      body: { currentPassword: PASSWORD, newPassword: "BrandNewPass123", confirmPassword: "BrandNewPass123" },
+    })
+    assert.equal(res.status, 200)
+    assert.equal(res.body.password, undefined, "the hash must never be echoed back")
+
+    const oldLogin = await call("/auth/login", { method: "POST", body: { email: "supervisor@s5.test", password: PASSWORD } })
+    assert.equal(oldLogin.status, 401, "the old password must no longer work")
+
+    const newLogin = await call("/auth/login", { method: "POST", body: { email: "supervisor@s5.test", password: "BrandNewPass123" } })
+    assert.equal(newLogin.status, 200, "the new password must work")
+
+    // The token issued before the change still works: it is a stateless JWT
+    // carrying only the user id, not a password fingerprint.
+    const stillValid = await call("/auth/me", { token: tokens.supervisor })
+    assert.equal(stillValid.status, 200)
+
+    const entry = await AuditLog.findOne({ action: "password_changed", targetId: supervisor._id })
+    assert.ok(entry, "the password change was audited")
+    assert.equal(entry.details, undefined, "the audit entry must not carry the password itself")
+  })
 
   await t.test("officers see only their own projects; admin sees all", async () => {
     const adminList = await call("/projects", { token: tokens.admin })

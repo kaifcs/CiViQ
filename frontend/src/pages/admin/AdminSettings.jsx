@@ -1,11 +1,11 @@
-// Administrator profile and notification preferences. Changes persist per
-// channel and category, and take effect on both email and the in-app feed.
+// Administrator profile, password and notification preferences. Changes
+// persist per channel and category, and take effect on both email and the
+// in-app feed.
 
-import { useState } from 'react'
 import { useAuth } from '../../hooks/useAuth'
 import { inputCls, labelCls } from '../../components/uiStyles'
 import { useNotificationCenter } from '../../hooks/useNotificationCenter'
-import { usersApi, normaliseError } from '../../services'
+import { useProfileForm, usePasswordForm } from '../../hooks/useAccountSettings'
 
 function Card({ children, className = '' }) {
   return (
@@ -48,42 +48,10 @@ const Toggle = ({ checked, onChange }) => (
 )
 
 export default function AdminSettings() {
-  const { user, deptMap, applyUserUpdate } = useAuth()
+  const { user } = useAuth()
   const { preferences, savePreferences } = useNotificationCenter()
-
-  const [name,        setName]        = useState(user?.name || '')
-  const [nameSaved,   setNameSaved]   = useState(false)
-  const [currentPw,   setCurrentPw]   = useState('')
-  const [newPw,       setNewPw]       = useState('')
-  const [confirmPw,   setConfirmPw]   = useState('')
-  const [pwError,     setPwError]     = useState('')
-  const [pwSuccess,   setPwSuccess]   = useState(false)
-
-  // PUT /api/users/:id — the admin updating their own record.
-  const [nameError, setNameError] = useState('')
-  async function handleSaveName() {
-    if (!name.trim() || !user?.id) return
-    setNameError('')
-    try {
-      // The response is the updated record, already adapted; handing it straight
-      // to the session updates the navbar now, at no extra request.
-      const saved = await usersApi.update(user.id, { fullName: name.trim() }, deptMap)
-      applyUserUpdate(saved)
-      setNameSaved(true)
-      setTimeout(() => setNameSaved(false), 2500)
-    } catch (err) {
-      // normaliseError, not err.message: an Axios rejection carries only
-      // "Request failed with status code 404" there.
-      setNameError(normaliseError(err).message || 'Could not save your name.')
-    }
-  }
-
-  // No password-change endpoint exists on the backend, so this form reports
-  // that plainly rather than confirming something that never ran.
-  function handleChangePassword() {
-    setPwError('Password changes are not available yet — ask an administrator to reset it for you.')
-    setPwSuccess(false)
-  }
+  const profile = useProfileForm()
+  const password = usePasswordForm()
 
   return (
     <div className="flex flex-col gap-5" style={{ fontFamily: "'Inter', sans-serif" }}>
@@ -93,16 +61,11 @@ export default function AdminSettings() {
         <div className="flex items-center gap-5 mb-6 pb-5 border-b border-[#F3F4F6] dark:border-[#27272A]">
           <div className="relative flex-shrink-0">
             <div className="w-16 h-16 rounded-full flex items-center justify-center text-[20px] font-bold bg-[#EEF2FF] dark:bg-[#1E2260] text-[#5E6AD2] dark:text-[#9BA3F0] border-2 border-[#E0E7FF] dark:border-[#252870]">
-              {getInitials(name)}
-            </div>
-            <div className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-[#5E6AD2] border-2 border-white dark:border-[#1C1C1F] flex items-center justify-center cursor-pointer">
-              <svg width="9" height="9" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-              </svg>
+              {getInitials(profile.name)}
             </div>
           </div>
           <div>
-            <p className="text-[16px] font-bold text-[#0F172A] dark:text-[#F8FAFC]">{name}</p>
+            <p className="text-[16px] font-bold text-[#0F172A] dark:text-[#F8FAFC]">{profile.name}</p>
             <p className="text-[13px] text-[#6B7280] dark:text-[#9CA3AF]">{user?.roleLabel || '—'}</p>
             <p className="text-[12px] text-[#9CA3AF] dark:text-[#6B7280] mt-0.5">{user?.email || '—'}</p>
           </div>
@@ -111,7 +74,7 @@ export default function AdminSettings() {
         <div className="grid grid-cols-2 gap-5">
           <div>
             <label className={labelCls}>Display name</label>
-            <input className={inputCls} value={name} onChange={e => setName(e.target.value)} placeholder="Your name" />
+            <input className={inputCls} value={profile.name} onChange={e => profile.setName(e.target.value)} placeholder="Your name" />
             <p className="text-[12px] text-[#9CA3AF] dark:text-[#6B7280] mt-1.5">This appears in the navbar and audit log</p>
           </div>
           <div>
@@ -133,18 +96,18 @@ export default function AdminSettings() {
         </div>
 
         <div className="flex justify-end mt-5">
-          {nameError && (
-            <span className="text-[13px] text-[#DC2626] mr-4">{nameError}</span>
+          {profile.error && (
+            <span className="text-[13px] text-[#DC2626] mr-4">{profile.error}</span>
           )}
-          {nameSaved && (
+          {profile.saved && (
             <span className="text-[13px] text-[#16A34A] dark:text-[#4ADE80] mr-4 flex items-center gap-1.5">
               <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
               Changes saved
             </span>
           )}
-          <button onClick={handleSaveName}
-            className="h-9 px-5 text-[13px] font-medium text-white bg-[#5E6AD2] rounded-[6px] hover:bg-[#4A56C1] transition-colors">
-            Save changes
+          <button onClick={profile.save} disabled={profile.saving}
+            className="h-9 px-5 text-[13px] font-medium text-white bg-[#5E6AD2] rounded-[6px] hover:bg-[#4A56C1] disabled:opacity-60 disabled:cursor-not-allowed transition-colors">
+            {profile.saving ? 'Saving…' : 'Save changes'}
           </button>
         </div>
       </Card>
@@ -154,28 +117,28 @@ export default function AdminSettings() {
         <div className="grid grid-cols-3 gap-4">
           <div>
             <label className={labelCls}>Current password</label>
-            <input className={inputCls} type="password" placeholder="••••••••" value={currentPw} onChange={e => setCurrentPw(e.target.value)} />
+            <input className={inputCls} type="password" placeholder="••••••••" value={password.currentPw} onChange={e => password.setCurrentPw(e.target.value)} />
           </div>
           <div>
             <label className={labelCls}>New password</label>
-            <input className={inputCls} type="password" placeholder="••••••••" value={newPw} onChange={e => setNewPw(e.target.value)} />
+            <input className={inputCls} type="password" placeholder="••••••••" value={password.newPw} onChange={e => password.setNewPw(e.target.value)} />
           </div>
           <div>
             <label className={labelCls}>Confirm new password</label>
-            <input className={inputCls} type="password" placeholder="••••••••" value={confirmPw} onChange={e => setConfirmPw(e.target.value)} />
+            <input className={inputCls} type="password" placeholder="••••••••" value={password.confirmPw} onChange={e => password.setConfirmPw(e.target.value)} />
           </div>
         </div>
-        {pwError && <p className="text-[13px] text-[#DC2626] dark:text-[#F87171] mt-3">{pwError}</p>}
-        {pwSuccess && (
+        {password.error && <p className="text-[13px] text-[#DC2626] dark:text-[#F87171] mt-3">{password.error}</p>}
+        {password.success && (
           <p className="text-[13px] text-[#16A34A] dark:text-[#4ADE80] mt-3 flex items-center gap-1.5">
             <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
             Password updated successfully
           </p>
         )}
         <div className="flex justify-end mt-4">
-          <button onClick={handleChangePassword}
-            className="h-9 px-5 text-[13px] font-medium text-white bg-[#5E6AD2] rounded-[6px] hover:bg-[#4A56C1] transition-colors">
-            Update password
+          <button onClick={password.change} disabled={password.saving}
+            className="h-9 px-5 text-[13px] font-medium text-white bg-[#5E6AD2] rounded-[6px] hover:bg-[#4A56C1] disabled:opacity-60 disabled:cursor-not-allowed transition-colors">
+            {password.saving ? 'Updating…' : 'Update password'}
           </button>
         </div>
       </Card>

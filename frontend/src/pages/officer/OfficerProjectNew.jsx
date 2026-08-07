@@ -10,7 +10,7 @@ import { DEFAULT_CENTER } from '../../gis/config'
 import { isValidLatitude, isValidLongitude } from '../../gis/coordinates'
 import { inputCls, labelCls } from '../../components/uiStyles'
 
-const STEPS = ['Phase', 'Identity', 'Location', 'Timeline', 'Budget', 'MCDM', 'Team', 'Documents']
+const STEPS = ['Phase', 'Identity', 'Location', 'Timeline', 'Budget', 'MCDM', 'Team']
 
 function StepBar({ current }) {
   return (
@@ -121,7 +121,6 @@ export default function OfficerProjectNew() {
   const [utilities,       setUtilities]       = useState([])
   const [disruptionDays,  setDisruptionDays]  = useState('')
   const [supervisorId, setSupervisorId] = useState('')
-  const [docName, setDocName] = useState('')
 
   function duration() {
     if (!startDate || !endDate) return ''
@@ -129,7 +128,7 @@ export default function OfficerProjectNew() {
     return diff > 0 ? `${diff} days` : ''
   }
 
-  function handleNext() { if (step < 7) setStep(s => s + 1) }
+  function handleNext() { if (step < 6) setStep(s => s + 1) }
   function handleBack() { if (step > 0) setStep(s => s - 1) }
 
   const [clashCount, setClashCount] = useState(0)
@@ -483,45 +482,6 @@ export default function OfficerProjectNew() {
             </div>
           )}
 
-          {step === 7 && (
-            <div className="flex flex-col gap-5">
-              <div>
-                <h2 className="text-[18px] font-bold text-[#0F172A] dark:text-[#F8FAFC] mb-1">Documents</h2>
-                <p className="text-[13px] text-[#6B7280] dark:text-[#9CA3AF]">Upload required project documentation.</p>
-              </div>
-              <div>
-                <label className={labelCls}>Project document PDF <span className="text-[#DC2626]">*</span></label>
-                <div className="flex items-center gap-3 p-4 rounded-[8px] border-2 border-dashed border-[#E2E8F0] dark:border-[#27272A] hover:border-[#5E6AD2]/50 transition-colors cursor-pointer"
-                  onClick={() => setDocName('project_document.pdf')}>
-                  {docName ? (
-                    <div className="flex items-center gap-3">
-                      <svg width="20" height="20" fill="none" viewBox="0 0 24 24" className="text-[#16A34A]" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                      <p className="text-[13px] font-medium text-[#16A34A] dark:text-[#4ADE80]">{docName} uploaded</p>
-                    </div>
-                  ) : (
-                    <>
-                      <svg width="20" height="20" fill="none" viewBox="0 0 24 24" className="text-[#9CA3AF]" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                      <div>
-                        <p className="text-[13px] font-medium text-[#0F172A] dark:text-[#F8FAFC]">Click to upload project document</p>
-                        <p className="text-[12px] text-[#9CA3AF] dark:text-[#6B7280]">PDF required · Max 10MB</p>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
-              <div>
-                <label className={labelCls}>Site photos <span className="text-[12px] font-normal text-[#9CA3AF]">(optional)</span></label>
-                <div className="flex items-center gap-3 p-4 rounded-[8px] border-2 border-dashed border-[#E2E8F0] dark:border-[#27272A] hover:border-[#5E6AD2]/50 transition-colors cursor-pointer">
-                  <svg width="20" height="20" fill="none" viewBox="0 0 24 24" className="text-[#9CA3AF]" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                  <div>
-                    <p className="text-[13px] font-medium text-[#0F172A] dark:text-[#F8FAFC]">Upload site photos</p>
-                    <p className="text-[12px] text-[#9CA3AF] dark:text-[#6B7280]">JPG, PNG · Max 3 photos</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
         </div>
       </div>
 
@@ -535,7 +495,7 @@ export default function OfficerProjectNew() {
           <span className="text-[12px] text-[#9CA3AF] dark:text-[#6B7280]">Step {step + 1} of {STEPS.length}</span>
           {submitError && <span className="text-[12px] text-[#DC2626] dark:text-[#F87171] mt-1">{submitError}</span>}
         </div>
-        {step < 7 ? (
+        {step < 6 ? (
           <button onClick={handleNext}
             className="flex items-center gap-2 h-9 px-5 text-[13px] font-medium text-white bg-[#5E6AD2] rounded-[6px] hover:bg-[#4A56C1] transition-colors">
             Continue

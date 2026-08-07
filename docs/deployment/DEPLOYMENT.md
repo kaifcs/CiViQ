@@ -211,7 +211,7 @@ the `database` field rather than the status code alone.
 | Scope | Limit |
 |---|---|
 | `/api` | 300 requests / 15 minutes |
-| `/api/auth/login`, `/api/auth/register` | 20 **failed** attempts / 15 minutes |
+| `/api/auth/login`, `/api/auth/register`, `/api/auth/password` | 20 **failed** attempts / 15 minutes |
 | `/api/notifications/stream` | 30 requests / minute |
 
 The credential endpoints skip successful requests, so an ordinary sign-in never

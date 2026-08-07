@@ -27,6 +27,16 @@ export const authApi = {
   async logout() {
     try { await apiClient.post("/auth/logout") } catch { /* stateless: ignore */ }
   },
+  // Self-service — always the caller's own record, never another user's.
+  // Distinct from usersApi.update, which is the admin-only endpoint.
+  async updateProfile(payload) {
+    const { data } = await apiClient.put("/auth/profile", payload)
+    return data.user
+  },
+  async changePassword(payload) {
+    const { data } = await apiClient.put("/auth/password", payload)
+    return data
+  },
 }
 
 export const departmentsApi = {

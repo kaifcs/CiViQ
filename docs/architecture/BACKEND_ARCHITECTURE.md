@@ -75,7 +75,7 @@ otherwise. The id is echoed on the response.
 
 | Controller | Resource | Notes |
 |---|---|---|
-| `authController` | `/api/auth` | Uniform failure message for unknown email and wrong password |
+| `authController` | `/api/auth` | Uniform failure message for unknown email and wrong password; `updateProfile`/`changePassword` are self-service, always scoped to `req.user`, and independent of `usersController`'s admin-only writes |
 | `projectsController` | `/api/projects` | Orchestrates MCDM, clash detection, notifications and audit on create; `getPublicProjects`/`getPublicProject` serve the unauthenticated `/public` routes through `serialisePublicProject` |
 | `conflictsController` | `/api/conflicts` | Two-stage resolution; every response passes through `serialiseConflict` |
 | `complaintsController` | `/api/complaints` | Whitelisted writable fields; `:id` accepts an ObjectId or a CNR ID; unpaginated reads capped at 200 records because the list is public; `/stats` delegates to `analyticsService` |

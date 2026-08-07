@@ -100,7 +100,7 @@ export default function Navbar({
   userInitials = "?",
   userRole = "",
 }) {
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const navigate = useNavigate();
   const { unreadCount } = useNotificationCenter();
   const [showNotif, setShowNotif] = useState(false);
@@ -182,7 +182,13 @@ export default function Navbar({
                     {userRole}
                   </p>
                 </div>
-                <button className="w-full text-left px-4 py-2.5 text-[13px] text-[#475569] dark:text-[#94A3B8] hover:bg-[#F8FAFC] dark:hover:bg-[#252529] hover:text-[#0F172A] dark:hover:text-[#F8FAFC] transition-colors">
+                <button
+                  onClick={() => {
+                    if (user?.role) navigate(`/${user.role}/settings`);
+                    setShowProfile(false);
+                  }}
+                  className="w-full text-left px-4 py-2.5 text-[13px] text-[#475569] dark:text-[#94A3B8] hover:bg-[#F8FAFC] dark:hover:bg-[#252529] hover:text-[#0F172A] dark:hover:text-[#F8FAFC] transition-colors"
+                >
                   Profile & Settings
                 </button>
                 <button
