@@ -1,4 +1,4 @@
-// Accounts for every role: admin, officer, supervisor and citizen.
+// Accounts for authenticated staff roles.
 // The password hash is withheld by three independent layers, so no single
 // mistake exposes it. `department` is a String, not a ref, so it cannot be populated.
 
@@ -18,7 +18,7 @@ const userSchema = new mongoose.Schema(
     password: { type: String, required: true, minlength: 8, select: false },
     role: {
       type: String,
-      enum: ["admin", "officer", "supervisor", "citizen"],
+      enum: ["admin", "officer", "supervisor"],
       required: true,
     },
     department: {

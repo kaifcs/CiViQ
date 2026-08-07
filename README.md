@@ -28,6 +28,17 @@ cp .env.example .env      # VITE_API_URL must point at the backend
 npm run dev               # http://localhost:5173
 ```
 
+## Public Portal
+
+The application opens on a public, read-only transparency portal — no account
+required. `/` and `/home` both render the landing page; `/projects` and
+`/projects/:id` list and detail projects the city has approved, started,
+finished or rescheduled. These are served by the unauthenticated
+`GET /api/projects/public` and `GET /api/projects/public/:id`, which return a
+whitelisted projection with no officer, supervisor, MCDM or conflict fields —
+see [API](#api). Staff sign in at `/login`, reachable from the portal header's
+"Staff Login" action, and are then routed to their role's dashboard.
+
 ## Quality Gates
 
 Both halves expose the same four scripts, and `check` is what CI runs.
@@ -36,7 +47,7 @@ Both halves expose the same four scripts, and `check` is what CI runs.
 |---|---|---|
 | `npm run lint` | ESLint | ESLint |
 | `npm run build` | syntax check | Vite production build |
-| `npm test` | 204 tests | 40 tests |
+| `npm test` | 207 tests | 41 tests |
 | `npm run check` | lint + build + test | lint + build + test |
 | `npm run test:coverage` | with coverage report | with coverage report |
 
@@ -101,10 +112,12 @@ Interactive documentation is served by the backend itself:
 - `GET /api/docs.json` — OpenAPI 3.0.3 document
 - `GET /api/health` — liveness, database state and subsystem diagnostics
 
-47 paths / 57 operations across auth, departments, users, projects, conflicts,
+49 paths / 59 operations across auth, departments, users, projects, conflicts,
 complaints, notifications, audit and dashboard. Authentication is Bearer JWT;
 authorization is role-based (`admin`, `officer`, `supervisor`, `citizen`) and,
-for projects, ownership-scoped.
+for projects, ownership-scoped. `GET /api/projects/public` and
+`GET /api/projects/public/:id` are the exception — unauthenticated, backing the
+public portal above.
 
 **Errors are uniform.** Every failure returns:
 

@@ -22,7 +22,6 @@ const ROLE_LABELS = {
   admin: "Municipal Coordinator",
   officer: "Executive Engineer",
   supervisor: "Junior Engineer",
-  citizen: "Citizen",
 }
 export const roleLabel = (role) => ROLE_LABELS[role] || role || ""
 

@@ -2,7 +2,7 @@
 // Errors are uniform, success payloads deliberately are not — both families are
 // documented as-is, because converging them would break existing consumers.
 
-const ROLES = ["admin", "officer", "supervisor", "citizen"]
+const ROLES = ["admin", "officer", "supervisor"]
 
 const ERROR_CODE_VALUES = [
   "AUTH_UNAUTHORIZED", "AUTH_FORBIDDEN", "AUTH_TOKEN_EXPIRED",
@@ -64,7 +64,7 @@ module.exports = {
     { name: "Users", description: "User management (admin only)" },
     { name: "Projects", description: "Project lifecycle, MCDM scoring and clash detection" },
     { name: "Conflicts", description: "Clash records and their resolution workflow" },
-    { name: "Complaints", description: "Citizen complaints, assignment and status" },
+    { name: "Complaints", description: "Public complaint reporting and resolution workflow" },
     { name: "Notifications", description: "Per-recipient notifications" },
     { name: "Audit", description: "Append-only audit trail (admin only)" },
     { name: "Dashboard", description: "Read-only aggregated analytics (admin only)" },
@@ -217,6 +217,32 @@ module.exports = {
           isActive: { type: "boolean", default: true, description: "Soft-delete flag. Distinct from `status: \"active\"`. A project with `isActive: false` is excluded from list and single-project reads; only `PATCH /api/projects/{id}/status` can restore it." },
           createdAt: { type: "string", format: "date-time" },
           updatedAt: { type: "string", format: "date-time" },
+        },
+      },
+
+      PublicProject: {
+        type: "object",
+        description: "The transparency portal's view of a project — whitelisted by serialisePublicProject, not redacted from Project. No officer, supervisor, MCDM, clash or admin field exists on this shape at all.",
+        properties: {
+          id: { type: "string" },
+          title: { type: "string" },
+          description: { type: "string" },
+          department: { type: "object", nullable: true, properties: { code: { type: "string" }, name: { type: "string" } } },
+          projectType: { type: "string", enum: ["road", "water", "sewage", "electricity", "parks", "other"] },
+          status: { type: "string", enum: ["approved", "active", "completed", "rescheduled"], description: "Only these four values are ever public — pending and rejected projects are excluded by the query." },
+          progress: { type: "number" },
+          startDate: { type: "string", format: "date-time" },
+          endDate: { type: "string", format: "date-time" },
+          actualEndDate: { type: "string", format: "date-time", nullable: true },
+          location: {
+            type: "object",
+            properties: {
+              ward: { type: "string", nullable: true }, zone: { type: "string", nullable: true },
+              address: { type: "string", nullable: true }, city: { type: "string", nullable: true },
+              state: { type: "string", nullable: true },
+              centerCoords: { type: "object", nullable: true, properties: { lat: { type: "number" }, lng: { type: "number" } } },
+            },
+          },
         },
       },
 

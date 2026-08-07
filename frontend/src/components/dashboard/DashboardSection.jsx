@@ -1,5 +1,5 @@
 // Titled panel used by every dashboard widget, so spacing, border and label
-// treatment stay identical across the admin, officer, supervisor and citizen
+// treatment stay identical across the admin, officer, supervisor
 // dashboards.
 export default function DashboardSection({ title, action, children, className = '', bodyClassName = '' }) {
   return (

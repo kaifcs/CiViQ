@@ -4,7 +4,7 @@ Base path: `/api`. Machine-readable specification: OpenAPI 3.0.3 at
 `GET /api/docs.json`, with Swagger UI at `GET /api/docs`. Both are
 unauthenticated.
 
-The specification declares 47 paths and 57 operations.
+The specification declares 49 paths and 59 operations.
 
 ## Authentication
 
@@ -150,7 +150,7 @@ Account creation is an administrative act, not self-service.
 | `role` | yes | `officer` or `supervisor` only |
 | `phone` | no | |
 
-`admin` and `citizen` cannot be created here, so no single request both creates
+`admin` cannot be created here, so no single request both creates
 a principal and grants it unrestricted access; promote an account with
 `PUT /api/users/:id` afterwards. Returns `201` with `{ success, message, user }`.
 A duplicate email returns 409 `DUPLICATE_RESOURCE`.
@@ -183,7 +183,31 @@ Returns `{ success, user }` for the authenticated caller.
 
 ## Projects — `/api/projects`
 
-All routes require authentication.
+Every route requires authentication except the two public ones below, which
+back the citizen transparency portal.
+
+### GET /api/projects/public
+**public**
+
+The citizen transparency portal's project list. Returns a bare array,
+newest first, scoped to `status` in `approved`, `active`, `completed` or
+`rescheduled` and `isActive: true` — a `pending` project is still under
+internal review and a `rejected` one never happened, so neither is public.
+
+The payload is whitelisted by `serialisePublicProject`, not redacted from the
+full document: only `id`, `title`, `description`, `department` (`code`,
+`name`), `projectType`, `status`, `progress`, `startDate`, `endDate`,
+`actualEndDate` and `location` (`ward`, `zone`, `address`, `city`, `state`,
+`centerCoords`) are present. Officer, supervisor, MCDM score, clash state and
+every other internal field are absent from the shape entirely. Supports
+`?page` and `?limit`.
+
+### GET /api/projects/public/:id
+**public**
+
+Same scope and field whitelist as the list. A project outside the public
+statuses returns 404 `PROJECT_NOT_FOUND`, identical to one that does not
+exist. An invalid id returns 400 `INVALID_ID`.
 
 ### GET /api/projects
 **auth**, scoped
@@ -480,10 +504,9 @@ Body `{ status }`, with optional `note` or `resolutionNote`. Records
 
 Body `{ assignedDepartment, assignedOfficer }` — at least one required. Both
 references are validated for existence and active state, and `assignedOfficer`
-must additionally hold a staff role: admin, officer and supervisor can all move
-a complaint's status, so any of them is a valid assignee, but a `citizen` is
-rejected. Records `complaint_assigned` and notifies the new officer only when
-the assignment actually changes.
+must additionally hold a staff role (`admin`, `officer` or `supervisor`).
+Records `complaint_assigned` and notifies the new officer only when the
+assignment actually changes.
 
 ---
 

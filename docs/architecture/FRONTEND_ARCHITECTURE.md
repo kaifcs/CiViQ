@@ -141,23 +141,20 @@ arrive as no-ops.
 | `useAuth` | Session accessor; throws outside `AuthProvider` |
 | `useResources` | Per-resource hooks built on `useApi` |
 | `useNotificationCenter` | Notification state accessor |
-| `useCnrWatchlist` | Locally stored complaint tracking references |
 | `useSupervisorNav` | Supervisor navigation callback |
 
 `useApi` guards state updates twice: a `cancelled` flag discards a superseded
 request, and an `alive` ref blocks updates after unmount.
 
-`useResources` exposes `useProjects`, `useProject`, `useConflicts`, `useConflict`,
-`useComplaints`, `useComplaint`, `useComplaintStats`, `useTrackedComplaints`,
-`useUsers`, `useUser`, `useAuditLogs`, `useDepartments`, `useNotifications`, the
-six `useDashboard*` hooks, and `useCombined`.
+`useResources` exposes `useProjects`, `useProject`, `usePublicProjects`,
+`usePublicProject`, `useConflicts`, `useConflict`, `useComplaints`,
+`useComplaint`, `useUsers`, `useUser`, `useAuditLogs`, `useDepartments`,
+`useNotifications`, the six `useDashboard*` hooks, and `useCombined`.
 
-`useComplaintStats` and `useTrackedComplaints` exist because `GET /api/complaints`
-is capped at 200 records server-side. Counting that array would report the cap as
-the city total, and filtering it for a resident's own reports would lose any
-older than the cap — so city-wide figures come from `GET /api/complaints/stats`
-and tracked reports are resolved one CNR at a time through
-`GET /api/complaints/:cnr`.
+`usePublicProjects` and `usePublicProject` read `GET /api/projects/public` and
+`GET /api/projects/public/:id`, the unauthenticated endpoints backing the
+citizen transparency portal — no department index is needed, since the public
+payload already carries department names.
 
 Any hook here that takes an argument must be listed in `test/hookDeps.test.js`,
 which fails the build if a new one is neither guarded nor explicitly exempt.
@@ -169,7 +166,10 @@ expose.
 ## Routing — `src/router/AppRouter.jsx`
 
 Routes are grouped by audience. `/admin`, `/officer` and `/supervisor` sit behind
-`RoleRoute` and the shared `DashboardLayout`; citizen routes are public.
+`RoleRoute` and the shared `DashboardLayout`; citizen routes are public and are
+the application's entry point — `/` renders `CitizenHome` directly rather than
+redirecting to `/login` (`/home` remains for backward compatibility). Staff
+reach `/login` through the "Staff Login" action in the citizen header.
 
 `RoleRoute` renders nothing while the session is being restored — an
 unauthenticated first paint would bounce the user to `/login` on refresh — then
@@ -215,7 +215,7 @@ import from there rather than reaching into individual files.
 | `admin/` | Dashboard, Projects, Project detail, Conflicts, Conflict detail, Map, Complaints, Complaint detail, Analytics, Audit, Users, User detail, Settings |
 | `officer/` | Dashboard, Projects, Project detail, New project, Conflicts, Conflict detail, Clash respond, Complaints, Complaint detail, Map, Settings |
 | `supervisor/` | Dashboard, Tasks, Task detail, Settings |
-| `citizen/` | Home, Projects, Project detail, Report, Track, Not found, plus layout, header and footer |
+| `citizen/` | Home, Projects, Project detail, Not found, plus the shared `CitizenNav` shell |
 | `auth/` | Login |
 | `notifications/` | Notification Center |
 

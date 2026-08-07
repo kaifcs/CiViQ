@@ -1,5 +1,5 @@
 // Shared dashboard building blocks. Role-specific dashboards compose these;
-// nothing here knows about admin, officer, supervisor or citizen.
+// nothing here knows about admin, officer or supervisor.
 
 export { default as DashboardSection } from "./DashboardSection"
 export { default as BarChart } from "./BarChart"

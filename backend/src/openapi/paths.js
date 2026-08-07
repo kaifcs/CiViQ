@@ -74,8 +74,7 @@ module.exports = {
       tags: ["Auth"], summary: "Create a staff account (admin)",
       description:
         "Account creation is an administrative act — this endpoint is **not** self-service and requires an administrator session. " +
-        "`role` is restricted to `officer` and `supervisor`; requesting `admin` or `citizen` returns 400, so no single request both " +
-        "creates a principal and grants it unrestricted access. Promote an account to `admin` afterwards with `PUT /api/users/{id}`. " +
+        "`role` is restricted to `officer` and `supervisor`; requesting `admin` returns 400, so no single request both creates a principal and grants it unrestricted access. Promote an account to `admin` afterwards with `PUT /api/users/{id}`. " +
         "Because every account-creating path requires an existing administrator, the first one is provisioned outside the API (the seed, or a direct insert).",
       requestBody: body({
         type: "object", required: ["fullName", "email", "password", "role"],
@@ -218,7 +217,7 @@ module.exports = {
         type: "object",
         properties: {
           fullName: { type: "string" }, phone: { type: "string" }, avatar: { type: "string" },
-          role: { type: "string", enum: ["admin", "officer", "supervisor", "citizen"] },
+          role: { type: "string", enum: ["admin", "officer", "supervisor"] },
           department: { type: "string", description: "Department ObjectId; must exist and be active." },
         },
       }),
@@ -234,10 +233,30 @@ module.exports = {
     },
   },
 
+  "/api/projects/public": {
+    get: {
+      tags: ["Projects"], summary: "List public projects (PUBLIC — no authentication)",
+      description:
+        "The citizen transparency portal's project list. Scoped to `status` in `approved`, `active`, `completed` or `rescheduled` — a project still `pending` review or `rejected` is never returned — and to `isActive: true`. " +
+        "The response is whitelisted by `serialisePublicProject`, not redacted from the full document: only `id`, `title`, `description`, `department` (code and name), `projectType`, `status`, `progress`, `startDate`, `endDate`, `actualEndDate` and `location` (ward, zone, address, city, state, centerCoords) are present. Officer, supervisor, MCDM score, clash state and every other internal field are absent, not merely hidden.",
+      security: [],
+      parameters: PAGED,
+      responses: { 200: { description: "Public projects, newest first.", headers: PAGE_HEADERS, ...json({ type: "array", items: ref("PublicProject") }) }, 429: res$("RateLimited"), 500: res$("ServerError") },
+    },
+  },
+  "/api/projects/public/{id}": {
+    get: {
+      tags: ["Projects"], summary: "Get one public project (PUBLIC — no authentication)",
+      description: "Same scope and field whitelist as the list. A project outside the public statuses returns 404, identical to one that does not exist.",
+      security: [],
+      parameters: [param$("IdParam")],
+      responses: { 200: { description: "Found.", ...json(ref("PublicProject")) }, 400: res$("Validation"), 404: res$("NotFound"), 429: res$("RateLimited"), 500: res$("ServerError") },
+    },
+  },
   "/api/projects": {
     get: {
       tags: ["Projects"], summary: "List projects (auth)",
-      description: "Results are role-scoped by the controller: `admin` sees every project, `officer` only those where they are the officer, `supervisor` only those where they are the supervisor. Any other role — `citizen` included — sees none; the scope is fail-closed rather than unfiltered. Soft-deleted projects are excluded. Returns a raw array.",
+      description:"Results are role-scoped by the controller: `admin` sees every project, `officer` only those where they are the officer, and `supervisor` only those where they are the supervisor. Any other authenticated role sees none; the scope is fail-closed rather than unfiltered. Soft-deleted projects are excluded. Returns a raw array.",
       parameters: PAGED,
       responses: { 200: { description: "Projects, newest first.", headers: PAGE_HEADERS, ...json(arrayOf("Project")) }, ...PLAIN_GUARDS },
     },
@@ -425,6 +444,7 @@ module.exports = {
     get: {
       tags: ["Complaints"], summary: "List / search complaints (PUBLIC — no authentication)",
       description:
+
         "Intentionally unauthenticated — this is the public citizen view. Every complaint matching the filters is returned regardless of caller, but the DOCUMENT IS REDACTED for an unauthenticated one: `assignedOfficer`, `assignedDepartment`, `photoUrl`, `resolutionNote`, `location.coords` and `location.address` are omitted. `location.ward` is kept. An authenticated caller of any role receives the full document.\n\n" +
         "**Capped at 200 records without `?page`/`?limit`**, the same ceiling the audit trail applies, so this public endpoint cannot be used to pull an unbounded collection in one request. `X-Total-Count` is sent on every response — paginated or not — so a truncated read is never silent: compare it against the array length. Page through for more, or use `GET /api/complaints/stats` for city-wide figures, which counts in the database rather than shipping the rows.",
       security: [],

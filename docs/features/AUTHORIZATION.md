@@ -128,6 +128,7 @@ not exist, so an id cannot be probed for existence.
 | `PUT /api/complaints/:id` | yes | admin, officer, supervisor | — |
 | `PATCH /api/complaints/:id/status` | yes | admin, officer, supervisor | — |
 | `PATCH /api/complaints/:id/assign` | yes | admin, officer | — |
+| `GET /api/projects/public`, `/public/:id` | — | — | status filter + field whitelist |
 | `GET /api/projects` | yes | any | scope filter |
 | `GET /api/projects/:id` | yes | any | `requireProjectAccess` |
 | `POST /api/projects` | yes | officer, admin | — |
@@ -182,6 +183,24 @@ The consequences are visible in the implementation:
   move it from there. Values supplied for them are dropped, not rejected.
 
 All complaint mutation routes are role-gated.
+
+## The public project portal is whitelisted, not redacted
+
+`GET /api/projects/public` and `GET /api/projects/public/:id` carry no
+`protect` either, backing the citizen transparency portal. Unlike the
+complaint routes, this is not the same query with fields stripped afterwards:
+`serialisePublicProject` builds a new object naming only the fields a resident
+may see — `id`, `title`, `description`, `department` (code and name),
+`projectType`, `status`, `progress`, `startDate`, `endDate`, `actualEndDate`
+and `location` (ward, zone, address, city, state, centerCoords). A field added
+to `Project` later is withheld by default rather than leaking until someone
+remembers to hide it.
+
+The query itself is also scoped, to `status` in `approved`, `active`,
+`completed` or `rescheduled` and `isActive: true`. A `pending` project is still
+under internal review and a `rejected` one never happened, so neither is
+public; a project outside that set returns 404 by id, identical to one that
+does not exist.
 
 ## Conflict payload redaction
 
