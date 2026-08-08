@@ -11,7 +11,7 @@ const { notifyComplaintAssigned, notifyComplaintStatusChanged } = require("../se
 const { parsePagination, setPaginationHeaders } = require("../utils/pagination")
 const { pickWritable: pickFields } = require("../utils/writableFields")
 const { serialiseComplaint, serialiseComplaints } = require("../utils/serializers")
-const { ERROR_CODES, badRequest, notFound, sendWriteError, serverError } = require("../utils/apiResponse")
+const { ERROR_CODES, badRequest, forbidden, notFound, sendWriteError, serverError } = require("../utils/apiResponse")
 
 const COMPLAINT_STATUSES = Complaint.schema.path("status").enumValues
 const ISSUE_TYPES = Complaint.schema.path("issueType").enumValues
@@ -33,13 +33,19 @@ const CREATE_WRITABLE_FIELDS = [
   "photoUrl",
 ]
 
+// Assignment is restricted to authorized roles and shared across both routes.
+const ASSIGNMENT_ROLES = ["admin", "officer"]
+exports.ASSIGNMENT_ROLES = ASSIGNMENT_ROLES
+
+// The subset of WRITABLE_FIELDS that ASSIGNMENT_ROLES governs.
+const ASSIGNMENT_FIELDS = ["assignedDepartment", "assignedOfficer"]
+
 // What a role-gated update may write: the reporter fields plus workflow state.
 const WRITABLE_FIELDS = [
   ...CREATE_WRITABLE_FIELDS,
   "status",
   "resolutionNote",
-  "assignedDepartment",
-  "assignedOfficer",
+  ...ASSIGNMENT_FIELDS,
 ]
 
 function escapeRegex(value) {
@@ -128,9 +134,7 @@ exports.getComplaints = async (req, res) => {
   } catch (err) { serverError(res, err, "complaintsController:") }
 }
 
-// Public city-wide figures for the citizen dashboard, derived by
-// analyticsService — the same module the admin dashboard reads, so the two
-// cannot disagree about the same number.
+// Public city-wide figures from the shared analytics service.
 exports.getComplaintStats = async (req, res) => {
   try {
     // `department` is not forwarded: `assignedDepartment` is redacted for an
@@ -211,9 +215,20 @@ exports.updateComplaint = async (req, res) => {
     if (updates.issueType !== undefined && !ISSUE_TYPES.includes(updates.issueType)) {
       return badRequest(res, `issueType must be one of: ${ISSUE_TYPES.join(", ")}`)
     }
+    // Use the same authorization as the dedicated assignment route.
+    const touchesAssignment = ASSIGNMENT_FIELDS.some((f) => updates[f] !== undefined)
+    if (touchesAssignment && !ASSIGNMENT_ROLES.includes(req.user.role)) {
+      return forbidden(res, "Not authorized to assign a complaint")
+    }
 
     const refError = await validateAssignmentRefs(updates)
     if (refError) return badRequest(res, refError)
+
+    // Read the previous assignment to detect an actual change.
+    const before = touchesAssignment
+      ? await Complaint.findById(req.params.id).select("assignedOfficer")
+      : null
+    const previousOfficer = before?.assignedOfficer ? String(before.assignedOfficer) : null
 
     const complaint = await Complaint.findByIdAndUpdate(req.params.id, updates, {
       new: true,
@@ -229,9 +244,15 @@ exports.updateComplaint = async (req, res) => {
       details: { fields: Object.keys(updates) },
     })
 
+    // Notify only when the assignment actually changes.
+    const newOfficer = complaint.assignedOfficer ? String(complaint.assignedOfficer) : null
+    if (touchesAssignment && newOfficer && newOfficer !== previousOfficer) {
+      await notifyComplaintAssigned(complaint.assignedOfficer, complaint)
+    }
+    
     res.json(complaint)
-  } catch (err) { return sendWriteError(res, err, { resource: "complaint", context: "Error updating complaint:" }) }
-}
+    } catch (err) { return sendWriteError(res, err, { resource: "complaint", context: "Error updating complaint:" }) }
+  }
 
 // PATCH /api/complaints/:id/status
 exports.updateStatus = async (req, res) => {

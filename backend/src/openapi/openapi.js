@@ -358,7 +358,7 @@ module.exports = {
         type: "object",
         properties: {
           _id: { type: "string" },
-          action: { type: "string", description: "Emitted values: project_created, project_updated, project_approved, project_rejected, progress_updated, project_status_updated, conflict_resolved, conflict_responded, complaint_created, complaint_updated, complaint_status_updated, complaint_assigned." },
+          action: { type: "string", description: "Emitted values: project_created, project_updated, project_approved, project_rejected, progress_updated, project_status_updated, conflict_resolved, conflict_responded, complaint_created, complaint_updated, complaint_status_updated, complaint_assigned, profile_updated, password_changed, user_updated, user_status_updated, department_created, department_updated, department_status_updated." },
           performedBy: { oneOf: [{ type: "string" }, { $ref: "#/components/schemas/User" }], nullable: true, description: "Null for unauthenticated public complaint submissions." },
           targetType: { type: "string" }, targetId: { type: "string" },
           details: { type: "object", nullable: true },

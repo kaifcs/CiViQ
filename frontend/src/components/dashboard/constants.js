@@ -80,6 +80,13 @@ export const AUDIT_ACTION_LABELS = {
   complaint_updated: 'Updated complaint',
   complaint_status_updated: 'Updated complaint status',
   complaint_assigned: 'Assigned complaint',
+  profile_updated: 'Updated own profile',
+  password_changed: 'Changed own password',
+  user_updated: 'Updated user',
+  user_status_updated: 'Changed user active state',
+  department_created: 'Created department',
+  department_updated: 'Updated department',
+  department_status_updated: 'Changed department active state',
 }
 
 // Falls back to the raw action so an entry is never rendered blank.

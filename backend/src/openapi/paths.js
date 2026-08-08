@@ -222,6 +222,7 @@ module.exports = {
     },
     post: {
       tags: ["Departments"], summary: "Create a department (admin)",
+      description: "Recorded as a `department_created` audit entry.",
       requestBody: body({
         type: "object", required: ["name", "code"],
         properties: { name: { type: "string" }, code: { type: "string" }, description: { type: "string" }, color: { type: "string" } },
@@ -242,7 +243,7 @@ module.exports = {
     },
     put: {
       tags: ["Departments"], summary: "Update a department (admin)",
-      description: "`isActive` is deliberately NOT updatable here — use `PATCH /{id}/status`.",
+      description: "`isActive` is deliberately NOT updatable here — use `PATCH /{id}/status`. Recorded as a `department_updated` audit entry naming the fields supplied.",
       parameters: [param$("IdParam")],
       requestBody: body({ type: "object", properties: { name: { type: "string" }, code: { type: "string" }, description: { type: "string" }, color: { type: "string" } } }),
       responses: { 200: { description: "Updated.", ...json(envelope("department", ref("Department"))) }, 400: res$("EnvValidation"), 404: res$("EnvNotFound"), ...ENV_GUARDS },
@@ -251,6 +252,7 @@ module.exports = {
   "/api/departments/{id}/status": {
     patch: {
       tags: ["Departments"], summary: "Activate / deactivate a department (admin)",
+      description: "Recorded as a `department_status_updated` audit entry.",
       parameters: [param$("IdParam")],
       requestBody: body({ type: "object", required: ["isActive"], properties: { isActive: { type: "boolean" } }, example: { isActive: false } }),
       responses: { 200: { description: "Updated.", ...json(envelope("department", ref("Department"))) }, 400: res$("EnvValidation"), 404: res$("EnvNotFound"), ...ENV_GUARDS },
@@ -277,7 +279,8 @@ module.exports = {
       tags: ["Users"], summary: "Update a user (admin)",
       description:
         "Only the listed fields are read from the body. `password`, `email`, `_id`, `isActive` and timestamps are ignored if supplied. `department` must be an ObjectId of an existing, active Department. " +
-        "Two lockout guards apply to `role` and are checked before any write, so a rejected request leaves the account unchanged: an administrator cannot demote themselves (400), and no `role` change may leave the system with zero active administrators (400).",
+        "Two lockout guards apply to `role` and are checked before any write, so a rejected request leaves the account unchanged: an administrator cannot demote themselves (400), and no `role` change may leave the system with zero active administrators (400). " +
+        "A successful update is recorded as a `user_updated` audit entry naming the fields written and, when the role changed, the transition. A rejected one records nothing.",
       parameters: [param$("IdParam")],
       requestBody: body({
         type: "object",
@@ -294,7 +297,8 @@ module.exports = {
     patch: {
       tags: ["Users"], summary: "Activate / deactivate a user (admin)",
       description:
-        "Deactivation is guarded against administrative lockout, checked before any write so a rejected request leaves the account unchanged: an administrator cannot deactivate their own account (400), and the last active administrator cannot be deactivated (400). Activation is never blocked.",
+        "Deactivation is guarded against administrative lockout, checked before any write so a rejected request leaves the account unchanged: an administrator cannot deactivate their own account (400), and the last active administrator cannot be deactivated (400). Activation is never blocked. " +
+        "A successful change is recorded as a `user_status_updated` audit entry; a rejected one records nothing.",
       parameters: [param$("IdParam")],
       requestBody: body({ type: "object", required: ["isActive"], properties: { isActive: { type: "boolean" } } }),
       responses: { 200: { description: "Updated.", ...json(envelope("user", ref("User"))) }, 400: res$("EnvValidation"), 404: res$("EnvNotFound"), ...ENV_GUARDS },
@@ -589,7 +593,10 @@ module.exports = {
     },
     put: {
       tags: ["Complaints"], summary: "Update a complaint (admin, officer, supervisor)",
-      description: "Accepts the legacy `{ status, note }` body (where `note` maps to `resolutionNote`) as well as general field updates. `cnrId`, `_id` and timestamps are never read from the body.",
+      description:
+        "Accepts the legacy `{ status, note }` body (where `note` maps to `resolutionNote`) as well as general field updates. `cnrId`, `_id` and timestamps are never read from the body.\n\n" +
+        "**Assignment is a narrower privilege than the rest of this route.** Supplying `assignedDepartment` or `assignedOfficer` requires `admin` or `officer` — the same roles `PATCH /:id/assign` is gated on — so a supervisor updating status or a resolution note here is accepted, while one attempting to reassign the complaint receives **403** and nothing is written. " +
+        "When the assigned officer actually changes, this route raises the same `complaint_assigned` notification `PATCH /:id/assign` does; re-submitting the same officer is silent.",
       parameters: [param$("IdParam")],
       requestBody: body({
         type: "object",

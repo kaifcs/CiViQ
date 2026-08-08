@@ -88,6 +88,22 @@ app.use(
   })
 )
 
+// Rate-limit unauthenticated complaint creation separately.
+const complaintCreateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: rateLimited,
+})
+
+// Apply the limiter only to public complaint creation.
+app.use("/api/complaints", (req, res, next) =>
+  req.method === "POST" && req.path === "/"
+    ? complaintCreateLimiter(req, res, next)
+    : next()
+)
+
 app.use("/api/health", require("./routes/health"))
 app.use("/api", require("./routes/docs"))
 

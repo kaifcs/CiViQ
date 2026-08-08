@@ -33,3 +33,5 @@ frontend/.vite
 
 # AI Tools
 .claudeignore
+.claude
+CLAUDE.md

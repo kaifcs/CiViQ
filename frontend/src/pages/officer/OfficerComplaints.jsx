@@ -27,20 +27,20 @@ function FilterSelect({ label, value, onChange, options }) {
 export default function OfficerComplaints() {
   const navigate = useNavigate()
   const { user } = useAuth()
-  // No fallback: without a department there is no "my department" to scope to,
-  // and defaulting to PWD would show another department's complaints as ours.
-  const dept = user?.department || null
-  const { data: complaints, loading, error, reload } = useComplaints()
+
+  // Officer complaints are scoped by assignedOfficer on the server.
+  const myParams = useMemo(() => ({ assignedOfficer: user.id }), [user.id])
+  const { data: complaints, loading, error, reload } = useComplaints(myParams)
 
   const [filterStatus, setFilterStatus] = useState('')
   const [statuses, setStatuses] = useState({}) // reflects server-confirmed status
 
-  const myComplaints = (complaints || []).filter(c => dept && c.department === dept)
-  const filtered = useMemo(() => myComplaints.filter(c => {
+  // Memoize the fallback to preserve a stable array reference.
+  const filtered = useMemo(() => (complaints || []).filter(c => {
     const currentStatus = statuses[c.id] || c.status
     if (filterStatus && currentStatus !== filterStatus) return false
     return true
-  }), [myComplaints, filterStatus, statuses])
+  }), [complaints, filterStatus, statuses])
 
   const hasFilters = filterStatus
   function clearFilters() { setFilterStatus('') }

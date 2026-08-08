@@ -5,6 +5,7 @@ const mongoose = require("mongoose")
 const User = require("../models/User")
 const Department = require("../models/Department")
 const { parsePagination, setPaginationHeaders } = require("../utils/pagination")
+const { recordAudit } = require("../services/auditService")
 const { notifyRoleChanged } = require("../services/notificationService")
 const { ERROR_CODES, badRequest, fail, notFound } = require("../utils/apiResponse")
 const { logger } = require("../utils/logger")
@@ -134,6 +135,21 @@ exports.updateUser = async (req, res) => {
       runValidators: true,
     }).select("-password")
 
+    // Recorded after the write so rejected lockout attempts leave no audit entry.
+    // Log only changed field names and role transitions; never include credentials.
+    await recordAudit({
+      req,
+      action: "user_updated",
+      targetType: "User",
+      targetId: updatedUser._id,
+      details: {
+        fields: Object.keys(updates),
+        ...(updates.role !== undefined && updates.role !== previousRole
+          ? { role: { from: previousRole, to: updates.role } }
+          : {}),
+      },
+    })
+
     // Only an actual change notifies, so re-saving the same role is silent.
     if (updates.role !== undefined && updates.role !== previousRole) {
       await notifyRoleChanged(updatedUser._id, updatedUser.role)
@@ -181,6 +197,15 @@ exports.updateUserStatus = async (req, res) => {
       { isActive },
       { new: true, runValidators: true }
     ).select("-password")
+
+    // After the write, so a refusal by the guards above records nothing.
+    await recordAudit({
+      req,
+      action: "user_status_updated",
+      targetType: "User",
+      targetId: user._id,
+      details: { isActive },
+    })
 
     res.status(200).json({ success: true, user })
   } catch (err) {

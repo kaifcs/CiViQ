@@ -4,7 +4,11 @@
 const mongoose = require("mongoose")
 const Department = require("../models/Department")
 const { parsePagination, setPaginationHeaders } = require("../utils/pagination")
+const { recordAudit } = require("../services/auditService")
 const { ERROR_CODES, badRequest, fail, notFound } = require("../utils/apiResponse")
+
+// Record only the fields supplied in the update.
+const DEPARTMENT_WRITABLE_FIELDS = ["name", "code", "description", "color"]
 const { logger } = require("../utils/logger")
 
 // GET /api/departments
@@ -57,6 +61,14 @@ exports.createDepartment = async (req, res) => {
       code,
       description,
       color
+    })
+
+    await recordAudit({
+      req,
+      action: "department_created",
+      targetType: "Department",
+      targetId: department._id,
+      details: { name: department.name, code: department.code },
     })
 
     res.status(201).json({ success: true, department })
@@ -112,6 +124,14 @@ exports.updateDepartment = async (req, res) => {
       { new: true, runValidators: true }
     )
 
+    await recordAudit({
+      req,
+      action: "department_updated",
+      targetType: "Department",
+      targetId: department._id,
+      details: { fields: DEPARTMENT_WRITABLE_FIELDS.filter((f) => req.body[f] !== undefined) },
+    })
+
     res.status(200).json({ success: true, department })
   } catch (err) {
     if (err.code === 11000) {
@@ -145,6 +165,14 @@ exports.updateDepartmentStatus = async (req, res) => {
     if (!department) {
       return notFound(res, "Department not found", ERROR_CODES.DEPARTMENT_NOT_FOUND)
     }
+
+    await recordAudit({
+      req,
+      action: "department_status_updated",
+      targetType: "Department",
+      targetId: department._id,
+      details: { isActive },
+    })
 
     res.status(200).json({ success: true, department })
   } catch (err) {

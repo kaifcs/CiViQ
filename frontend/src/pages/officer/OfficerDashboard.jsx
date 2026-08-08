@@ -33,7 +33,9 @@ export default function OfficerDashboard() {
   // so this list IS "my projects" — no client-side ownership filtering needed.
   const { data: projects, loading, error, reload } = useProjects()
   const { data: conflicts, loading: loadingConflicts, error: conflictsError } = useConflicts()
-  const { data: complaints, loading: loadingComplaints, error: complaintsError } = useComplaints()
+  // Dashboard and list use the same assigned-officer scope.
+  const myComplaintParams = useMemo(() => ({ assignedOfficer: user.id }), [user.id])
+  const { data: complaints, loading: loadingComplaints, error: complaintsError } = useComplaints(myComplaintParams)
   // Audit is admin-only, so notifications are the officer's authorised feed.
   const { data: notifications, loading: loadingNotifications, error: notificationsError } = useNotifications()
 
@@ -48,11 +50,8 @@ export default function OfficerDashboard() {
   )
   const openConflicts = useMemo(() => myConflicts.filter((c) => c.status === 'unresolved'), [myConflicts])
 
-  // Complaint.assignedOfficer is the field that expresses "assigned to me".
-  const myComplaints = useMemo(
-    () => (complaints || []).filter((c) => c.assignedOfficer && c.assignedOfficer === user?.id),
-    [complaints, user]
-  )
+  // Already scoped by the request above; no client-side narrowing to drift.
+  const myComplaints = useMemo(() => complaints || [], [complaints])
 
   const upcomingDeadlines = useMemo(
     () => myProjects

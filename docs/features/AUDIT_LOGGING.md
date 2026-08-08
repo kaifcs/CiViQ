@@ -31,7 +31,7 @@ a Mongoose ref, so an entry survives the deletion of whatever it describes.
 
 ## Recorded actions
 
-Twelve actions are written by the current implementation.
+Nineteen actions are written by the current implementation.
 
 | Action | Source | `targetType` | `details` |
 |---|---|---|---|
@@ -47,12 +47,29 @@ Twelve actions are written by the current implementation.
 | `complaint_updated` | `complaintsController.updateComplaint` | Complaint | `{ fields }` |
 | `complaint_status_updated` | `complaintsController.updateStatus` | Complaint | `{ status }` |
 | `complaint_assigned` | `complaintsController.assignComplaint` | Complaint | `{ assignedDepartment, assignedOfficer }` |
+| `profile_updated` | `authController.updateProfile` | User | — |
+| `password_changed` | `authController.changePassword` | User | — |
+| `user_updated` | `usersController.updateUser` | User | `{ fields }`, plus `{ role: { from, to } }` when the role changed |
+| `user_status_updated` | `usersController.updateUserStatus` | User | `{ isActive }` |
+| `department_created` | `departmentController.createDepartment` | Department | `{ name, code }` |
+| `department_updated` | `departmentController.updateDepartment` | Department | `{ fields }` |
+| `department_status_updated` | `departmentController.updateDepartmentStatus` | Department | `{ isActive }` |
 
 `action` is a free-form `String` on the schema, not an enum, so this list
 reflects the call sites rather than a schema constraint.
 
-Authentication events, user administration, department changes and notification
-lifecycle actions are not audited.
+User administration and department changes are recorded because they are the
+most privilege-relevant operations in the system: promotion to `admin` and
+deactivation both decide who holds access, and the trail has to be able to say
+who granted it. Each entry is written **after** the write succeeds, so an
+operation the administrative lockout guards refuse leaves no record at all.
+
+`user_updated` records field *names* and the role transition, never values —
+the writable set is `fullName`, `phone`, `avatar`, `role` and `department`, none
+of which is a credential. No audited action anywhere records a password, token
+or secret.
+
+Notification lifecycle actions are not audited.
 
 ## Override marking
 
