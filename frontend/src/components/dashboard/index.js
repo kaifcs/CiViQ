@@ -10,6 +10,7 @@ export { default as DashboardFilters } from "./DashboardFilters"
 export { default as StatGrid } from "./StatGrid"
 export { default as Pill } from "./Pill"
 export { default as ActionIcon } from "./ActionIcon"
+export { default as Pagination } from "./Pagination"
 
 export * from "./csv"
 export * from "./format"

@@ -4,7 +4,7 @@ Base path: `/api`. Machine-readable specification: OpenAPI 3.0.3 at
 `GET /api/docs.json`, with Swagger UI at `GET /api/docs`. Both are
 unauthenticated.
 
-The specification declares 51 paths and 61 operations.
+The specification declares 52 paths and 62 operations.
 
 ## Authentication
 
@@ -101,11 +101,19 @@ Metadata travels in headers:
 `X-Request-Id` matching `^[A-Za-z0-9._-]{8,64}$` is reused; otherwise one is
 generated.
 
-**Rate limiting.** 300 requests per 15 minutes across `/api`, 20 **failed**
-attempts per 15 minutes on `/api/auth/login`, `/api/auth/register` and
-`/api/auth/password`, and 30 per minute on `/api/notifications/stream`.
-Exceeding any of them returns 429 `RATE_LIMITED`. Successful sign-ins do not
-consume the credential budget, and `/api/auth/me` is outside it.
+**Rate limiting.** Four limiters, all returning 429 `RATE_LIMITED`:
+
+| Scope | Limit |
+|---|---|
+| `/api` | 1000 requests / 15 minutes; skips `/api/notifications/stream` |
+| `/api/auth/login`, `/api/auth/register`, `/api/auth/password` | 20 **failed** attempts / 15 minutes |
+| `/api/notifications/stream` | 30 requests / minute |
+| `POST /api/complaints` | 10 requests / hour |
+
+Successful sign-ins do not consume the credential budget, and `/api/auth/me` is
+outside it. The complaint limiter applies only to public complaint *creation* —
+it is matched on method and path, so reading or updating a complaint is
+unaffected — because that is the one write any unauthenticated caller can make.
 
 ---
 
@@ -211,6 +219,33 @@ server-side session to revoke — the same limitation that already applies to
 
 ---
 
+## Config — `/api/config`
+
+### GET /api/config/wards
+**public**
+
+The municipal ward register, served from `config/staticConfig.wards`. Read-only:
+there is no ward collection and no route that modifies the register — it is
+redrawn by municipal notification, not by an operator.
+
+```json
+{ "success": true, "count": 9, "wards": ["Ward 3", "Ward 5", "..."] }
+```
+
+**Unauthenticated**, deliberately. The public complaint form at
+`POST /api/complaints` selects a ward from this register and needs no session,
+so neither does the lookup. The response is a static list of ward names: it
+carries no user, project or complaint data, and reveals only which wards the
+municipality operates in.
+
+Client selectors read this rather than carrying their own copy, so the values
+offered are always the ones the backend reasons about. `Project.location.ward`
+drives clash-detection candidate selection, the MCDM condition criterion and
+every ward analytic, and `Complaint.location.ward` feeds the same condition
+criterion — a value outside this register degrades all of them.
+
+---
+
 ## Projects — `/api/projects`
 
 Every route requires authentication except the two public ones below, which
@@ -249,17 +284,23 @@ admin sees all.
 Populates `officer` and `supervisor` (`fullName`, `email`, `department`),
 `department` (`name`, `code`) and `projectManager` (`fullName`, `email`).
 
-Soft-deleted projects (`isActive: false`) are excluded.
+Soft-deleted projects (`isActive: false`) are excluded, unless an
+**administrator** sends `?includeDeleted=true`. That is the only way to find a
+deleted project: every other read path hides one, so without it
+`PATCH /api/projects/:id/status` could never be used to restore it. The role
+scope still applies, and for a non-admin caller the parameter is ignored rather
+than refused.
 
 Supports `?page` and `?limit`; the reported total respects the caller's scope
-and the same exclusion.
+and whichever exclusion is in force.
 
 ### GET /api/projects/:id
 **auth**, owner
 
 Guarded by `requireProjectAccess`. A project outside the caller's scope returns
 404 `PROJECT_NOT_FOUND`, identical to a project that does not exist, so ids
-cannot be probed. A soft-deleted project returns the same 404; only
+cannot be probed. A soft-deleted project returns the same 404 — it is reachable only through
+`GET /api/projects?includeDeleted=true`, and only
 `PATCH /api/projects/:id/status` can restore it. An invalid id returns 400
 `INVALID_ID`.
 
@@ -339,7 +380,16 @@ so the administrator's decision would be locked out permanently.
 ### PATCH /api/projects/:id/status
 **admin**
 
-Body `{ isActive }` — boolean, required. Soft delete; a non-boolean returns 400.
+Body `{ isActive }` — boolean, required. A non-boolean returns 400.
+
+`false` is a **soft delete**: the document and its audit trail are kept and only
+its visibility changes. `true` restores it. Both are recorded as
+`project_status_updated`.
+
+Because every read path hides a soft-deleted project — the list filter, and
+`requireProjectAccess`, which answers 404 — an administrator needs
+`GET /api/projects?includeDeleted=true` to find one before it can be restored.
+There is no hard delete.
 
 ---
 

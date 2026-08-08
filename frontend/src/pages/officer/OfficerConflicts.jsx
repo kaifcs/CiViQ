@@ -7,7 +7,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { useConflicts } from '../../hooks/useResources'
 import AsyncState from '../../components/AsyncState'
-import { CONFLICT_STATUS_CONFIG, DEPT_STYLES, SEVERITY_CONFIG, scoreColor } from '../../components/uiStyles'
+import { CONFLICT_STATUS_CONFIG, deptStyle, SEVERITY_CONFIG, scoreColor } from '../../components/uiStyles'
 import { daysSince } from '../../components/dashboard'
 
 
@@ -98,7 +98,7 @@ export default function OfficerConflicts() {
                 <div className="flex-1 min-w-0 flex flex-col gap-1.5">
                   <p className="text-[14px] font-semibold text-[#0F172A] dark:text-[#F8FAFC] leading-snug">{c.projectATitle}</p>
                   <div className="flex items-center gap-2">
-                    <span className={`inline-flex items-center text-[12px] font-medium px-2.5 py-1 rounded-full ${DEPT_STYLES[c.projectADept] || ''}`}>{c.projectADept}</span>
+                    <span className={`inline-flex items-center text-[12px] font-medium px-2.5 py-1 rounded-full ${deptStyle(c.projectADept)}`}>{c.projectADept}</span>
                     <span className="text-[11px] font-semibold text-[#9CA3AF] dark:text-[#6B7280] uppercase tracking-wide">MCDM</span>
                     <span className="text-[14px] font-bold" style={{ color: scoreColor(c.projectAScore) }}>{c.projectAScore}</span>
                   </div>
@@ -111,7 +111,7 @@ export default function OfficerConflicts() {
                   <div className="flex items-center gap-2">
                     <span className="text-[11px] font-semibold text-[#9CA3AF] dark:text-[#6B7280] uppercase tracking-wide">MCDM</span>
                     <span className="text-[14px] font-bold" style={{ color: scoreColor(c.projectBScore) }}>{c.projectBScore}</span>
-                    <span className={`inline-flex items-center text-[12px] font-medium px-2.5 py-1 rounded-full ${DEPT_STYLES[c.projectBDept] || ''}`}>{c.projectBDept}</span>
+                    <span className={`inline-flex items-center text-[12px] font-medium px-2.5 py-1 rounded-full ${deptStyle(c.projectBDept)}`}>{c.projectBDept}</span>
                   </div>
                 </div>
               </div>

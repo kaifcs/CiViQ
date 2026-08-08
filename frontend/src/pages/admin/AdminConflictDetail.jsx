@@ -8,11 +8,9 @@ import { useConflict, useProjects } from '../../hooks/useResources'
 import AsyncState from '../../components/AsyncState'
 import { conflictsApi, normaliseError } from '../../services'
 import { useAuth } from '../../hooks/useAuth'
-import { CONFLICT_STATUS_CONFIG, DEPT_STYLES, SEVERITY_CONFIG, TYPE_STYLES, scoreColor } from '../../components/uiStyles'
-import { formatDate, formatDateLong, daysSince, MCDM_CRITERIA, criterionWidth } from '../../components/dashboard'
-
-
-
+import { CONFLICT_STATUS_CONFIG, deptStyle, SEVERITY_CONFIG, TYPE_STYLES, scoreColor } from '../../components/uiStyles'
+import { formatDate, formatDateLong, daysSince, MCDM_CRITERIA, criterionWidth, UNMEASURED_CRITERION_NOTE } from '../../components/dashboard'
+import { LocationMap } from '../../gis'
 
 function Badge({ label, className }) {
   return <span className={`inline-flex items-center text-[12px] font-medium px-2.5 py-1 rounded-full ${className}`}>{label}</span>
@@ -81,7 +79,7 @@ function ProjectPanel({ project, score, breakdown, isHigher }) {
           {project.title}
         </h3>
         <div className="flex items-center gap-2 flex-wrap">
-          <Badge label={project.department} className={DEPT_STYLES[project.department] || DEPT_STYLES.PWD} />
+          <Badge label={project.department} className={deptStyle(project.department)} />
           <Badge label={project.type}       className={TYPE_STYLES[project.type] || TYPE_STYLES.Other} />
         </div>
       </div>
@@ -101,9 +99,11 @@ function ProjectPanel({ project, score, breakdown, isHigher }) {
         <div className="flex flex-col gap-2.5">
           {MCDM_CRITERIA.map(c => (
             <div key={c.label}>
-              <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center justify-between mb-1" title={c.measured === false ? UNMEASURED_CRITERION_NOTE : undefined}>
                 <span className="text-[11px] text-[#6B7280] dark:text-[#9CA3AF]">{c.label}</span>
-                <span className="text-[10px] font-semibold text-[#9CA3AF] dark:text-[#6B7280]">{c.weight}%</span>
+                <span className="text-[10px] font-semibold text-[#9CA3AF] dark:text-[#6B7280]">
+                  {c.measured === false ? `${c.weight}% · n/m` : `${c.weight}%`}
+                </span>
               </div>
               <div className="h-[4px] bg-[#F3F4F6] dark:bg-[#27272A] rounded-full overflow-hidden">
                 <div
@@ -130,9 +130,7 @@ export default function AdminConflictDetail() {
   const { data: conflict, loading, error, reload } = useConflict(id)
   const { data: projects } = useProjects()
 
-  // `conflict` is null on the first render, so seeding once would leave this at
-  // 'unresolved' and keep the panel live on an already-actioned conflict.
-  // Re-seeded during render rather than from an effect that costs a render.
+   // Seed local state when a different conflict loads.
   const [resolutionStatus, setResolutionStatus] = useState('unresolved')
   const [seededFor,        setSeededFor]        = useState(null)
   const [actionDone,       setActionDone]       = useState(null)
@@ -141,12 +139,22 @@ export default function AdminConflictDetail() {
   const [rejectReason,     setRejectReason]     = useState('')
   const [resolveError,     setResolveError]     = useState('')
 
+  // Admin decision override details.
+  const [overrideOn,       setOverrideOn]       = useState(false)
+  const [overrideCategory, setOverrideCategory] = useState('')
+  const [overrideReason,   setOverrideReason]   = useState('')
+  const [overrideRef,      setOverrideRef]      = useState('')
+
   if (conflict && conflict.id !== seededFor) {
     setSeededFor(conflict.id)
     setResolutionStatus(conflict.status)
     setActionDone(null)
     setActiveOption(null)
     setResolveError('')
+    setOverrideOn(false)
+    setOverrideCategory('')
+    setOverrideReason('')
+    setOverrideRef('')
   }
 
   if (loading || error) {
@@ -180,12 +188,32 @@ export default function AdminConflictDetail() {
     ? { project: projectB, title: conflict.projectBTitle, dept: conflict.projectBDept, score: conflict.projectBScore, breakdown: conflict.projectBBreakdown }
     : { project: projectA, title: conflict.projectATitle, dept: conflict.projectADept, score: conflict.projectAScore, breakdown: conflict.projectABreakdown }
 
+  // Both override fields are required together: a category with no stated reason
+  // would put an OVERRIDE badge in the audit trail that explains nothing.
+  const overrideIncomplete = overrideOn && !(overrideCategory.trim() && overrideReason.trim())
+
+  // Sent only when the administrator has actually declared an override, so an
+  // ordinary resolution records isOverride: false exactly as it does today.
+  const overridePayload = () =>
+    overrideOn
+      ? {
+          overrideCategory: overrideCategory.trim(),
+          overrideReason: overrideReason.trim(),
+          // Optional: a file, minute or order number backing the decision.
+          ...(overrideRef.trim() ? { overrideRef: overrideRef.trim() } : {}),
+        }
+      : {}
+
   // PUT /api/conflicts/:id/resolve
   async function handleApproveBoth() {
-    if (!coordNote.trim()) return
+    if (!coordNote.trim() || overrideIncomplete) return
     setResolveError('')
     try {
-      const saved = await conflictsApi.resolve(id, { action: 'approve_both', coordinationNote: coordNote }, deptMap)
+      const saved = await conflictsApi.resolve(
+        id,
+        { action: 'approve_both', coordinationNote: coordNote, ...overridePayload() },
+        deptMap
+      )
       setResolutionStatus(saved.status)
       setActionDone('approve_both')
       setActiveOption(null)
@@ -197,10 +225,14 @@ export default function AdminConflictDetail() {
   }
 
   async function handleRejectOne() {
-    if (!rejectReason.trim()) return
+    if (!rejectReason.trim() || overrideIncomplete) return
     setResolveError('')
     try {
-      const saved = await conflictsApi.resolve(id, { action: 'reject_lower', coordinationNote: rejectReason }, deptMap)
+      const saved = await conflictsApi.resolve(
+        id,
+        { action: 'reject_lower', coordinationNote: rejectReason, ...overridePayload() },
+        deptMap
+      )
       setResolutionStatus(saved.status)
       setActionDone('reject_one')
       setActiveOption(null)
@@ -262,20 +294,16 @@ export default function AdminConflictDetail() {
 
       <Card className="p-5">
         <SectionLabel>Overlap location</SectionLabel>
-        <div
-          className="rounded-[8px] flex flex-col items-center justify-center bg-[#F8FAFC] dark:bg-[#18181B] border border-[#E5E5E5] dark:border-[#27272A]"
-          style={{ height: '180px' }}
-        >
-          <svg width="28" height="28" fill="none" viewBox="0 0 24 24" className="text-[#D1D5DB] dark:text-[#374151] mb-2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
-          </svg>
-          <p className="text-[13px] font-medium text-[#9CA3AF] dark:text-[#6B7280]">{conflict.overlapDescription}</p>
-          <div className="flex items-center gap-4 mt-3">
-            <span className="text-[12px] text-[#9CA3AF] dark:text-[#6B7280]">
-              {projectA?.ward} · {projectB?.ward}
-            </span>
-          </div>
-          <p className="text-[11px] text-[#D1D5DB] dark:text-[#374151] mt-3">Interactive map in Phase 3</p>
+        <div className="flex flex-col gap-2">
+          <LocationMap
+            height="180px"
+            points={[
+              { coord: conflict.projectACoords, color: '#5E6AD2', label: conflict.projectATitle },
+              { coord: conflict.projectBCoords, color: '#9CA3AF', label: conflict.projectBTitle },
+            ]}
+            emptyMessage="Neither project records coordinates, so the overlap cannot be mapped."
+          />
+          <p className="text-[12px] text-[#6B7280] dark:text-[#9CA3AF]">{conflict.overlapDescription}</p>
         </div>
       </Card>
 
@@ -412,6 +440,77 @@ export default function AdminConflictDetail() {
               </button>
             </div>
 
+            {activeOption && (
+              <div className="flex flex-col gap-3 p-4 rounded-[8px] bg-[#FFFBEB] dark:bg-[#181305] border border-[#FDE68A] dark:border-[#3F2D05]">
+                <label className="flex items-start gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={overrideOn}
+                    onChange={e => setOverrideOn(e.target.checked)}
+                    className="w-3.5 h-3.5 mt-0.5 accent-[#D97706] cursor-pointer"
+                  />
+                  <span>
+                    <span className="block text-[13px] font-semibold text-[#0F172A] dark:text-[#F8FAFC]">
+                      Record as an override
+                    </span>
+                    <span className="block text-[12px] text-[#92400E] dark:text-[#FACC15] mt-0.5">
+                      Tick this when the decision departs from the MCDM recommendation above.
+                      The audit entry is flagged OVERRIDE and keeps the justification.
+                    </span>
+                  </span>
+                </label>
+
+                {overrideOn && (
+                  <div className="flex flex-col gap-3">
+                    <div>
+                      <label htmlFor="override-category" className="block text-[12px] font-semibold text-[#0F172A] dark:text-[#F8FAFC] mb-1">
+                        Override category
+                      </label>
+                      <input
+                        id="override-category"
+                        type="text"
+                        value={overrideCategory}
+                        onChange={e => setOverrideCategory(e.target.value)}
+                        placeholder="e.g. Emergency works, Ministerial directive, Public safety"
+                        className="w-full h-9 px-3 text-[13px] rounded-[6px] border border-[#E2E8F0] dark:border-[#27272A] bg-[#FFFFFF] dark:bg-[#1C1C1F] text-[#0F172A] dark:text-[#F8FAFC] placeholder:text-[#9CA3AF] focus:outline-none focus:border-[#D97706] focus:ring-2 focus:ring-[#D97706]/10 transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="override-reason" className="block text-[12px] font-semibold text-[#0F172A] dark:text-[#F8FAFC] mb-1">
+                        Override reason
+                      </label>
+                      <textarea
+                        id="override-reason"
+                        value={overrideReason}
+                        onChange={e => setOverrideReason(e.target.value)}
+                        placeholder="Why the MCDM recommendation is being set aside..."
+                        rows={2}
+                        className="w-full px-3 py-2 text-[13px] rounded-[6px] border border-[#E2E8F0] dark:border-[#27272A] bg-[#FFFFFF] dark:bg-[#1C1C1F] text-[#0F172A] dark:text-[#F8FAFC] placeholder:text-[#9CA3AF] focus:outline-none focus:border-[#D97706] focus:ring-2 focus:ring-[#D97706]/10 resize-none transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="override-ref" className="block text-[12px] font-semibold text-[#0F172A] dark:text-[#F8FAFC] mb-1">
+                        Reference <span className="font-normal text-[#9CA3AF]">(optional)</span>
+                      </label>
+                      <input
+                        id="override-ref"
+                        type="text"
+                        value={overrideRef}
+                        onChange={e => setOverrideRef(e.target.value)}
+                        placeholder="File, minute or order number backing this decision"
+                        className="w-full h-9 px-3 text-[13px] rounded-[6px] border border-[#E2E8F0] dark:border-[#27272A] bg-[#FFFFFF] dark:bg-[#1C1C1F] text-[#0F172A] dark:text-[#F8FAFC] placeholder:text-[#9CA3AF] focus:outline-none focus:border-[#D97706] focus:ring-2 focus:ring-[#D97706]/10 transition-all"
+                      />
+                    </div>
+                    {overrideIncomplete && (
+                      <p className="text-[12px] text-[#B45309] dark:text-[#FACC15]">
+                        A category and a reason are both required to record an override.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
             {activeOption === 'approve_both' && (
               <div className="flex flex-col gap-3 p-4 rounded-[8px] bg-[#F8FAFC] dark:bg-[#18181B] border border-[#E5E5E5] dark:border-[#27272A]">
                 <p className="text-[13px] font-semibold text-[#0F172A] dark:text-[#F8FAFC]">Coordination note</p>
@@ -426,7 +525,7 @@ export default function AdminConflictDetail() {
                 <div className="flex justify-end">
                   <button
                     onClick={handleApproveBoth}
-                    disabled={!coordNote.trim()}
+                    disabled={!coordNote.trim() || overrideIncomplete}
                     className="px-5 py-2 text-[13px] font-medium text-white bg-[#5E6AD2] rounded-[6px] hover:bg-[#4A56C1] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     Confirm — Approve Both
@@ -451,7 +550,7 @@ export default function AdminConflictDetail() {
                 <div className="flex justify-end">
                   <button
                     onClick={handleRejectOne}
-                    disabled={!rejectReason.trim()}
+                    disabled={!rejectReason.trim() || overrideIncomplete}
                     className="px-5 py-2 text-[13px] font-medium text-white bg-[#DC2626] rounded-[6px] hover:bg-[#B91C1C] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     Confirm — Reject {defer.dept} Project

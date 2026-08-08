@@ -1,7 +1,4 @@
-// The single source of notification state for the whole app: the badge, the
-// dropdown and the Notification Center all read from here, so one fetch serves
-// every consumer and the unread count can never disagree between them.
-
+// Shared notification state for the badge, dropdown, and Notification Center.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { NotificationContext } from './notification-context'
 import { notificationsApi, openNotificationStream } from '../services'
@@ -9,16 +6,17 @@ import { useAuth } from '../hooks/useAuth'
 
 export function NotificationProvider({ children }) {
   const { user } = useAuth()
-
   const [data, setData] = useState([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [preferences, setPreferences] = useState(null)
 
-  // The list is capped server-side, so the badge reads its own exact count
-  // rather than counting what happened to be returned. Both are fetched in one
-  // round trip and refreshed together.
+  // Triggers archived-feed refreshes when notification lifecycle changes.
+  const [lifecycleVersion, setLifecycleVersion] = useState(0)
+  const bumpLifecycle = useCallback(() => setLifecycleVersion((v) => v + 1), [])
+
+  // Fetches the list, unread count, and preferences together.
   const load = useCallback(async (signal) => {
     setLoading(true)
     setError(null)
@@ -54,17 +52,15 @@ export function NotificationProvider({ children }) {
   }, [user, load])
 
   const reload = useCallback(() => load(), [load])
-
   const reloadRef = useRef(reload)
   reloadRef.current = reload
-
   const dataRef = useRef(data)
   dataRef.current = data
 
   const applyCreated = useCallback((incoming) => {
     if (!incoming?.id) return
     setData((prev) => {
-      // A tab that triggered the change may already hold it; never render twice.
+      // Ignore rows already added locally.
       if (prev.some((n) => n.id === incoming.id)) return prev
       return [incoming, ...prev]
     })
@@ -74,7 +70,6 @@ export function NotificationProvider({ children }) {
   const applyRead = useCallback((incoming) => {
     if (!incoming?.id) return
     const existing = dataRef.current.find((n) => n.id === incoming.id)
-    // Already read locally: the count was decremented when it happened.
     if (!existing || existing.read) return
     setUnreadCount((c) => Math.max(0, c - 1))
     setData((prev) => prev.map((n) => (n.id === incoming.id ? incoming : n)))
@@ -85,8 +80,7 @@ export function NotificationProvider({ children }) {
     setUnreadCount(0)
   }, [])
 
-  // Archived and deleted rows both leave the default feed; the difference is
-  // only whether they remain retrievable, which is a backend concern.
+  // Remove archived or deleted rows from the default feed.
   const removeLocally = useCallback((ids) => {
     const wanted = new Set(ids)
     const going = dataRef.current.filter((n) => wanted.has(n.id))
@@ -102,22 +96,16 @@ export function NotificationProvider({ children }) {
       onCreated: applyCreated,
       onRead: applyRead,
       onReadAll: applyReadAll,
-      onArchived: removeLocally,
-      onDeleted: removeLocally,
-      // An unarchive puts a row back into the default feed, which needs the
-      // record itself rather than just its id.
-      onUnarchived: () => reloadRef.current(),
+      onArchived: (ids) => { removeLocally(ids); bumpLifecycle() },
+      onDeleted: (ids) => { removeLocally(ids); bumpLifecycle() },
+      onUnarchived: () => { bumpLifecycle(); reloadRef.current() },
       onPreferences: setPreferences,
-      // Anything missed while disconnected comes back over REST.
       onReconnect: () => reloadRef.current(),
     })
     return close
-  }, [user, applyCreated, applyRead, applyReadAll, removeLocally])
+  }, [user, applyCreated, applyRead, applyReadAll, removeLocally, bumpLifecycle])
 
-  // Archive and delete are optimistic and revert on failure, like markRead. The
-  // server also broadcasts the change for other tabs; this one has already
-  // converged, so its own broadcast arrives as a no-op.
-
+  // Archive and delete optimistically, reverting if the request fails.
   const runLifecycle = useCallback(async (ids, call) => {
     const wanted = Array.isArray(ids) ? ids : [ids]
     if (wanted.length === 0) return
@@ -126,11 +114,12 @@ export function NotificationProvider({ children }) {
     removeLocally(wanted)
     try {
       await call(wanted)
+      bumpLifecycle()
     } catch {
       setData(snapshot)
       setUnreadCount(snapshotCount)
     }
-  }, [data, unreadCount, removeLocally])
+  }, [data, unreadCount, removeLocally, bumpLifecycle])
 
   const archive = useCallback(
     (ids) => runLifecycle(ids, notificationsApi.archive),
@@ -141,6 +130,17 @@ export function NotificationProvider({ children }) {
     (ids) => runLifecycle(ids, notificationsApi.remove),
     [runLifecycle]
   )
+
+  // Re-read the default feed after unarchiving.
+  const unarchive = useCallback(async (ids) => {
+    const wanted = Array.isArray(ids) ? ids : [ids]
+    if (wanted.length === 0) return
+    try {
+      await notificationsApi.unarchive(wanted)
+      bumpLifecycle()
+      await reloadRef.current()
+    } catch { /* the archived view keeps the row; the action can be retried */ }
+  }, [bumpLifecycle])
 
   const loadPreferences = useCallback(async () => {
     try {
@@ -160,8 +160,7 @@ export function NotificationProvider({ children }) {
     try {
       const saved = await notificationsApi.updatePreferences(patch)
       if (saved) setPreferences(saved)
-      // Muting a category changes what the feed should contain, so the list and
-      // count are re-read from the server rather than recomputed here.
+      // Refresh the feed because preferences affect visible notifications.
       reloadRef.current()
     } catch {
       setPreferences(snapshot)
@@ -171,7 +170,7 @@ export function NotificationProvider({ children }) {
   const markRead = useCallback(async (id) => {
     const target = data.find((n) => n.id === id)
     if (!target || target.read) return
-    // Optimistic: the row and the badge move together, and revert together.
+    // Optimistic: row and unread count update together.
     setData((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)))
     setUnreadCount((c) => Math.max(0, c - 1))
     try {
@@ -200,10 +199,12 @@ export function NotificationProvider({ children }) {
   const value = useMemo(
     () => ({
       data, loading, error, reload, unreadCount, markRead, markAllRead,
-      archive, remove, preferences, loadPreferences, savePreferences,
+      archive, unarchive, remove, lifecycleVersion,
+      preferences, loadPreferences, savePreferences,
     }),
     [data, loading, error, reload, unreadCount, markRead, markAllRead,
-     archive, remove, preferences, loadPreferences, savePreferences]
+    archive, unarchive, remove, lifecycleVersion,
+    preferences, loadPreferences, savePreferences]
   )
 
   return (

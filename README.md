@@ -47,7 +47,7 @@ Both halves expose the same four scripts, and `check` is what CI runs.
 |---|---|---|
 | `npm run lint` | ESLint | ESLint |
 | `npm run build` | syntax check | Vite production build |
-| `npm test` | 210 tests | 41 tests |
+| `npm test` | 243 tests | 59 tests |
 | `npm run check` | lint + build + test | lint + build + test |
 | `npm run test:coverage` | with coverage report | with coverage report |
 
@@ -112,12 +112,17 @@ Interactive documentation is served by the backend itself:
 - `GET /api/docs.json` — OpenAPI 3.0.3 document
 - `GET /api/health` — liveness, database state and subsystem diagnostics
 
-51 paths / 61 operations across auth, departments, users, projects, conflicts,
-complaints, notifications, audit and dashboard. Authentication is Bearer JWT;
-authorization is role-based (`admin`, `officer`, `supervisor`, `citizen`) and,
-for projects, ownership-scoped. `GET /api/projects/public` and
-`GET /api/projects/public/:id` are the exception — unauthenticated, backing the
-public portal above.
+52 paths / 62 operations across auth, config, departments, users, projects,
+conflicts, complaints, notifications, audit and dashboard. Authentication is
+Bearer JWT; authorization is role-based and, for projects, ownership-scoped.
+
+There are exactly three roles — `admin`, `officer` and `supervisor`. **There is
+no citizen account type**: every citizen surface is unauthenticated, so a
+resident never signs in. Those public routes are `GET /api/projects/public`,
+`GET /api/projects/public/:id`, `GET /api/config/wards`, `GET /api/complaints`,
+`GET /api/complaints/:id`, `GET /api/complaints/stats` and
+`POST /api/complaints`. The complaint reads are redacted for an unauthenticated
+caller — see [Citizen complaints](#citizen-complaints).
 
 **Errors are uniform.** Every failure returns:
 
@@ -134,18 +139,59 @@ notifications return the raw document or array, which the frontend adapters
 read directly. The spec documents this as-is — converging it would break every
 existing consumer.
 
+## Citizen complaints
+
+The portal carries a complete public complaint workflow, with no account at any
+step:
+
+- `/complaints/new` — the intake form. Issue type and description are required,
+  and the location is placed by clicking the map, because `location.coords` is
+  required by the schema. Ward is selected from `GET /api/config/wards`, so a
+  reported ward always matches the register the backend reasons about. On
+  success the server-generated **CNR** is shown; the confirmation appears only
+  from a 201, never optimistically.
+- `/complaints/track?cnr=…` — lookup by reference number.
+  `GET /api/complaints/:id` accepts a CNR in place of an id. The screen shows
+  the status timeline and the reporter's own description.
+
+`POST /api/complaints` accepts only reporter fields — issue type, description,
+location and photo URL — so workflow state, status and assignment cannot be set
+from the public form. It is rate-limited to 10 submissions per hour.
+
+Complaint reads are **redacted for an unauthenticated caller**:
+`assignedOfficer`, `assignedDepartment`, `photoUrl`, `resolutionNote`,
+`location.coords` and `location.address` are omitted, and `location.ward` is
+kept. The tracking screen therefore shows no handling detail, and says so rather
+than rendering the missing fields as empty.
+
 ## GIS
 
-Map functionality lives in `frontend/src/gis` and is built on Leaflet. The map
-routes are its only consumers and load lazily, so the GIS bundle stays off the
+Map functionality lives in `frontend/src/gis` and is built on Leaflet. Its
+consumers — the map routes, the detail screens, the project wizard and the
+citizen complaint form — all load lazily, so the GIS bundle stays off the
 critical path for every other screen.
 
 **Primitives**
 - `MapContainer` — map lifecycle, resize handling, view synchronisation
 - `MarkerLayer` — clustered point rendering
 - `GeoJSONLayer` — stored line/polygon geometry
+- `LocationMap` — read-only single-record map for the detail screens
 - `PopupCard` — shared read-only popup shell
 - `coordinates` / `geojson` / `gisService` — validation, conversion, bounds, record adapters
+
+**Authoring** — the only writers of stored geometry:
+- `PointPicker` — click or drag to set one coordinate. Backs the complaint
+  form's location and the project wizard's `centerCoords`.
+- `GeometryEditor` + `geometryModes` — click to add vertices, building a
+  `LineString` or `Polygon` for `Project.location.geoJSON`. Both go through the
+  constructors in `geojson.js`, which own `[lng, lat]` ordering and ring
+  closure, and emit `null` until the shape is valid — so a half-drawn outline is
+  never persisted, and a project with no shape stores no geometry at all.
+
+Geometry is drawn on the Location step of the project wizard and persists
+through the ordinary `POST`/`PUT /api/projects` routes; `location` is
+whitelisted as a whole, so no new endpoint is involved. An edit re-opens the
+saved shape rather than starting blank.
 
 **Layers** — independently toggleable; stacking order is centralised in `gis/config.js`.
 
@@ -269,6 +315,51 @@ On the frontend a single `NotificationProvider` owns the state; the navbar
 badge, the dropdown and the Notification Center (`/{role}/notifications`) all
 read it through `useNotificationCenter`, so one fetch serves every surface and
 the unread count cannot disagree between them.
+
+The Notification Center has an **Archived** view, reached from the header, with
+per-row and bulk **Restore** alongside Delete. The provider deliberately holds
+only the default feed — which excludes archived rows — so the archived list is a
+separate `?archived=true` read through the same service method, re-run whenever
+a row crosses the archived boundary, including from another tab via the stream.
+
+## Known Limitations
+
+Things the system genuinely does not do. Each is a missing data source or an
+undefined requirement, not an unfinished screen.
+
+**Two MCDM criteria are not measured.** `populationImpact` (21% of the weight)
+and `economicValue` (3%) have no data source: there is no ward population
+register, no benefit valuation, and neither is collected from the officer. The
+engine assigns both the neutral mid-scale value for every project, so they
+separate no two projects and change no ranking — the outcome is decided by the
+five criteria that are computed. They are shown in the UI with their weight and
+labelled *not measured*, and their bars stay empty, so the constant is never
+presented as a measurement. Inventing figures would corrupt 24% of the weight
+with fabricated data, and the weights are not adjusted to hide the gap.
+
+**Complaints have no deadline model.** There is no due date, target date or SLA
+on `Complaint`, so an overdue state cannot be derived. The adapter previously
+emitted a constant `overdue: false`, which made the overdue treatment on the
+complaint screens permanently unreachable; the field and that treatment were
+removed rather than left showing a value nothing supports. Elapsed time since
+filing is still shown. Adding overdue means first deciding what a deadline is —
+a policy question, not a code change.
+
+**Some project fields are API-only.** `documents[]`, `parentProject` and
+`phaseNumber` are legitimate domain fields, writable and readable through the
+project API and documented in the OpenAPI spec, but no screen writes them.
+`documents[]` in particular would need a file upload and storage service that
+this deployment does not have; building one only to consume the field would be
+speculative. They are retained, not removed. `photoUrl` (complaints) and
+`avatar` (users) *are* consumed — by the complaint adapter and `Avatar`
+respectively — and are set through the API rather than an upload UI.
+
+**One notification type has no producer.** `Notification.type` is a closed enum
+of nine values; `early_completion` is defined and reserved but nothing raises
+it.
+
+**The admin shell is desktop-only.** It targets widths ≥1024px. The sidebar
+collapses to an icon rail, but the layout is not designed for narrow viewports.
 
 ## Tech Stack
 

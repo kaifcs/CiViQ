@@ -6,6 +6,7 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { NotificationList } from '../../components/notifications'
 import { useNotificationCenter } from '../../hooks/useNotificationCenter'
+import { useArchivedNotifications } from '../../hooks/useResources'
 
 const FILTERS = [
   { id: 'all', label: 'All' },
@@ -60,9 +61,17 @@ export default function NotificationCenter() {
   const navigate = useNavigate()
   const {
     data, loading, error, reload, unreadCount, markRead, markAllRead,
-    archive, remove, preferences, savePreferences,
+    archive, unarchive, remove, preferences, savePreferences,
   } = useNotificationCenter()
 
+  // Archived rows live outside the shared feed, so they are read separately and
+  // only while the archive is on screen.
+  const {
+    data: archivedData, loading: archivedLoading,
+    error: archivedError, reload: reloadArchived,
+  } = useArchivedNotifications()
+
+  const [showArchived, setShowArchived] = useState(false)
   const [filter, setFilter] = useState('all')
   const [category, setCategory] = useState('')
   const [priority, setPriority] = useState('')
@@ -73,9 +82,11 @@ export default function NotificationCenter() {
   // Filtering runs against the list already in memory, so typing does not
   // issue a request per keystroke. The same fields are supported server-side
   // for callers that page through a longer history.
+  const source = showArchived ? archivedData : data
+
   const visible = useMemo(() => {
     const term = search.trim().toLowerCase()
-    return data.filter((n) => {
+    return source.filter((n) => {
       if (filter === 'unread' && n.read) return false
       if (filter === 'read' && !n.read) return false
       if (category && n.category !== category) return false
@@ -83,7 +94,7 @@ export default function NotificationCenter() {
       if (term && !`${n.title} ${n.message}`.toLowerCase().includes(term)) return false
       return true
     })
-  }, [data, filter, category, priority, search])
+  }, [source, filter, category, priority, search])
 
   // Rows can leave the list at any time — archived from another tab, deleted,
   // or filtered out. Rather than pruning the stored set, selection is narrowed
@@ -122,7 +133,9 @@ export default function NotificationCenter() {
         <div>
           <h1 className="text-[20px] font-bold text-[#0F172A] dark:text-[#F8FAFC]">Notifications</h1>
           <p className="text-[13px] text-[#6B7280] dark:text-[#9CA3AF] mt-1">
-            {unreadCount > 0 ? `${unreadCount} unread` : 'You are all caught up.'}
+            {showArchived
+              ? 'Archived notifications. Restoring one returns it to your inbox.'
+              : unreadCount > 0 ? `${unreadCount} unread` : 'You are all caught up.'}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -130,7 +143,15 @@ export default function NotificationCenter() {
             aria-expanded={showPrefs} className={linkBtn}>
             {showPrefs ? 'Hide preferences' : 'Preferences'}
           </button>
-          {unreadCount > 0 && (
+          <button
+            type="button"
+            aria-pressed={showArchived}
+            onClick={() => { setShowArchived((v) => !v); setSelected(new Set()) }}
+            className={linkBtn}
+          >
+            {showArchived ? 'Back to inbox' : 'Archived'}
+          </button>
+          {!showArchived && unreadCount > 0 && (
             <button
               type="button"
               onClick={markAllRead}
@@ -233,8 +254,12 @@ export default function NotificationCenter() {
           {activeSelection.size > 0 && (
             <>
               <button type="button" className={linkBtn}
-                onClick={() => { archive(selectedIds); setSelected(new Set()) }}>
-                Archive selected
+                onClick={() => {
+                  if (showArchived) unarchive(selectedIds)
+                  else archive(selectedIds)
+                  setSelected(new Set())
+                }}>
+                {showArchived ? 'Restore selected' : 'Archive selected'}
               </button>
               <button type="button"
                 className="text-[12px] font-medium text-[#DC2626] hover:text-[#B91C1C] transition-colors px-1 rounded-[4px] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#DC2626]"
@@ -249,19 +274,19 @@ export default function NotificationCenter() {
       <div className="bg-[#FFFFFF] dark:bg-[#1C1C1F] border border-[#E5E5E5] dark:border-[#27272A] rounded-[8px] overflow-hidden">
         <NotificationList
           notifications={visible}
-          loading={loading}
-          error={error}
-          onRetry={reload}
+          loading={showArchived ? archivedLoading : loading}
+          error={showArchived ? archivedError : error}
+          onRetry={showArchived ? reloadArchived : reload}
           onActivate={handleActivate}
           selectable
           selectedIds={activeSelection}
           onSelectChange={toggleSelect}
           renderActions={(n) => (
             <>
-              <button type="button" onClick={() => archive(n.id)}
-                aria-label={`Archive notification: ${n.title}`}
+              <button type="button" onClick={() => (showArchived ? unarchive(n.id) : archive(n.id))}
+                aria-label={`${showArchived ? 'Restore' : 'Archive'} notification: ${n.title}`}
                 className="text-[11px] font-medium text-[#6B7280] hover:text-[#0F172A] dark:hover:text-[#F8FAFC] px-1.5 py-1 rounded-[4px] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#5E6AD2]">
-                Archive
+                {showArchived ? 'Restore' : 'Archive'}
               </button>
               <button type="button" onClick={() => remove(n.id)}
                 aria-label={`Delete notification: ${n.title}`}
@@ -270,11 +295,16 @@ export default function NotificationCenter() {
               </button>
             </>
           )}
-          emptyTitle={hasFilters ? 'No matching notifications' : 'No notifications yet'}
+          emptyTitle={
+            hasFilters ? 'No matching notifications'
+              : showArchived ? 'Nothing archived'
+              : 'No notifications yet'
+          }
           emptyHint={
-            hasFilters
-              ? 'Try clearing the filters or search term.'
-              : 'Updates about your projects, complaints and conflicts will appear here.'
+            hasFilters ? 'Try clearing the filters or search term.'
+              : showArchived
+                ? 'Notifications you archive are kept here and can be restored.'
+                : 'Updates about your projects, complaints and conflicts will appear here.'
           }
         />
       </div>

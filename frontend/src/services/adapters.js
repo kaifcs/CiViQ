@@ -1,12 +1,10 @@
-// Maps backend models to frontend view models. Field names, enum casing and the
-// conflict vocabulary all differ from what the screens consume, so every entity
-// is projected here rather than in the JSX.
+// Maps backend models to frontend view models.
 
-// Fields the UI renders that have no backend source; adapters emit null/false
-// for these rather than fabricating a value.
+
+// UI fields with no backend source.
 export const UNAVAILABLE_FIELDS = {
   project: ["approvedAt"],
-  complaint: ["acknowledgedAt", "resolvedAt", "overdue"],
+  complaint: ["acknowledgedAt"],
   auditLog: ["resourceTitle", "description"],
 }
 
@@ -17,19 +15,24 @@ export function initialsOf(name) {
   return name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()
 }
 
-// Presentational label derived from the role the backend already stores.
+// Role labels mirror the backend role enum.
 const ROLE_LABELS = {
   admin: "Municipal Coordinator",
   officer: "Executive Engineer",
   supervisor: "Junior Engineer",
 }
+
 export const roleLabel = (role) => ROLE_LABELS[role] || role || ""
 
-// Backend projectType enum -> the Title Case labels the UI styles by.
+// Roles available to administrators.
+export const ROLES = Object.keys(ROLE_LABELS)
+
+// Backend projectType -> UI label.
 const PROJECT_TYPE_LABEL = {
   road: "Road", water: "Water", sewage: "Sewage",
   electricity: "Electrical", parks: "Parks", other: "Other",
 }
+
 export const PROJECT_TYPE_VALUE = Object.fromEntries(
   Object.entries(PROJECT_TYPE_LABEL).map(([k, v]) => [v, k])
 )
@@ -39,38 +42,40 @@ const ISSUE_TYPE_LABEL = {
   garbage: "Garbage", drainage: "Drainage", other: "Other",
 }
 
-// Backend conflict vocabulary -> the vocabulary the existing screens style by.
+// The complaint intake form's options. Values are the backend enum exactly, so
+// the form cannot offer an issue type the API would reject.
+export const ISSUE_TYPE_OPTIONS = Object.entries(ISSUE_TYPE_LABEL).map(
+  ([value, label]) => ({ value, label })
+)
+
+// Backend conflict status -> UI status.
 const CONFLICT_STATUS = {
   pending: "unresolved",
   awaiting_officer: "pending_response",
   resolved_both: "resolved",
   resolved_rejected: "resolved",
 }
+
 const CONFLICT_SEVERITY = { incompatible: "high", conditional: "medium" }
 
-// Project.mcdmScore is stored on the engine's 0–10 scale; screens display the
-// 0–100 scale the engine reports as `outOf100`. Only the create response carries
-// that field, so reads convert here, once, at the contract boundary.
+// Backend score is 0–10; UI uses 0–100.
 const scoreOutOf100 = (score) => (Number.isFinite(score) ? Math.round(score * 10) : null)
 
-// Per-criterion scores stay on their own 0–10 scale, which is what the
-// breakdown bars represent. Absent when the project predates mcdmBreakdown.
+// Per-criterion scores remain 0–10.
 const breakdownOf = (breakdown) =>
   breakdown && typeof breakdown === "object" ? breakdown : null
 
-// Mirrors the comparison in conflictsController.resolveConflict, which scores a
-// missing value as -Infinity so an unscored project always yields.
+// Higher score wins; missing scores rank lowest.
 const rankScore = (score) => (Number.isFinite(score) ? score : -Infinity)
 
-// Build an id -> department lookup so ObjectId references can be shown as codes.
+// Build a department lookup by ID.
 export function departmentIndex(departments = []) {
   const map = new Map()
   for (const d of departments) map.set(String(d._id), d)
   return map
 }
 
-// A department reference may arrive populated ({_id,name,code}) or as a bare
-// id string, depending on the endpoint. Resolve either through the index.
+// Resolve populated department objects or IDs.
 function resolveDept(ref, deptMap) {
   if (ref && typeof ref === "object" && ref.code) return { code: ref.code, name: ref.name }
   const hit = deptMap?.get(String(ref))
@@ -119,7 +124,6 @@ export function adaptProject(p, deptMap) {
     type: PROJECT_TYPE_LABEL[p.projectType] || "Other",
     status: p.status,
     priority: p.priority,
-    // Backend enum is standalone | phase1 | continuation; screens test "phased".
     phase: p.phase === "phase1" ? "phased" : p.phase,
     ward: loc.ward || null,
     zone: loc.zone || null,
@@ -139,7 +143,6 @@ export function adaptProject(p, deptMap) {
     progress: p.progress ?? 0,
     isActive: p.isActive !== false,
     submittedAt: p.createdAt,
-    // No backend equivalent — see UNAVAILABLE_FIELDS.
     approvedAt: null,
     rejectionReason: p.rejectionReason || null,
     suggestedDate: p.suggestedDate || null,
@@ -147,8 +150,7 @@ export function adaptProject(p, deptMap) {
   }
 }
 
-
-// Normalize the public project response for the Citizen UI.
+// Normalize the public project response.
 export function adaptPublicProject(p) {
   if (!p) return null
   const loc = p.location || {}
@@ -174,8 +176,7 @@ export function adaptPublicProject(p) {
   }
 }
 
-// Kept local to the adapter so services stay free of GIS imports; returns null
-// for absent or out-of-range coordinates rather than a partial object.
+// Return valid coordinates or null.
 function normalizeCoords(coords) {
   const lat = coords?.lat
   const lng = coords?.lng
@@ -184,6 +185,7 @@ function normalizeCoords(coords) {
   return { lat, lng }
 }
 
+// Calculate overlapping project days.
 function overlapDays(a, b) {
   if (!a?.startDate || !a?.endDate || !b?.startDate || !b?.endDate) return 0
   const start = Math.max(new Date(a.startDate), new Date(b.startDate))
@@ -214,14 +216,11 @@ export function adaptConflict(c, deptMap) {
     projectBScore: scoreOutOf100(B?.mcdmScore),
     projectABreakdown: breakdownOf(A?.mcdmBreakdown),
     projectBBreakdown: breakdownOf(B?.mcdmBreakdown),
-    // Which side the backend keeps for `reject_lower`: resolveConflict defers
-    // the lower mcdmScore, treats a non-finite score as lowest, and keeps
-    // project1 on a tie. The two sides carry no precedence of their own.
+    // Higher score wins; ties keep project1.
     higherPriorityId: rankScore(A?.mcdmScore) >= rankScore(B?.mcdmScore)
       ? id(c.project1)
       : id(c.project2),
-    // Real stored coordinates for each side. Null when the endpoint has none —
-    // the conflict layer omits rendering rather than inventing a position.
+    // Use stored coordinates only.
     projectACoords: normalizeCoords(A?.location?.centerCoords),
     projectBCoords: normalizeCoords(B?.location?.centerCoords),
     clashTypes: c.clashTypes || [],
@@ -267,12 +266,11 @@ export function adaptComplaint(c, deptMap) {
     status: c.status,
     assignedOfficer: id(c.assignedOfficer),
     filedAt: c.createdAt,
-    // No backend equivalent — see UNAVAILABLE_FIELDS.
     acknowledgedAt: null,
+    // No deadline exists in the complaint schema.
     resolvedAt: c.status === "resolved" ? c.updatedAt : null,
     resolutionNote: c.resolutionNote || null,
     photos: c.photoUrl ? [c.photoUrl] : [],
-    overdue: false,
     _raw: c,
   }
 }
@@ -286,13 +284,10 @@ export function adaptAuditLog(a, deptMap) {
     userId: id(a.performedBy),
     userName: by?.fullName || "System",
     userRole: by?.role || null,
-    // performedBy.department is a Department id stored as a String, resolved
-    // through the same index as every other reference.
     department: resolveDept(by?.department, deptMap).code,
     action: a.action,
     resourceType: a.targetType || null,
     resourceId: a.targetId || null,
-    // No human-readable title is stored; fall back to whatever detail exists.
     resourceTitle: d.cnrId || d.reason || d.status || "",
     description: "",
     isOverride: !!a.isOverride,
@@ -314,7 +309,6 @@ export function adaptNotification(n) {
     read: !!n.read,
     readAt: n.readAt || null,
     archived: !!n.archived,
-    // Absent on notifications written before these were derived from the type.
     category: n.category || null,
     priority: n.priority || null,
     createdAt: n.createdAt,
@@ -324,5 +318,53 @@ export function adaptNotification(n) {
 
 export function adaptDepartment(d) {
   if (!d) return null
-  return { id: d._id, name: d.name, code: d.code, description: d.description || null, color: d.color, isActive: d.isActive, createdAt: d.createdAt, _raw: d }
+  return {
+    id: d._id,
+    name: d.name,
+    code: d.code,
+    description: d.description || null,
+    color: d.color,
+    isActive: d.isActive,
+    createdAt: d.createdAt,
+    _raw: d,
+  }
+}
+
+// Translate the project wizard's flat form state into the backend schema.
+export function buildProjectPayload(form) {
+  return {
+    title: form.title,
+    department: form.departmentId,
+    projectType: PROJECT_TYPE_VALUE[form.type] || "other",
+    description: form.description,
+    phase: form.phase === "phased" ? "phase1" : form.phase === "continue" ? "continuation" : "standalone",
+    startDate: form.startDate,
+    endDate: form.endDate,
+    estimatedCost: form.estimatedCost ? Number(form.estimatedCost) : undefined,
+    budgetSource: form.budgetSource,
+    tenderNumber: form.tenderNumber,
+    contractorName: form.contractorName,
+    contractorFirm: form.contractorFirm,
+    supervisor: form.supervisorId || undefined,
+    location: {
+      ward: form.ward,
+      address: form.address,
+      centerCoords: { lat: Number(form.lat), lng: Number(form.lng) },
+      // Omitted entirely when nothing was drawn, so a project without a shape
+      // stores no geometry rather than an empty object the GIS layer would
+      // then have to guard against. `location` is whitelisted as a whole, so
+      // this reaches the document exactly as built by gis/geojson.js.
+      ...(form.geoJSON ? { geoJSON: form.geoJSON } : {}),
+    },
+    mcdmInputs: {
+      conditionRating: form.conditionRating,
+      incidents: form.incidents || [],
+      lastWorkYear: form.lastWorkYear ? Number(form.lastWorkYear) : undefined,
+      tenderStatus: form.tenderStatus,
+      contractorAssigned: form.contractorAssigned === "yes",
+      roadClosure: form.roadClosure,
+      utilityDisruption: form.utilities || [],
+      disruptionDays: form.disruptionDays ? Number(form.disruptionDays) : undefined,
+    },
+  }
 }

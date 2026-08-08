@@ -5,6 +5,12 @@ export { default as MapContainer } from "./MapContainer"
 export { useMap } from "./useMap"
 export { MapContext } from "./map-context"
 
+// Authoring primitives — the only writers of stored geometry.
+export { default as LocationMap } from "./LocationMap"
+export { default as PointPicker } from "./PointPicker"
+export { default as GeometryEditor } from "./GeometryEditor"
+export { GEOMETRY_MODES, buildGeometry } from "./geometryModes"
+
 export { default as MarkerLayer } from "./layers/MarkerLayer"
 export { default as PopupCard } from "./layers/PopupCard"
 export { default as ProjectLayer } from "./layers/ProjectLayer"

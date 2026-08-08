@@ -39,6 +39,8 @@ function CiviqWordmark({ size = 28 }) {
 const navLinks = [
   { label: "Home", path: "/home" },
   { label: "Projects", path: "/projects" },
+  { label: "Report an issue", path: "/complaints/new" },
+  { label: "Track complaint", path: "/complaints/track" },
 ]
 
 function CitizenHeader() {

@@ -4,7 +4,7 @@
 import { useState, useMemo } from 'react'
 import { useAuditLogs, useUsers, useDepartmentOptions } from '../../hooks/useResources'
 import AsyncState from '../../components/AsyncState'
-import { DEPT_STYLES, ROLE_STYLES } from '../../components/uiStyles'
+import { deptStyle, ROLE_STYLES } from '../../components/uiStyles'
 import { auditActionLabel, AUDIT_ACTION_OPTIONS, toCsv, downloadCsv } from '../../components/dashboard'
 
 function formatDateTime(dateStr) {
@@ -174,7 +174,7 @@ export default function AdminAudit() {
 
               <div className="flex-shrink-0 w-[80px] flex justify-center">
                 {log.department ? (
-                  <span className={`inline-flex items-center text-[11px] font-medium px-2 py-0.5 rounded-full ${DEPT_STYLES[log.department] || ''}`}>
+                  <span className={`inline-flex items-center text-[11px] font-medium px-2 py-0.5 rounded-full ${deptStyle(log.department)}`}>
                     {log.department}
                   </span>
                 ) : (

@@ -202,7 +202,13 @@ module.exports = {
           tenderNumber: { type: "string" }, contractorName: { type: "string" }, contractorFirm: { type: "string" },
           location: { $ref: "#/components/schemas/ProjectLocation" },
           mcdmScore: { type: "number", description: "Computed by mcdmEngine on create. 0–10 scale." },
-          mcdmBreakdown: { type: "object" },
+          mcdmBreakdown: {
+            type: "object",
+            description:
+              "Per-criterion scores on a 1–10 scale, keyed by criterion name. " +
+              "`populationImpact` and `economicValue` are **not measured**: this deployment holds no ward population register and no benefit valuation, and neither is collected from the officer, so the engine assigns both the neutral mid-scale value (5) for every project. " +
+              "They therefore separate no two projects and change no ranking, despite carrying 21% and 3% of the weight. The remaining five criteria are computed from stored project data.",
+          },
           mcdmInputs: { $ref: "#/components/schemas/McdmInputs" },
           status: { type: "string", enum: ["pending", "approved", "rejected", "active", "completed", "rescheduled"], default: "pending" },
           priority: { type: "string", enum: ["Low", "Medium", "High", "Critical"], default: "Medium" },

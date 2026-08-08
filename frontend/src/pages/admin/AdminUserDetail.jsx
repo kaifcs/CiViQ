@@ -6,7 +6,7 @@ import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useUser, useProjects, useAuditLogs } from '../../hooks/useResources'
 import AsyncState from '../../components/AsyncState'
-import { usersApi, normaliseError } from '../../services'
+import { usersApi, normaliseError, ROLES, roleLabel } from '../../services'
 import { useAuth } from '../../hooks/useAuth'
 import { ROLE_STYLES } from '../../components/uiStyles'
 import { formatDateLong, auditActionLabel } from '../../components/dashboard'
@@ -63,9 +63,21 @@ export default function AdminUserDetail() {
   const [actionError,  setActionError]  = useState('')
   const [deactivating, setDeactivating] = useState(false)
 
+  // Role is held separately from `user` so the card reflects a saved change
+  // without a refetch, and reverts cleanly when the backend refuses one.
+  const [currentRole, setCurrentRole] = useState('officer')
+  const [roleDraft,   setRoleDraft]   = useState('officer')
+  const [savingRole,  setSavingRole]  = useState(false)
+  const [roleSaved,   setRoleSaved]   = useState(false)
+  const [roleError,   setRoleError]   = useState('')
+
   if (user && user.id !== seededFor) {
     setSeededFor(user.id)
     setUserStatus(user.status)
+    setCurrentRole(user.role)
+    setRoleDraft(user.role)
+    setRoleSaved(false)
+    setRoleError('')
     setActionDone(null)
     setActionError('')
   }
@@ -85,9 +97,9 @@ export default function AdminUserDetail() {
     )
   }
 
-  const userProjects = user.role === 'officer'
+  const userProjects = currentRole === 'officer'
     ? projects.filter(p => p.officerId === user.id)
-    : user.role === 'supervisor'
+    : currentRole === 'supervisor'
       ? projects.filter(p => p.supervisorId === user.id)
       : []
 
@@ -101,6 +113,29 @@ export default function AdminUserDetail() {
   const completionRate = userProjects.length > 0
     ? Math.round((completedProjects / userProjects.length) * 100)
     : 0
+
+  // PUT /api/users/:id — the same admin-only endpoint that owns every other
+  // profile field. The backend is the authority on whether the change is
+  // allowed: it refuses an administrator demoting themselves and refuses any
+  // change that would leave no active administrator, so those messages are
+  // surfaced verbatim rather than being re-derived here.
+  async function handleRoleSave() {
+    if (savingRole || roleDraft === currentRole) return
+    setRoleError('')
+    setRoleSaved(false)
+    setSavingRole(true)
+    try {
+      const saved = await usersApi.update(id, { role: roleDraft }, deptMap)
+      setCurrentRole(saved.role)
+      setRoleDraft(saved.role)
+      setRoleSaved(true)
+    } catch (err) {
+      setRoleError(normaliseError(err).message)
+      setRoleDraft(currentRole)
+    } finally {
+      setSavingRole(false)
+    }
+  }
 
   // Keep the current status if the backend rejects the update.
   async function handleDeactivate() {
@@ -140,8 +175,8 @@ export default function AdminUserDetail() {
           <div>
             <div className="flex items-center gap-2 mb-1">
               <h1 className="text-[20px] font-bold text-[#0F172A] dark:text-[#F8FAFC]">{user.name}</h1>
-              <span className={`inline-flex items-center text-[12px] font-medium px-2.5 py-1 rounded-full ${ROLE_STYLES[user.role] || ROLE_STYLES.officer}`}>
-                {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
+              <span className={`inline-flex items-center text-[12px] font-medium px-2.5 py-1 rounded-full ${ROLE_STYLES[currentRole] || ROLE_STYLES.officer}`}>
+                {currentRole.charAt(0).toUpperCase() + currentRole.slice(1)}
               </span>
               <span className={`inline-flex items-center text-[12px] font-medium px-2.5 py-1 rounded-full ${
                 userStatus === 'active'
@@ -200,18 +235,55 @@ export default function AdminUserDetail() {
           <SectionLabel>Profile information</SectionLabel>
           <InfoRow label="Full name"    value={user.name} />
           <InfoRow label="Email"        value={user.email} />
-          <InfoRow label="Role"         value={user.roleLabel} />
+          <InfoRow label="Role"         value={roleLabel(currentRole)} />
           <InfoRow label="Department"   value={user.departmentFull || '—'} />
           <InfoRow label="Account created" value={formatDateLong(user.createdAt)} />
           <InfoRow label="Last active"  value={formatDateLong(user.lastActive)} />
           <InfoRow label="Status"       value={userStatus === 'active' ? 'Active' : 'Inactive'} />
+
+          <div className="mt-5 pt-5 border-t border-[#F3F4F6] dark:border-[#27272A]">
+            <label htmlFor="user-role" className="block text-[13px] font-semibold text-[#0F172A] dark:text-[#F8FAFC] mb-1.5">
+              Change role
+            </label>
+            <p className="text-[12px] text-[#6B7280] dark:text-[#9CA3AF] mb-2.5">
+              Takes effect on this account&rsquo;s next request. The change is recorded in the
+              audit trail and the account is notified.
+            </p>
+            <div className="flex items-center gap-2">
+              <select
+                id="user-role"
+                value={roleDraft}
+                onChange={e => { setRoleDraft(e.target.value); setRoleSaved(false); setRoleError('') }}
+                disabled={savingRole}
+                className="h-9 px-3 text-[13px] rounded-[6px] border border-[#E2E8F0] dark:border-[#27272A] bg-[#FFFFFF] dark:bg-[#18181B] text-[#0F172A] dark:text-[#F8FAFC] focus:outline-none focus:border-[#5E6AD2] focus:ring-2 focus:ring-[#5E6AD2]/10 disabled:opacity-60 transition-all"
+              >
+                {ROLES.map(r => (
+                  <option key={r} value={r}>{roleLabel(r)}</option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={handleRoleSave}
+                disabled={savingRole || roleDraft === currentRole}
+                className="h-9 px-4 text-[13px] font-medium text-white bg-[#5E6AD2] rounded-[6px] hover:bg-[#4A56C1] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {savingRole ? 'Saving...' : 'Save role'}
+              </button>
+            </div>
+            {roleError && (
+              <p role="alert" className="text-[12px] text-[#DC2626] dark:text-[#F87171] mt-2">{roleError}</p>
+            )}
+            {roleSaved && !roleError && (
+              <p className="text-[12px] text-[#15803D] dark:text-[#4ADE80] mt-2">Role updated.</p>
+            )}
+          </div>
         </Card>
 
         <Card>
           <SectionLabel>Activity summary</SectionLabel>
           <div className="grid grid-cols-2 gap-4 mb-5">
             {[
-              { label: user.role === 'supervisor' ? 'Tasks assigned' : 'Projects submitted', value: userProjects.length },
+              { label: currentRole === 'supervisor' ? 'Tasks assigned' : 'Projects submitted', value: userProjects.length },
               { label: 'Completion rate', value: `${completionRate}%` },
             ].map(s => (
               <div key={s.label} className="flex flex-col p-3 rounded-[8px] bg-[#F8FAFC] dark:bg-[#18181B] border border-[#E5E5E5] dark:border-[#27272A]">

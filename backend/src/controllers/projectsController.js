@@ -116,8 +116,13 @@ exports.getPublicProject = async (req, res) => {
 
 exports.getProjects = async (req, res) => {
   try {
-    // The same scope and soft-delete rules the single-project routes enforce.
-    const filter = { ...NOT_SOFT_DELETED, ...projectScopeFilter(req.user) }
+    // Apply the same scope and soft-delete rules as single-project routes.
+    // Admins may use `includeDeleted=true` to access projects for restoration.
+    const includeDeleted = req.user?.role === "admin" && req.query.includeDeleted === "true"
+    const filter = {
+      ...(includeDeleted ? {} : NOT_SOFT_DELETED),
+      ...projectScopeFilter(req.user),
+    }
     const page = parsePagination(req.query)
     let q = Project.find(filter)
       .populate("officer supervisor","fullName email department")

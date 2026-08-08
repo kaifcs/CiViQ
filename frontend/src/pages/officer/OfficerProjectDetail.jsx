@@ -5,8 +5,9 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useProject, useConflicts, useAssignableSupervisors } from '../../hooks/useResources'
 import AsyncState from '../../components/AsyncState'
 import { projectsApi, normaliseError } from '../../services'
-import { formatDateLong, MCDM_CRITERIA, criterionWidth, isTerminalProject } from '../../components/dashboard'
-import { DEPT_STYLES, PROJECT_STATUS_CONFIG, TYPE_STYLES } from '../../components/uiStyles'
+import { formatDateLong, MCDM_CRITERIA, criterionWidth, isTerminalProject, UNMEASURED_CRITERION_NOTE } from '../../components/dashboard'
+import { deptStyle, PROJECT_STATUS_CONFIG, TYPE_STYLES } from '../../components/uiStyles'
+import { LocationMap } from '../../gis'
 
 function formatCurrency(n) {
   if (!n) return '—'
@@ -84,7 +85,7 @@ export default function OfficerProjectDetail() {
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-2.5">
-            <span className={`inline-flex items-center text-[12px] font-medium px-2.5 py-1 rounded-full ${DEPT_STYLES[project.department] || ''}`}>{project.department}</span>
+            <span className={`inline-flex items-center text-[12px] font-medium px-2.5 py-1 rounded-full ${deptStyle(project.department)}`}>{project.department}</span>
             <span className={`inline-flex items-center text-[12px] font-medium px-2.5 py-1 rounded-full ${TYPE_STYLES[project.type] || ''}`}>{project.type}</span>
             <span className={`inline-flex items-center gap-1.5 text-[13px] font-semibold px-3 py-1 rounded-full ${status.bg} ${status.color}`}>
               <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: status.dot }} />
@@ -153,9 +154,11 @@ export default function OfficerProjectDetail() {
           <div className="grid grid-cols-2 gap-x-8 gap-y-3">
             {MCDM_CRITERIA.map(c => (
               <div key={c.label}>
-                <div className="flex items-center justify-between mb-1.5">
+                <div className="flex items-center justify-between mb-1.5" title={c.measured === false ? UNMEASURED_CRITERION_NOTE : undefined}>
                   <span className="text-[12px] text-[#6B7280] dark:text-[#9CA3AF]">{c.label}</span>
-                  <span className="text-[11px] font-semibold text-[#9CA3AF] dark:text-[#6B7280]">{c.weight}%</span>
+                  <span className="text-[11px] font-semibold text-[#9CA3AF] dark:text-[#6B7280]">
+                    {c.measured === false ? `${c.weight}% · not measured` : `${c.weight}%`}
+                  </span>
                 </div>
                 <div className="h-[5px] bg-[#F3F4F6] dark:bg-[#27272A] rounded-full overflow-hidden">
                   <div className="h-full rounded-full bg-[#5E6AD2]" style={{ width: criterionWidth(project.mcdmBreakdown, c.key), transition: 'width 0.4s ease' }} />
@@ -166,11 +169,15 @@ export default function OfficerProjectDetail() {
         </Card>
         <Card className="p-5 flex flex-col">
           <SectionLabel>Location</SectionLabel>
-          <div className="flex-1 rounded-[8px] flex flex-col items-center justify-center bg-[#F8FAFC] dark:bg-[#18181B] border border-[#E5E5E5] dark:border-[#27272A]" style={{ minHeight: '200px' }}>
-            <svg width="28" height="28" fill="none" viewBox="0 0 24 24" className="text-[#D1D5DB] dark:text-[#374151] mb-2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-            <p className="text-[14px] font-medium text-[#6B7280] dark:text-[#9CA3AF]">{project.ward}</p>
-            <p className="text-[12px] text-[#9CA3AF] dark:text-[#6B7280] mt-1 text-center px-4">{project.address}</p>
-            <p className="text-[11px] text-[#D1D5DB] dark:text-[#374151] mt-3">Interactive map in Phase 3</p>
+          <div className="flex-1 flex flex-col gap-2">
+            <LocationMap
+              height="200px"
+              points={[{ coord: { lat: project.centerLat, lng: project.centerLng }, label: project.title }]}
+              geoJSON={project._raw?.location?.geoJSON}
+              emptyMessage="No coordinates recorded for this project."
+            />
+            <p className="text-[12px] text-[#6B7280] dark:text-[#9CA3AF]">{project.ward}</p>
+            <p className="text-[12px] text-[#9CA3AF] dark:text-[#6B7280]">{project.address}</p>
           </div>
         </Card>
       </div>

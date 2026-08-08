@@ -3,11 +3,13 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
-import { useComplaints } from '../../hooks/useResources'
+import { useComplaintsPaged } from '../../hooks/useResources'
 import AsyncState from '../../components/AsyncState'
 import { complaintsApi } from '../../services'
 import { COMPLAINT_STATUS_CONFIG } from '../../components/uiStyles'
-import { formatDateLong, daysSince } from '../../components/dashboard'
+import { formatDateLong, daysSince, Pagination } from '../../components/dashboard'
+
+const PAGE_SIZE = 25
 
 
 const NEXT_STATUS = { submitted: 'acknowledged', acknowledged: 'in_progress', in_progress: 'resolved' }
@@ -28,22 +30,36 @@ export default function OfficerComplaints() {
   const navigate = useNavigate()
   const { user } = useAuth()
 
-  // Officer complaints are scoped by assignedOfficer on the server.
-  const myParams = useMemo(() => ({ assignedOfficer: user.id }), [user.id])
-  const { data: complaints, loading, error, reload } = useComplaints(myParams)
-
   const [filterStatus, setFilterStatus] = useState('')
+  const [page, setPage] = useState(1)
   const [statuses, setStatuses] = useState({}) // reflects server-confirmed status
 
-  // Memoize the fallback to preserve a stable array reference.
-  const filtered = useMemo(() => (complaints || []).filter(c => {
-    const currentStatus = statuses[c.id] || c.status
-    if (filterStatus && currentStatus !== filterStatus) return false
-    return true
-  }), [complaints, filterStatus, statuses])
+  // A changed filter invalidates the page number — page 4 of the old result set
+  // is meaningless in the new one — so the reset happens where the filter
+  // changes. Paging never touches the filter.
+  function changeStatusFilter(value) {
+    setFilterStatus(value)
+    setPage(1)
+  }
+
+  // Scoped by assignedOfficer on the server, and paged there too — the
+  // unpaginated read is capped at 200 records.
+  const myParams = useMemo(() => ({
+    assignedOfficer: user.id,
+    page,
+    limit: PAGE_SIZE,
+    ...(filterStatus ? { status: filterStatus } : {}),
+  }), [user.id, page, filterStatus])
+
+  const { data, loading, error, reload } = useComplaintsPaged(myParams)
+  const pagination = data?.pagination || null
+
+  // An optimistic status change can move a row out of the active status filter.
+  // It is left in place until the next fetch rather than vanishing mid-update.
+  const filtered = data?.items || []
 
   const hasFilters = filterStatus
-  function clearFilters() { setFilterStatus('') }
+  function clearFilters() { changeStatusFilter('') }
 
   // PATCH /api/complaints/:id/status
   async function handleUpdateStatus(e, id, currentStatus) {
@@ -64,14 +80,16 @@ export default function OfficerComplaints() {
     <div className="flex flex-col gap-4 h-full" style={{ fontFamily: "'Inter', sans-serif" }}>
 
       <div className="flex items-center gap-3 flex-wrap flex-shrink-0">
-        <FilterSelect label="Status" value={filterStatus} onChange={setFilterStatus}
+        <FilterSelect label="Status" value={filterStatus} onChange={changeStatusFilter}
           options={[
             { value: 'submitted', label: 'Submitted' }, { value: 'acknowledged', label: 'Acknowledged' },
             { value: 'in_progress', label: 'In Progress' }, { value: 'resolved', label: 'Resolved' },
           ]}
         />
         <div className="flex items-center gap-3 ml-auto">
-          <span className="text-[13px] text-[#6B7280] dark:text-[#9CA3AF]">{filtered.length} complaints</span>
+          <span className="text-[13px] text-[#6B7280] dark:text-[#9CA3AF]">
+            {pagination ? pagination.total : filtered.length} complaints
+          </span>
           {hasFilters && <button onClick={clearFilters} className="text-[13px] text-[#5E6AD2] font-medium">Clear filters</button>}
         </div>
       </div>
@@ -89,9 +107,8 @@ export default function OfficerComplaints() {
           const nextSt = NEXT_STATUS[currentStatus]
           return (
             <div key={c.id} onClick={() => navigate(`/officer/complaints/${c.id}`)}
-              className={`flex items-center gap-4 px-5 py-4 rounded-[8px] border cursor-pointer transition-all ${
-                c.overdue ? 'bg-[#FEF2F2] dark:bg-[#1F0A0A] border-[#FECACA] dark:border-[#7F1D1D] hover:border-[#DC2626]/40' : 'bg-[#FFFFFF] dark:bg-[#1C1C1F] border-[#E5E5E5] dark:border-[#27272A] hover:border-[#5E6AD2]/40 hover:bg-[#FAFAFA] dark:hover:bg-[#252529]'
-              }`} style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+              className="flex items-center gap-4 px-5 py-4 rounded-[8px] border cursor-pointer transition-all bg-[#FFFFFF] dark:bg-[#1C1C1F] border-[#E5E5E5] dark:border-[#27272A] hover:border-[#5E6AD2]/40 hover:bg-[#FAFAFA] dark:hover:bg-[#252529]"
+              style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
 
               <div className="flex-shrink-0 w-[108px]">
                 <span className="text-[12px] font-bold text-[#5E6AD2] dark:text-[#818CF8] font-mono">{c.cnrId}</span>
@@ -101,7 +118,6 @@ export default function OfficerComplaints() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <p className="text-[14px] font-semibold text-[#0F172A] dark:text-[#F8FAFC]">{c.issueType}</p>
-                  {c.overdue && <span className="text-[11px] font-semibold text-[#DC2626] dark:text-[#F87171] bg-[#FEE2E2] dark:bg-[#7F1D1D]/30 px-1.5 py-0.5 rounded flex-shrink-0">Overdue</span>}
                 </div>
                 <p className="text-[12px] text-[#6B7280] dark:text-[#9CA3AF] truncate mt-0.5">{c.address}</p>
               </div>
@@ -109,7 +125,7 @@ export default function OfficerComplaints() {
 
               <div className="flex-shrink-0 w-[80px] flex flex-col items-end gap-0.5">
                 <span className="text-[11px] font-semibold text-[#9CA3AF] dark:text-[#6B7280] uppercase tracking-wide">Filed</span>
-                <span className={`text-[14px] font-bold leading-none ${c.overdue ? 'text-[#DC2626] dark:text-[#FCA5A5]' : 'text-[#0F172A] dark:text-[#F8FAFC]'}`}>{days}d</span>
+                <span className="text-[14px] font-bold leading-none text-[#0F172A] dark:text-[#F8FAFC]">{days}d</span>
                 <span className="text-[11px] text-[#9CA3AF] dark:text-[#6B7280]">{formatDateLong(c.filedAt)}</span>
               </div>
               <VDivider />
@@ -137,6 +153,13 @@ export default function OfficerComplaints() {
           )
         })}
       </div>
+
+      <Pagination
+        pagination={pagination}
+        page={page}
+        onPageChange={setPage}
+        label="complaints"
+      />
     </div>
     </AsyncState>
   )

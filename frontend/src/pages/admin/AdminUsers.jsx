@@ -8,7 +8,7 @@ import { useUsers, useDepartments, useDepartmentOptions } from '../../hooks/useR
 import AsyncState from '../../components/AsyncState'
 import { authApi, usersApi, normaliseError } from '../../services'
 import { useAuth } from '../../hooks/useAuth'
-import { DEPT_STYLES, ROLE_STYLES } from '../../components/uiStyles'
+import { deptStyle, ROLE_STYLES } from '../../components/uiStyles'
 import { formatDateLong } from '../../components/dashboard'
 
 function getInitials(name) {
@@ -298,7 +298,7 @@ export default function AdminUsers() {
 
               <div className="flex-shrink-0 w-[80px] flex justify-center">
                 {u.department ? (
-                  <span className={`inline-flex items-center text-[12px] font-medium px-2.5 py-1 rounded-full ${DEPT_STYLES[u.department] || ''}`}>
+                  <span className={`inline-flex items-center text-[12px] font-medium px-2.5 py-1 rounded-full ${deptStyle(u.department)}`}>
                     {u.department}
                   </span>
                 ) : (

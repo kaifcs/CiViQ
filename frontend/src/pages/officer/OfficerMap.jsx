@@ -10,7 +10,7 @@ import {
   PROJECT_TYPE_COLORS, toBoundsTuple,
 } from '../../gis'
 import { coordinateOf, viewportForRecords } from '../../gis/gisService'
-import { DEPT_STYLES, PROJECT_STATUS_CONFIG } from '../../components/uiStyles'
+import { deptStyle, PROJECT_STATUS_CONFIG } from '../../components/uiStyles'
 
 const SELECTED_ZOOM = 16
 
@@ -151,7 +151,7 @@ export default function OfficerMap() {
                   <h3 className="text-[14px] font-semibold text-[#0F172A] dark:text-[#F8FAFC] leading-snug">{selected.title}</h3>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className={`inline-flex items-center text-[11px] font-medium px-2 py-0.5 rounded-full ${DEPT_STYLES[selected.department] || ''}`}>{selected.department}</span>
+                  <span className={`inline-flex items-center text-[11px] font-medium px-2 py-0.5 rounded-full ${deptStyle(selected.department)}`}>{selected.department}</span>
                   <span className={`inline-flex items-center text-[11px] font-medium px-2 py-0.5 rounded-full ${TYPE_BADGE[selected.type] || ''}`}>{selected.type}</span>
                   <span className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full ${selectedStatus?.bg} ${selectedStatus?.color}`}>
                     <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: selectedStatus?.dot }} />{selectedStatus?.text}

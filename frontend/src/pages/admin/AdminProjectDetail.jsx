@@ -7,9 +7,10 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useProject, useConflicts, useAuditLogs } from '../../hooks/useResources'
 import AsyncState from '../../components/AsyncState'
 import { projectsApi, normaliseError } from '../../services'
-import { formatDateLong, relativeDay, auditActionLabel, MCDM_CRITERIA, criterionWidth } from '../../components/dashboard'
+import { formatDateLong, relativeDay, auditActionLabel, MCDM_CRITERIA, criterionWidth, UNMEASURED_CRITERION_NOTE } from '../../components/dashboard'
 import { useAuth } from '../../hooks/useAuth'
-import { DEPT_STYLES, PROJECT_STATUS_CONFIG, TYPE_STYLES } from '../../components/uiStyles'
+import { deptStyle, PROJECT_STATUS_CONFIG, TYPE_STYLES } from '../../components/uiStyles'
+import { LocationMap } from '../../gis'
 
 function formatCurrency(n) {
   if (!n) return '—'
@@ -127,6 +128,8 @@ export default function AdminProjectDetail() {
   const [projectStatus,   setProjectStatus]   = useState('pending')
   const [seededFor,       setSeededFor]       = useState(null)
   const [showRejectModal, setShowRejectModal] = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deleting,        setDeleting]        = useState(false)
   const [actionDone,      setActionDone]      = useState(null)
   const [actionError,     setActionError]     = useState('')
 
@@ -188,6 +191,24 @@ export default function AdminProjectDetail() {
     }
   }
 
+  // PATCH /api/projects/:id/status — a soft delete. The record and its audit
+  // trail survive; only its visibility changes. Every read path then hides it,
+  // so this view cannot stay open on it and returns to the register, where
+  // "Include deleted" offers the restore.
+  async function handleDelete() {
+    if (deleting) return
+    setActionError('')
+    setDeleting(true)
+    try {
+      await projectsApi.setStatus(id, false, deptMap)
+      navigate('/admin/projects')
+    } catch (err) {
+      setActionError(normaliseError(err).message)
+      setDeleting(false)
+      setShowDeleteModal(false)
+    }
+  }
+
   const scoreColor = project.mcdmScore >= 75 ? '#16A34A' : project.mcdmScore >= 60 ? '#D97706' : '#DC2626'
   const scoreLabel = project.mcdmScore >= 75 ? 'High priority' : project.mcdmScore >= 60 ? 'Medium priority' : 'Low priority'
 
@@ -207,7 +228,7 @@ export default function AdminProjectDetail() {
       <div className="flex items-start justify-between gap-6">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-2.5">
-            <Badge label={project.department} className={DEPT_STYLES[project.department] || DEPT_STYLES.PWD} />
+            <Badge label={project.department} className={deptStyle(project.department)} />
             <Badge label={project.type}       className={TYPE_STYLES[project.type] || TYPE_STYLES.Other} />
             <StatusBadge status={projectStatus} />
             {project.phase === 'phased' && (
@@ -244,14 +265,16 @@ export default function AdminProjectDetail() {
               Project rejected
             </span>
           )}
+          {/* Soft delete, never a hard one: the row is retained and can be
+              restored from Projects -> Include deleted. */}
+          <button
+            onClick={() => setShowDeleteModal(true)}
+            className="h-9 px-4 text-[13px] font-medium text-[#DC2626] border border-[#FECACA] dark:border-[#7F1D1D] rounded-[6px] hover:bg-[#FEF2F2] dark:hover:bg-[#1F0A0A] transition-colors"
+          >
+            Delete project
+          </button>
           {canTakeAction && (
             <>
-              <button
-                className="h-9 px-4 text-[13px] font-medium text-[#6B7280] dark:text-[#9CA3AF] border border-[#E2E8F0] dark:border-[#27272A] rounded-[6px] hover:bg-[#F8FAFC] dark:hover:bg-[#18181B] transition-colors"
-                title="Override MCDM — available in Phase 3"
-              >
-                Override MCDM
-              </button>
               <button
                 onClick={() => setShowRejectModal(true)}
                 className="h-9 px-4 text-[13px] font-medium text-white bg-[#DC2626] rounded-[6px] hover:bg-[#B91C1C] transition-colors"
@@ -308,9 +331,11 @@ export default function AdminProjectDetail() {
           <div className="grid grid-cols-2 gap-x-8 gap-y-3">
             {MCDM_CRITERIA.map(c => (
               <div key={c.label}>
-                <div className="flex items-center justify-between mb-1.5">
+                <div className="flex items-center justify-between mb-1.5" title={c.measured === false ? UNMEASURED_CRITERION_NOTE : undefined}>
                   <span className="text-[12px] text-[#6B7280] dark:text-[#9CA3AF]">{c.label}</span>
-                  <span className="text-[11px] font-semibold text-[#9CA3AF] dark:text-[#6B7280]">{c.weight}%</span>
+                  <span className="text-[11px] font-semibold text-[#9CA3AF] dark:text-[#6B7280]">
+                    {c.measured === false ? `${c.weight}% · not measured` : `${c.weight}%`}
+                  </span>
                 </div>
                 <div className="h-[5px] bg-[#F3F4F6] dark:bg-[#27272A] rounded-full overflow-hidden">
                   <div
@@ -328,16 +353,15 @@ export default function AdminProjectDetail() {
 
         <Card className="p-5 flex flex-col">
           <SectionLabel>Location</SectionLabel>
-          <div
-            className="flex-1 rounded-[8px] flex flex-col items-center justify-center bg-[#F8FAFC] dark:bg-[#18181B] border border-[#E5E5E5] dark:border-[#27272A]"
-            style={{ minHeight: '200px' }}
-          >
-            <svg width="32" height="32" fill="none" viewBox="0 0 24 24" className="text-[#D1D5DB] dark:text-[#374151] mb-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
-            </svg>
-            <p className="text-[14px] font-semibold text-[#6B7280] dark:text-[#9CA3AF]">{project.ward}</p>
-            <p className="text-[12px] text-[#9CA3AF] dark:text-[#6B7280] mt-1 text-center px-6 leading-relaxed">{project.address}</p>
-            <p className="text-[11px] text-[#D1D5DB] dark:text-[#374151] mt-4">Interactive map in Phase 3</p>
+          <div className="flex-1 flex flex-col gap-2">
+            <LocationMap
+              height="200px"
+              points={[{ coord: { lat: project.centerLat, lng: project.centerLng }, label: project.title }]}
+              geoJSON={project._raw?.location?.geoJSON}
+              emptyMessage="No coordinates recorded for this project."
+            />
+            <p className="text-[12px] text-[#6B7280] dark:text-[#9CA3AF]">{project.ward}</p>
+            <p className="text-[12px] text-[#9CA3AF] dark:text-[#6B7280]">{project.address}</p>
           </div>
         </Card>
 
@@ -406,6 +430,38 @@ export default function AdminProjectDetail() {
           onConfirm={handleReject}
           onCancel={() => setShowRejectModal(false)}
         />
+      )}
+
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.4)' }}>
+          <div
+            className="bg-[#FFFFFF] dark:bg-[#1C1C1F] border border-[#E5E5E5] dark:border-[#27272A] rounded-[12px] p-6 w-full max-w-md mx-4"
+            style={{ boxShadow: '0 8px 24px rgba(0,0,0,0.12)' }}
+          >
+            <h3 className="text-[16px] font-semibold text-[#0F172A] dark:text-[#F8FAFC] mb-1">Delete project</h3>
+            <p className="text-[13px] text-[#6B7280] dark:text-[#9CA3AF] mb-4">
+              &ldquo;{project.title}&rdquo; will be hidden from every list, map and detail view.
+              Nothing is erased — the record and its audit trail are kept, and an administrator
+              can restore it from Projects &rarr; Include deleted.
+            </p>
+            <div className="flex items-center gap-3 justify-end">
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                disabled={deleting}
+                className="px-4 py-2 text-[13px] font-medium text-[#6B7280] dark:text-[#9CA3AF] bg-[#F8FAFC] dark:bg-[#18181B] border border-[#E2E8F0] dark:border-[#27272A] rounded-[6px] hover:bg-[#F1F5F9] dark:hover:bg-[#252529] disabled:opacity-60 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="px-4 py-2 text-[13px] font-medium text-white bg-[#DC2626] rounded-[6px] hover:bg-[#B91C1C] disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+              >
+                {deleting ? 'Deleting...' : 'Delete project'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       <style>{`@keyframes civiq-pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }`}</style>

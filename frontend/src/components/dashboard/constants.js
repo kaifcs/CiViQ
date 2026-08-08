@@ -1,9 +1,5 @@
-// Vocabulary shared by every dashboard. Keys mirror the backend enums exactly
-// (Project.status, Complaint.status, and the vocabulary adaptConflict emits),
-// so a label change lands in one place.
-
+// Shared vocabulary matching backend enums and adapter output.
 export const PROJECT_STATUSES = ['pending', 'approved', 'active', 'rejected', 'completed', 'rescheduled']
-
 export const PROJECT_STATUS_LABELS = {
   pending: 'Pending',
   approved: 'Approved',
@@ -13,13 +9,11 @@ export const PROJECT_STATUS_LABELS = {
   rescheduled: 'Rescheduled',
 }
 
-// Statuses after which a project needs no further scheduling attention.
+// Project states requiring no further scheduling.
 export const PROJECT_TERMINAL_STATUSES = ['completed', 'rejected']
-
 export const PROJECT_PROGRESSABLE_STATUSES = ['approved', 'active']
 
 export const COMPLAINT_STATUSES = ['submitted', 'acknowledged', 'in_progress', 'resolved']
-
 export const COMPLAINT_STATUS_LABELS = {
   submitted: 'Submitted',
   acknowledged: 'Acknowledged',
@@ -27,15 +21,14 @@ export const COMPLAINT_STATUS_LABELS = {
   resolved: 'Resolved',
 }
 
-// adaptConflict's view vocabulary, not the raw Conflict.status enum.
+// adaptConflict's view vocabulary.
 export const CONFLICT_STATUS_LABELS = {
   unresolved: 'Unresolved',
   pending_response: 'Awaiting officer',
   resolved: 'Resolved',
 }
 
-// The raw Conflict.status enum, which the analytics endpoints report verbatim
-// because they aggregate in the database rather than through adaptConflict.
+// Raw Conflict.status labels used by analytics.
 export const CONFLICT_RAW_STATUS_LABELS = {
   pending: 'Pending',
   awaiting_officer: 'Awaiting officer',
@@ -43,7 +36,7 @@ export const CONFLICT_RAW_STATUS_LABELS = {
   resolved_rejected: 'Resolved — one rejected',
 }
 
-// Conflict.severity enum, likewise reported verbatim by the analytics endpoints.
+// Raw Conflict.severity labels used by analytics.
 export const CONFLICT_SEVERITY_LABELS = {
   incompatible: 'Incompatible',
   conditional: 'Conditional',
@@ -55,18 +48,16 @@ export const conflictStatusLabel = (s) => CONFLICT_STATUS_LABELS[s] || s || '—
 
 export const isTerminalProject = (p) => PROJECT_TERMINAL_STATUSES.includes(p?.status)
 
-// Whether PUT /api/projects/:id/progress would be accepted for this project.
+// Whether project progress can be recorded.
 export const canRecordProgress = (p) => PROJECT_PROGRESSABLE_STATUSES.includes(p?.status)
 
-// Combined lookup for screens that mix both vocabularies (analytics).
+// Combined labels for screens using multiple vocabularies.
 export const STATUS_LABELS = {
   ...PROJECT_STATUS_LABELS,
   ...COMPLAINT_STATUS_LABELS,
 }
 
-// Every action auditService is actually called with, and nothing else. Keys
-// mirror the `action` strings the controllers emit, so the filter can never
-// offer a value that no entry carries.
+// Audit actions emitted by the backend.
 export const AUDIT_ACTION_LABELS = {
   project_created: 'Created project',
   project_updated: 'Updated project',
@@ -89,31 +80,32 @@ export const AUDIT_ACTION_LABELS = {
   department_status_updated: 'Changed department active state',
 }
 
-// Falls back to the raw action so an entry is never rendered blank.
+// Falls back to the raw action.
 export const auditActionLabel = (action) => AUDIT_ACTION_LABELS[action] || action || '—'
 
-// Filter options, derived from the labels so the two cannot drift.
+// Filter options derived from audit labels.
 export const AUDIT_ACTION_OPTIONS = Object.entries(AUDIT_ACTION_LABELS)
   .map(([value, label]) => ({ value, label }))
   .sort((a, b) => a.label.localeCompare(b.label))
 
-// The seven MCDM criteria, in the order the engine weights them. `key` matches
-// the field mcdmEngine writes into Project.mcdmBreakdown and `weight` mirrors
-// config/staticConfig.mcdmWeights as a percentage.
+// MCDM criteria and their weights.
 export const MCDM_CRITERIA = [
-  { key: 'conditionSeverity',     label: 'Condition Severity',           weight: 26 },
-  { key: 'populationImpact',      label: 'Population & Facility Impact', weight: 21 },
-  { key: 'seasonalCompatibility', label: 'Seasonal Compatibility',       weight: 16 },
-  { key: 'executionReadiness',    label: 'Execution Readiness',          weight: 16 },
-  { key: 'citizenDisruption',     label: 'Citizen Disruption',           weight: 10 },
-  { key: 'infrastructureAge',     label: 'Infrastructure Age',           weight:  8 },
-  { key: 'economicValue',         label: 'Economic Value',               weight:  3 },
+  { key: 'conditionSeverity',     label: 'Condition Severity',           weight: 26, measured: true  },
+  { key: 'populationImpact',      label: 'Population & Facility Impact', weight: 21, measured: false },
+  { key: 'seasonalCompatibility', label: 'Seasonal Compatibility',       weight: 16, measured: true  },
+  { key: 'executionReadiness',    label: 'Execution Readiness',          weight: 16, measured: true  },
+  { key: 'citizenDisruption',     label: 'Citizen Disruption',           weight: 10, measured: true  },
+  { key: 'infrastructureAge',     label: 'Infrastructure Age',           weight:  8, measured: true  },
+  { key: 'economicValue',         label: 'Economic Value',               weight:  3, measured: false },
 ]
 
-// Bar width for one criterion. Scores are 1-10, so the bar is that share of the
-// track; a project with no stored breakdown renders empty rather than borrowing
-// the overall score.
+// Note shown for unmeasured criteria.
+export const UNMEASURED_CRITERION_NOTE =
+  'Not measured — no data source. Scored neutral for every project, so it changes no ranking.'
+
+// Returns the visual width for a measured criterion score.
 export const criterionWidth = (breakdown, key) => {
+  if (MCDM_CRITERIA.find((c) => c.key === key)?.measured === false) return '0%'
   const value = breakdown?.[key]
   return Number.isFinite(value) ? `${Math.max(0, Math.min(100, value * 10))}%` : '0%'
 }

@@ -5,7 +5,7 @@ import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useProjects } from '../../hooks/useResources'
 import AsyncState from '../../components/AsyncState'
-import { PROJECT_STATUS_CONFIG, TYPE_STYLES } from '../../components/uiStyles'
+import { PROJECT_STATUS_CONFIG, PROJECT_STATUS_OPTIONS, TYPE_STYLES } from '../../components/uiStyles'
 import { formatDate } from '../../components/dashboard'
 
 function isThisMonth(dateStr) {
@@ -95,10 +95,7 @@ export default function OfficerProjects() {
             ]}
           />
           <FilterSelect label="Status" value={filterStatus} onChange={setFilterStatus}
-            options={[
-              { value: 'pending', label: 'Pending' }, { value: 'approved', label: 'Approved' },
-              { value: 'active', label: 'Active' }, { value: 'rejected', label: 'Rejected' },
-            ]}
+            options={PROJECT_STATUS_OPTIONS}
           />
           <FilterSelect label="Timeline" value={filterTime} onChange={setFilterTime}
             options={[

@@ -2,6 +2,12 @@
 const config = require("../config/staticConfig")
 const Complaint = require("../models/Complaint")
 
+// No authoritative population or economic data exists in this deployment.
+// Both criteria therefore use a neutral value and are treated as a stated
+// limitation rather than measured data.
+const NEUTRAL_SCORE = 5
+const UNMEASURED_CRITERIA = ["populationImpact", "economicValue"]
+
 async function calculateMCDM(projectData) {
   const scores = {}
   const w = config.mcdmWeights
@@ -34,8 +40,8 @@ async function calculateMCDM(projectData) {
 
   scores.conditionSeverity = c1
 
-  // Population and facility impact.
-  scores.populationImpact = projectData.autoDetected?.populationScore || 5
+  // Population and facility impact — unmeasured, see NEUTRAL_SCORE.
+  scores.populationImpact = NEUTRAL_SCORE
 
   // Seasonal compatibility.
   const { monsoon, drySeason } = config.seasonal
@@ -104,8 +110,8 @@ async function calculateMCDM(projectData) {
 
   scores.infrastructureAge = c6
 
-  // Economic value.
-  scores.economicValue = projectData.autoDetected?.economicScore || 5
+  // Economic value — unmeasured, see NEUTRAL_SCORE.
+  scores.economicValue = NEUTRAL_SCORE
 
   const total =
     scores.conditionSeverity * w.conditionSeverity +
@@ -123,4 +129,4 @@ async function calculateMCDM(projectData) {
   }
 }
 
-module.exports = { calculateMCDM }
+module.exports = { calculateMCDM, NEUTRAL_SCORE, UNMEASURED_CRITERIA }

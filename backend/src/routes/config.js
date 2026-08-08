@@ -1,12 +1,9 @@
-// Exposes shared lookup values from the backend configuration.
+// Exposes shared lookup values from backend configuration.
 
 const router = require("express").Router()
-const { protect } = require("../middleware/auth")
 const config = require("../config/staticConfig")
 
-router.use(protect)
-
-// Returns available wards.
+// Returns the configured ward register used by public and backend workflows.
 router.get("/wards", (req, res) => {
   const wards = config.wards || []
   res.status(200).json({ success: true, count: wards.length, wards })

@@ -207,6 +207,11 @@ Leaflet 1.9 with `leaflet.markercluster` and `leaflet.heat`. Detail:
 The module exposes a single public surface through `gis/index.js`; consumers
 import from there rather than reaching into individual files.
 
+Besides the read-only layers it holds the two authoring primitives —
+`PointPicker` and `GeometryEditor` — which are the only writers of stored
+coordinates and geometry, and `LocationMap`, the small read-only map the detail
+screens embed.
+
 ## Pages — `src/pages/`
 
 | Group | Screens |
@@ -214,7 +219,7 @@ import from there rather than reaching into individual files.
 | `admin/` | Dashboard, Projects, Project detail, Conflicts, Conflict detail, Map, Complaints, Complaint detail, Analytics, Audit, Users, User detail, Settings |
 | `officer/` | Dashboard, Projects, Project detail, New project, Conflicts, Conflict detail, Clash respond, Complaints, Complaint detail, Map, Settings |
 | `supervisor/` | Dashboard, Tasks, Task detail, Settings |
-| `citizen/` | Home, Projects, Project detail, Not found, plus the shared `CitizenNav` shell |
+| `citizen/` | Home, Projects, Project detail, Report an issue, Track complaint, Not found, plus the shared `CitizenNav` shell |
 | `auth/` | Login |
 | `notifications/` | Notification Center |
 
@@ -239,9 +244,19 @@ hook is the entire test tooling.
 
 Covered: `test/gis.test.js` (coordinate validation, ordering conversions,
 bounds, bounding box, distance), `test/adapters.test.js` (view-model mapping,
-redacted-reference handling, no-fabrication rule) and `test/hookDeps.test.js`,
+redacted-reference handling, no-fabrication rule), `test/hookDeps.test.js`,
 which reads the source to enforce that no screen passes an inline object or
-array literal to a data hook, and that every argument-taking hook in
-`useResources.js` is classified.
+array literal to a data hook and that every argument-taking hook in
+`useResources.js` is classified, and `test/workflows.test.js` (department
+badge coverage, project status filters, MCDM unmeasured criteria, geometry
+construction and its rejection of invalid shapes, the geometry payload,
+complaint intake vocabulary, role vocabulary, and the absence of the overdue
+flag).
 
-React component rendering is not tested.
+Several of those read the backend schema and engine source directly and compare
+against the frontend's copy of the same vocabulary, so a divergence fails here
+rather than reaching a screen that offers a value the API would reject.
+
+React component rendering is not tested — there is no JSX transform in the test
+runner, so behaviour is tested through the pure module each screen delegates its
+decision to.

@@ -1,6 +1,5 @@
-// Referential stability of the arguments screens pass to the data hooks: useApi
-// spreads `deps` into a useEffect dependency array, so an inline literal changes
-// identity every render and refetches forever. Checked by reading the source.
+// Verifies that data-hook arguments remain referentially stable.
+// useApi spreads deps into useEffect, so inline objects/arrays can refetch repeatedly.
 
 import test from "node:test"
 import assert from "node:assert/strict"
@@ -11,21 +10,19 @@ import { fileURLToPath } from "node:url"
 const SRC = fileURLToPath(new URL("../src", import.meta.url))
 const USE_RESOURCES = join(SRC, "hooks", "useResources.js")
 
-// Hooks that forward their argument into the useApi dependency array.
+// Hooks whose arguments are passed into useApi dependencies.
 const GUARDED = [
   "useProjects", "useProject", "usePublicProjects", "usePublicProject",
   "useConflicts", "useConflict",
-  "useComplaints", "useComplaint",
+  "useComplaints", "useComplaintsPaged", "useComplaint",
   "useUser", "useDepartment", "useAuditLogs",
   "useDashboardSummary", "useDashboardProjects", "useDashboardConflicts",
   "useDashboardComplaints", "useDashboardDepartments", "useDashboardActivity",
 ]
 
-// Hooks that take an argument but are not subject to the rule, listed
-// explicitly so each exemption is a decision rather than an oversight.
+// Argument-taking hooks explicitly exempt from the rule.
 const EXEMPT = {
-  // Derives its own stable key from Object.keys(loaders).join(","), so an
-  // inline object of loaders is deliberately safe here.
+  // Uses loader names as its stable key instead of object identity.
   useCombined: "keys itself on the loader names, not on object identity",
 }
 
@@ -37,7 +34,7 @@ function sourceFiles(dir) {
   })
 }
 
-// Call sites of `hook` whose first argument opens with `{` or `[`.
+// Finds calls whose first argument is an inline object or array.
 function literalArgumentCallSites(source, hook) {
   const hits = []
   const call = new RegExp(`\\b${hook}\\s*\\(`, "g")
@@ -57,7 +54,7 @@ test("no screen passes an inline literal to a data hook", () => {
 
   for (const file of sourceFiles(SRC)) {
     const source = readFileSync(file, "utf8")
-    // The hook definitions themselves are not call sites.
+    // Skip hook definitions themselves.
     if (file === USE_RESOURCES) continue
 
     for (const hook of GUARDED) {
@@ -71,8 +68,8 @@ test("no screen passes an inline literal to a data hook", () => {
     offenders,
     [],
     "These call sites build a new object/array every render, which makes useApi " +
-      "refetch on every render:\n  " + offenders.join("\n  ") +
-      "\nWrap the argument in useMemo, or hoist it to module scope."
+    "refetch on every render:\n  " + offenders.join("\n  ") +
+    "\nWrap the argument in useMemo, or hoist it to module scope."
   )
 })
 
@@ -88,7 +85,7 @@ test("every argument-taking resource hook is either guarded or explicitly exempt
     unclassified,
     [],
     "New hook(s) in useResources.js take an argument but are not classified. " +
-      "Add each to GUARDED, or to EXEMPT with the reason it is safe:\n  " +
-      unclassified.join("\n  ")
+    "Add each to GUARDED, or to EXEMPT with the reason it is safe:\n  " +
+    unclassified.join("\n  ")
   )
 })

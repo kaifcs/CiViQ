@@ -6,7 +6,7 @@ import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useConflicts, useDepartmentOptions } from '../../hooks/useResources'
 import AsyncState from '../../components/AsyncState'
-import { CONFLICT_STATUS_CONFIG, DEPT_STYLES, SEVERITY_CONFIG, scoreColor } from '../../components/uiStyles'
+import { CONFLICT_STATUS_CONFIG, deptStyle, SEVERITY_CONFIG, scoreColor } from '../../components/uiStyles'
 import { daysSince } from '../../components/dashboard'
 
 
@@ -76,7 +76,7 @@ function ConflictCard({ conflict, onClick }) {
             {conflict.projectATitle}
           </p>
           <div className="flex items-center gap-2">
-            <Badge label={conflict.projectADept} className={DEPT_STYLES[conflict.projectADept] || DEPT_STYLES.PWD} />
+            <Badge label={conflict.projectADept} className={deptStyle(conflict.projectADept)} />
             <span className="text-[11px] font-semibold text-[#9CA3AF] dark:text-[#6B7280] uppercase tracking-wide">MCDM</span>
             <span className="text-[14px] font-bold" style={{ color: scoreColor(conflict.projectAScore) }}>
               {conflict.projectAScore}
@@ -99,7 +99,7 @@ function ConflictCard({ conflict, onClick }) {
             <span className="text-[14px] font-bold" style={{ color: scoreColor(conflict.projectBScore) }}>
               {conflict.projectBScore}
             </span>
-            <Badge label={conflict.projectBDept} className={DEPT_STYLES[conflict.projectBDept] || DEPT_STYLES.PWD} />
+            <Badge label={conflict.projectBDept} className={deptStyle(conflict.projectBDept)} />
           </div>
         </div>
 

@@ -9,8 +9,9 @@ import { useAuth } from '../../hooks/useAuth'
 import { useMutation } from '../../hooks/useApi'
 import { complaintsApi } from '../../services'
 import AsyncState from '../../components/AsyncState'
-import { COMPLAINT_STATUS_CONFIG, DEPT_STYLES, inputCls, labelCls } from '../../components/uiStyles'
+import { COMPLAINT_STATUS_CONFIG, deptStyle, inputCls, labelCls } from '../../components/uiStyles'
 import { formatDateLong } from '../../components/dashboard'
+import { LocationMap } from '../../gis'
 
 function formatDateTime(dateStr) {
   if (!dateStr) return null
@@ -205,18 +206,13 @@ export default function AdminComplaintDetail() {
         <div>
           <div className="flex items-center gap-2 flex-wrap mb-2">
             <span className="text-[13px] font-bold text-[#5E6AD2] dark:text-[#818CF8] font-mono">{complaint.cnrId}</span>
-            <span className={`inline-flex items-center text-[12px] font-medium px-2.5 py-1 rounded-full ${DEPT_STYLES[complaint.department] || DEPT_STYLES.Other}`}>
+            <span className={`inline-flex items-center text-[12px] font-medium px-2.5 py-1 rounded-full ${deptStyle(complaint.department)}`}>
               {complaint.department}
             </span>
             <span className={`inline-flex items-center gap-1.5 text-[12px] font-semibold px-2.5 py-1 rounded-full ${status.bg} ${status.color}`}>
               <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: status.dot }} />
               {status.text}
             </span>
-            {complaint.overdue && (
-              <span className="text-[11px] font-semibold text-[#DC2626] dark:text-[#F87171] bg-[#FEE2E2] dark:bg-[#7F1D1D]/30 px-2 py-0.5 rounded">
-                Overdue
-              </span>
-            )}
           </div>
           <h1 className="text-[20px] font-bold text-[#0F172A] dark:text-[#F8FAFC]">
             {complaint.issueType}
@@ -305,16 +301,14 @@ export default function AdminComplaintDetail() {
 
         <Card className="flex flex-col">
           <SectionLabel>Complaint location</SectionLabel>
-          <div
-            className="flex-1 rounded-[8px] flex flex-col items-center justify-center bg-[#F8FAFC] dark:bg-[#18181B] border border-[#E5E5E5] dark:border-[#27272A]"
-            style={{ minHeight: '220px' }}
-          >
-            <svg width="28" height="28" fill="none" viewBox="0 0 24 24" className="text-[#DC2626] mb-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
-            </svg>
-            <p className="text-[13px] font-medium text-[#6B7280] dark:text-[#9CA3AF]">{complaint.ward}</p>
-            <p className="text-[12px] text-[#9CA3AF] dark:text-[#6B7280] mt-1 text-center px-6 leading-relaxed">{complaint.address}</p>
-            <p className="text-[11px] text-[#D1D5DB] dark:text-[#374151] mt-4">Pin map loads in Phase 3</p>
+          <div className="flex-1 flex flex-col gap-2">
+            <LocationMap
+              height="220px"
+              points={[{ coord: { lat: complaint.lat, lng: complaint.lng }, color: '#DC2626', label: complaint.issueType }]}
+              emptyMessage="This complaint was filed without coordinates."
+            />
+            <p className="text-[12px] text-[#6B7280] dark:text-[#9CA3AF]">{complaint.ward}</p>
+            <p className="text-[12px] text-[#9CA3AF] dark:text-[#6B7280]">{complaint.address}</p>
           </div>
         </Card>
 

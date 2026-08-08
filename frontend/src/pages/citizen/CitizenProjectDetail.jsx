@@ -7,7 +7,7 @@ import CitizenNav from "./CitizenNav"
 import { usePublicProject } from "../../hooks/useResources"
 import AsyncState from "../../components/AsyncState"
 import { formatDateLong } from "../../components/dashboard"
-import { DEPT_STYLES, PROJECT_STATUS_CONFIG, TYPE_STYLES } from "../../components/uiStyles"
+import { deptStyle, PROJECT_STATUS_CONFIG, TYPE_STYLES } from "../../components/uiStyles"
 
 function Card({ children, className = "" }) {
   return (
@@ -74,7 +74,7 @@ export default function CitizenProjectDetail() {
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap mb-2.5">
-              <span className={`inline-flex items-center text-[12px] font-medium px-2.5 py-1 rounded-full ${DEPT_STYLES[project.department] || DEPT_STYLES.Other}`}>{project.department || "—"}</span>
+              <span className={`inline-flex items-center text-[12px] font-medium px-2.5 py-1 rounded-full ${deptStyle(project.department)}`}>{project.department || "—"}</span>
               <span className={`inline-flex items-center text-[12px] font-medium px-2.5 py-1 rounded-full ${TYPE_STYLES[project.type] || TYPE_STYLES.Other}`}>{project.type}</span>
               <span className={`inline-flex items-center gap-1.5 text-[13px] font-semibold px-3 py-1 rounded-full ${status.bg} ${status.color}`}>
                 <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: status.dot }} />

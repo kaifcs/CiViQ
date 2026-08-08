@@ -10,7 +10,7 @@ import {
   toBoundsTuple, boundsOf, padBounds,
 } from '../../gis'
 import { coordinateOf, viewportForRecords } from '../../gis/gisService'
-import { DEPT_STYLES, PROJECT_STATUS_CONFIG } from '../../components/uiStyles'
+import { deptStyle, PROJECT_STATUS_CONFIG } from '../../components/uiStyles'
 
 const SELECTED_ZOOM = 16
 
@@ -743,7 +743,7 @@ export default function AdminMap() {
                 </div>
 
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className={`inline-flex items-center text-[11px] font-medium px-2 py-0.5 rounded-full ${DEPT_STYLES[selected.department] || DEPT_STYLES.PWD}`}>
+                  <span className={`inline-flex items-center text-[11px] font-medium px-2 py-0.5 rounded-full ${deptStyle(selected.department)}`}>
                     {selected.department}
                   </span>
                   <span className={`inline-flex items-center text-[11px] font-medium px-2 py-0.5 rounded-full ${TYPE_BADGE[selected.type] || TYPE_BADGE.Other}`}>

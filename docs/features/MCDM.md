@@ -72,8 +72,10 @@ Supplied under `project.mcdmInputs`:
 | `utilityDisruption` | String[] | Citizen disruption |
 | `disruptionDays` | Number | Citizen disruption |
 
-Two further inputs are read from `projectData.autoDetected`: `populationScore`
-and `economicScore`. Both default to 5 when absent.
+Two criteria take no input at all — `populationImpact` and `economicValue` are
+assigned the neutral constant `mcdmEngine.NEUTRAL_SCORE` (5) for every project,
+because this deployment has no data source for either. See
+[Unmeasured criteria](#unmeasured-criteria).
 
 The engine also reads `projectData.projectType`, `projectData.startDate` and
 `projectData.location.ward`.
@@ -105,8 +107,10 @@ reads the database.
 
 ## Criterion 2 — Population and facility impact (0.21)
 
-Taken directly from `projectData.autoDetected.populationScore`, defaulting to 5.
-The engine performs no calculation of its own.
+**Not measured.** Assigned `NEUTRAL_SCORE` (5) for every project. There is no
+ward population register, facility index or catchment figure anywhere in this
+system, and nothing is collected from the officer, so there is no input to
+compute from. See [Unmeasured criteria](#unmeasured-criteria).
 
 ## Criterion 3 — Seasonal compatibility (0.16)
 
@@ -186,25 +190,26 @@ project's age score changes over time if recalculated.
 
 ## Criterion 7 — Economic value (0.03)
 
-Taken directly from `projectData.autoDetected.economicScore`, defaulting to 5.
-The lightest criterion.
+**Not measured.** Assigned `NEUTRAL_SCORE` (5) for every project. The lightest
+criterion. `estimatedCost` is stored, but cost is what a project consumes, not
+the value it returns; treating one as the other would be an invented mapping.
+See [Unmeasured criteria](#unmeasured-criteria).
 
 ## Worked example
 
 A `road` project, condition `poor`, starting in January (dry season), tender
 `complete` with a contractor assigned, `partial` closure with no utility
-disruption, last worked 12 years ago, in a ward with 14 recent complaints and no
-`autoDetected` data:
+disruption, last worked 12 years ago, in a ward with 14 recent complaints:
 
 | Criterion | Score | Weight | Contribution |
 |---|---|---|---|
 | Condition severity | 7 + 1 = 8 | 0.26 | 2.08 |
-| Population impact | 5 (default) | 0.21 | 1.05 |
+| Population impact | 5 (not measured) | 0.21 | 1.05 |
 | Seasonal compatibility | 10 | 0.16 | 1.60 |
 | Execution readiness | 8 + 2 = 10 | 0.16 | 1.60 |
 | Citizen disruption | 6 | 0.10 | 0.60 |
 | Infrastructure age | ratio 1.2 → 8 | 0.08 | 0.64 |
-| Economic value | 5 (default) | 0.03 | 0.15 |
+| Economic value | 5 (not measured) | 0.03 | 0.15 |
 | **Total** | | | **7.72 → 7.7** |
 
 `outOf100` would be 77.
@@ -219,9 +224,37 @@ The lower-scoring project is rescheduled. A non-finite score is treated as
 The winning project's end date plus its configured buffer becomes the suggested
 new start date — see [GIS.md](GIS.md#buffer-periods).
 
-## Known constraints
+## Unmeasured criteria
 
-`populationImpact` and `economicValue` — 24% of the total weight combined —
-depend on `projectData.autoDetected`, which no route populates. Both therefore
-resolve to their default of 5 for every project created through the API, making
-them constant contributors that do not differentiate projects.
+`populationImpact` (0.21) and `economicValue` (0.03) — 24% of the total weight
+combined — are **not measured**. No ward population register, catchment figure
+or benefit valuation exists in this system; neither value is collected from the
+officer, and no external dataset is consulted. `mcdmEngine` exports both the
+constant and the list:
+
+```js
+const NEUTRAL_SCORE = 5
+const UNMEASURED_CRITERIA = ["populationImpact", "economicValue"]
+```
+
+**What this means for ranking.** Because both contribute the same value to every
+project, they add the same 1.20 to every total. They shift no project relative
+to another, so the ordering — and therefore `reject_lower` on a conflict — is
+decided entirely by the five criteria that are computed. The absolute score is
+inflated by a constant; the ranking is unaffected.
+
+**Why it is not filled in.** Assigning plausible-looking population or economic
+figures would put fabricated data behind a quarter of the weight, and would make
+the score appear to discriminate between projects on grounds that do not exist.
+Re-weighting the remaining five to 1.0 would change every stored score and the
+conflict ordering derived from them, so the weights are left as configured.
+
+**How it is surfaced.** `MCDM_CRITERIA` in the frontend marks both
+`measured: false`; the breakdown panels show the criterion and its weight,
+label it *not measured*, and leave its bar empty rather than drawing the
+constant as though it were a score. `Project.mcdmBreakdown` is documented the
+same way in the OpenAPI spec.
+
+Closing this properly means sourcing a ward-level population or facility dataset
+and a benefit-valuation input, then computing both from stored data — not
+defaulting them.

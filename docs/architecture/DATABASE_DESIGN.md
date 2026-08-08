@@ -53,7 +53,7 @@ reference, so neither can be populated:
 | `fullName` | String | Required |
 | `email` | String | Required, unique, lowercased, trimmed |
 | `password` | String | Required, min 8, `select: false` |
-| `role` | String | Required; `admin`, `officer`, `supervisor`, `citizen` |
+| `role` | String | Required; `admin`, `officer`, `supervisor`. There is no `citizen` account type — every citizen surface is unauthenticated |
 | `department` | String | Not a reference |
 | `phone`, `avatar` | String | |
 | `isActive` | Boolean | Default `true` |

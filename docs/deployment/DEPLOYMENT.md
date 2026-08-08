@@ -210,9 +210,10 @@ the `database` field rather than the status code alone.
 
 | Scope | Limit |
 |---|---|
-| `/api` | 300 requests / 15 minutes |
+| `/api` | 1000 requests / 15 minutes |
 | `/api/auth/login`, `/api/auth/register`, `/api/auth/password` | 20 **failed** attempts / 15 minutes |
 | `/api/notifications/stream` | 30 requests / minute |
+| `POST /api/complaints` | 10 requests / hour |
 
 The credential endpoints skip successful requests, so an ordinary sign-in never
 consumes an attempt and only guessing counts against the budget. `/api/auth/me`
@@ -221,6 +222,10 @@ is deliberately outside that limiter — it runs on every page load.
 The stream route is excluded from the general limiter, because one SSE
 connection is a single long-lived request while a flapping network reconnects
 repeatedly, which would otherwise drain a user's ordinary allowance.
+
+`POST /api/complaints` carries its own hourly budget because it is the only
+write an unauthenticated caller can make. The limiter is matched on method and
+path, so reading, updating or assigning a complaint is unaffected by it.
 
 Both emit standard `RateLimit-*` headers and return 429 with the shared error
 envelope and code `RATE_LIMITED`.

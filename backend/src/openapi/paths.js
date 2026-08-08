@@ -190,9 +190,11 @@ module.exports = {
 
   "/api/config/wards": {
     get: {
-      tags: ["Config"], summary: "List the municipal ward register (auth)",
+      tags: ["Config"], summary: "List the municipal ward register (public)",
+      security: [],
       description:
         "Read-only lookup configuration, served from `config/staticConfig.wards`. There is no ward collection and no way to modify the register through the API — it is redrawn by municipal notification, not by an operator.\n\n" +
+        "**Unauthenticated.** The public complaint form at `POST /api/complaints` selects a ward from this register, and that form needs no session, so neither does this lookup. The payload is a static list of ward names: it carries no user, project or complaint data, and reveals only which wards the municipality operates in.\n\n" +
         "Client ward selectors read this rather than carrying their own copy, so the values offered are always the ones the backend reasons about. `Project.location.ward` drives clash-detection candidate selection, the MCDM condition criterion and every ward analytic; a value outside this register degrades all three, which is why the list is served rather than duplicated.",
       responses: {
         200: {
@@ -328,8 +330,18 @@ module.exports = {
   "/api/projects": {
     get: {
       tags: ["Projects"], summary: "List projects (auth)",
-      description:"Results are role-scoped by the controller: `admin` sees every project, `officer` only those where they are the officer, and `supervisor` only those where they are the supervisor. Any other authenticated role sees none; the scope is fail-closed rather than unfiltered. Soft-deleted projects are excluded. Returns a raw array.",
-      parameters: PAGED,
+      description:"Results are role-scoped by the controller: `admin` sees every project, `officer` only those where they are the officer, and `supervisor` only those where they are the supervisor. Any other authenticated role sees none; the scope is fail-closed rather than unfiltered. Soft-deleted projects are excluded unless `includeDeleted=true` is sent by an administrator. Returns a raw array.",
+      parameters: [
+        ...PAGED,
+        {
+          name: "includeDeleted", in: "query", required: false,
+          schema: { type: "string", enum: ["true"] },
+          description:
+            "Administrator-only. `true` includes soft-deleted projects (`isActive: false`) in the results. " +
+            "Every other read path hides them, so without this an administrator has no way to find a deleted project and `PATCH /{id}/status` could never restore one. " +
+            "The role scope still applies; for a non-admin caller the parameter is ignored rather than refused.",
+        },
+      ],
       responses: { 200: { description: "Projects, newest first.", headers: PAGE_HEADERS, ...json(arrayOf("Project")) }, ...PLAIN_GUARDS },
     },
     post: {

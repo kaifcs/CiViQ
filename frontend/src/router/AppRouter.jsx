@@ -35,6 +35,8 @@ const AdminMap = lazy(() => import('../pages/admin/AdminMap'))
 const CitizenProjects = lazy(() => import('../pages/citizen/CitizenProjects'))
 const CitizenProjectDetail = lazy(() => import('../pages/citizen/CitizenProjectDetail'))
 const CitizenNotFound = lazy(() => import('../pages/citizen/CitizenNotFound'))
+const CitizenComplaintNew = lazy(() => import('../pages/citizen/CitizenComplaintNew'))
+const CitizenComplaintTrack = lazy(() => import('../pages/citizen/CitizenComplaintTrack'))
 
 // Officer
 const OfficerProjects = lazy(() => import('../pages/officer/OfficerProjects'))
@@ -214,6 +216,9 @@ export default function AppRouter() {
         <Route path="/home" element={<CitizenHome />} />
         <Route path="/projects" element={<CitizenProjects />} />
         <Route path="/projects/:id" element={<CitizenProjectDetail />} />
+        
+        <Route path="/complaints/new" element={<CitizenComplaintNew />} />
+        <Route path="/complaints/track" element={<CitizenComplaintTrack />} />
         <Route path="*" element={<CitizenNotFound />} />
       </Routes>
       </Suspense>

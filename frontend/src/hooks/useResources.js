@@ -1,6 +1,4 @@
-// Per-resource data hooks. Each returns adapted view models and takes the
-// department index from AuthContext so adapters can resolve department refs.
-
+// Per-resource data hooks with department context where needed.
 import { useCallback, useMemo } from "react"
 import { useApi } from "./useApi"
 import { useAuth } from "./useAuth"
@@ -8,10 +6,10 @@ import { useNotificationCenter } from "./useNotificationCenter"
 import {
   projectsApi, conflictsApi, complaintsApi, usersApi,
   auditApi, dashboardApi, departmentsApi, publicProjectsApi, configApi,
+  notificationsApi,
 } from "../services"
 
-// The citizen transparency portal. Unauthenticated, so unlike useProjects()
-// this needs no department index — the public payload already carries names.
+// Public project data needs no department index.
 export function usePublicProjects(params) {
   return useApi(
     useCallback(() => publicProjectsApi.list(params), [params]),
@@ -21,7 +19,11 @@ export function usePublicProjects(params) {
 }
 
 export function usePublicProject(id) {
-  return useApi(useCallback(() => publicProjectsApi.get(id), [id]), [id], { skip: !id })
+  return useApi(
+    useCallback(() => publicProjectsApi.get(id), [id]),
+    [id],
+    { skip: !id }
+  )
 }
 
 export function useProjects(params) {
@@ -35,7 +37,11 @@ export function useProjects(params) {
 
 export function useProject(id) {
   const { deptMap } = useAuth()
-  return useApi(useCallback(() => projectsApi.get(id, deptMap), [id, deptMap]), [id, deptMap], { skip: !id })
+  return useApi(
+    useCallback(() => projectsApi.get(id, deptMap), [id, deptMap]),
+    [id, deptMap],
+    { skip: !id }
+  )
 }
 
 export function useConflicts(params) {
@@ -49,7 +55,11 @@ export function useConflicts(params) {
 
 export function useConflict(id) {
   const { deptMap } = useAuth()
-  return useApi(useCallback(() => conflictsApi.get(id, deptMap), [id, deptMap]), [id, deptMap], { skip: !id })
+  return useApi(
+    useCallback(() => conflictsApi.get(id, deptMap), [id, deptMap]),
+    [id, deptMap],
+    { skip: !id }
+  )
 }
 
 export function useComplaints(params) {
@@ -61,31 +71,55 @@ export function useComplaints(params) {
   )
 }
 
+// Server-paged complaints; callers should memoise params.
+export function useComplaintsPaged(params) {
+  const { deptMap } = useAuth()
+  return useApi(
+    useCallback(() => complaintsApi.listPaged(params, deptMap), [params, deptMap]),
+    [params, deptMap],
+    { initialData: { items: [], pagination: null } }
+  )
+}
+
 export function useComplaint(id) {
   const { deptMap } = useAuth()
-  return useApi(useCallback(() => complaintsApi.get(id, deptMap), [id, deptMap]), [id, deptMap], { skip: !id })
+  return useApi(
+    useCallback(() => complaintsApi.get(id, deptMap), [id, deptMap]),
+    [id, deptMap],
+    { skip: !id }
+  )
 }
 
 export function useUsers() {
   const { deptMap } = useAuth()
-  return useApi(useCallback(() => usersApi.list(deptMap), [deptMap]), [deptMap], { initialData: [] })
+  return useApi(
+    useCallback(() => usersApi.list(deptMap), [deptMap]),
+    [deptMap],
+    { initialData: [] }
+  )
 }
 
 export function useUser(id) {
   const { deptMap } = useAuth()
-  return useApi(useCallback(() => usersApi.get(id, deptMap), [id, deptMap]), [id, deptMap], { skip: !id })
+  return useApi(
+    useCallback(() => usersApi.get(id, deptMap), [id, deptMap]),
+    [id, deptMap],
+    { skip: !id }
+  )
 }
 
 export function useAuditLogs(params) {
   const { deptMap } = useAuth()
-  return useApi(useCallback(() => auditApi.list(deptMap, params), [deptMap, params]), [deptMap, params], { initialData: [] })
+  return useApi(
+    useCallback(() => auditApi.list(deptMap, params), [deptMap, params]),
+    [deptMap, params],
+    { initialData: [] }
+  )
 }
 
 // Derive assignable supervisors from accessible projects.
-// Officers cannot call the admin-only /api/users endpoint.
 export function useAssignableSupervisors() {
   const { data: projects, loading, error, reload } = useProjects()
-
   const supervisors = useMemo(() => {
     const byId = new Map()
     for (const project of projects || []) {
@@ -97,7 +131,6 @@ export function useAssignableSupervisors() {
     }
     return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name))
   }, [projects])
-
   return { supervisors, loading, error, reload }
 }
 
@@ -114,24 +147,45 @@ export function useDepartmentOptions() {
   )
 }
 
-// Reuse the shared notification state to avoid duplicate requests.
+// Reuse shared notification state.
 export function useNotifications() {
   const { data, loading, error, reload } = useNotificationCenter()
   return { data, loading, error, reload }
 }
 
-// The municipal ward register, served from the backend's lookup configuration
-// so no selector hardcodes a vocabulary the backend reasons about.
+// Archived notifications are fetched separately from the default feed.
+export function useArchivedNotifications() {
+  const { lifecycleVersion } = useNotificationCenter()
+  return useApi(
+    useCallback(() => notificationsApi.list({ archived: "true" }), []),
+    [lifecycleVersion],
+    { initialData: [] }
+  )
+}
+
+// Ward register from backend configuration.
 export function useWards() {
-  return useApi(useCallback(() => configApi.wards(), []), [], { initialData: [] })
+  return useApi(
+    useCallback(() => configApi.wards(), []),
+    [],
+    { initialData: [] }
+  )
 }
 
 export function useDepartments() {
-  return useApi(useCallback(() => departmentsApi.list(), []), [], { initialData: [] })
+  return useApi(
+    useCallback(() => departmentsApi.list(), []),
+    [],
+    { initialData: [] }
+  )
 }
 
 export function useDepartment(id) {
-  return useApi(useCallback(() => departmentsApi.get(id), [id]), [id], { skip: !id })
+  return useApi(
+    useCallback(() => departmentsApi.get(id), [id]),
+    [id],
+    { skip: !id }
+  )
 }
 
 export function useDashboardSummary(params) {
@@ -142,19 +196,31 @@ export function useDashboardSummary(params) {
 }
 
 export function useDashboardProjects(params) {
-  return useApi(useCallback(() => dashboardApi.projects(params), [params]), [params])
+  return useApi(
+    useCallback(() => dashboardApi.projects(params), [params]),
+    [params]
+  )
 }
 
 export function useDashboardConflicts(params) {
-  return useApi(useCallback(() => dashboardApi.conflicts(params), [params]), [params])
+  return useApi(
+    useCallback(() => dashboardApi.conflicts(params), [params]),
+    [params]
+  )
 }
 
 export function useDashboardComplaints(params) {
-  return useApi(useCallback(() => dashboardApi.complaints(params), [params]), [params])
+  return useApi(
+    useCallback(() => dashboardApi.complaints(params), [params]),
+    [params]
+  )
 }
 
 export function useDashboardDepartments(params) {
-  return useApi(useCallback(() => dashboardApi.departments(params), [params]), [params])
+  return useApi(
+    useCallback(() => dashboardApi.departments(params), [params]),
+    [params]
+  )
 }
 
 export function useDashboardActivity(params) {
@@ -164,7 +230,7 @@ export function useDashboardActivity(params) {
   )
 }
 
-// Loads several resources in parallel behind a single loading/error pair.
+// Load multiple resources in parallel.
 export function useCombined(loaders) {
   const keys = Object.keys(loaders)
   const key = keys.join(",")

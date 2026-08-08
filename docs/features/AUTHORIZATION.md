@@ -39,14 +39,19 @@ instead of treating a routine timeout as a credential failure.
 
 ## Roles
 
-Four roles, defined by the `User.role` enum.
+Three roles, defined by the `User.role` enum.
 
 | Role | Scope |
 |---|---|
 | `admin` | Unrestricted across the municipality |
 | `officer` | Projects they own; complaints; conflicts touching their projects |
 | `supervisor` | Projects they supervise |
-| `citizen` | No staff endpoint |
+
+There is **no `citizen` role**. Every citizen-facing surface — the transparency
+portal, the ward lookup, complaint intake and complaint tracking — is
+unauthenticated, so a resident never holds an account. An administrator may
+assign any of the three roles above through `PUT /api/users/:id`, subject to the
+lockout guards below.
 
 There is no self-registration. `POST /api/auth/register` requires an
 administrator session, and accepts only `officer` and `supervisor`
@@ -64,6 +69,50 @@ Because every account-creating path requires an existing administrator, the
 first administrator is provisioned outside the API — `npm run seed` in
 development, or a direct database insert in production. There is deliberately no
 unauthenticated bootstrap route.
+
+### Administrative lockout guards
+
+A role change and a deactivation both run through `usersController`, which
+refuses any write that would leave the deployment with no way back in. There is
+no self-service recovery path, so these are checked **before** the write — a
+rejected request leaves the database untouched and writes no audit entry.
+
+| Guard | Rule |
+|---|---|
+| Self-demotion | An administrator cannot change their own role away from `admin` |
+| Last administrator | No change may leave zero active administrators, whether by role change or deactivation |
+
+The last-administrator check asks whether *any other* active administrator would
+survive the operation, not whether one exists now, and stops at the first match
+rather than counting the whole set. An account that is not currently an active
+administrator can never trigger it.
+
+The admin **Users → user → Change role** control surfaces these refusals
+verbatim rather than re-deriving them, so the backend stays the only authority
+on whether a role change is permitted. A successful change is recorded as
+`user_updated` with the role transition in `details`, and notifies the affected
+account.
+
+### Routes that require no session
+
+Every other route is behind `protect`. These are public deliberately, and are
+the whole of the unauthenticated surface:
+
+| Route | Why |
+|---|---|
+| `GET /api/health` | Liveness probe; exposes no host, URI or credential |
+| `GET /api/docs`, `GET /api/docs.json` | The specification itself |
+| `POST /api/auth/login` | Obtaining a session |
+| `GET /api/projects/public`, `GET /api/projects/public/:id` | The transparency portal; whitelisted projection |
+| `GET /api/config/wards` | Static lookup the public complaint form selects from |
+| `GET /api/complaints`, `GET /api/complaints/:id`, `GET /api/complaints/stats` | Citizen visibility; redacted without a session |
+| `POST /api/complaints` | Citizen intake; reporter fields only, 10/hour |
+
+`GET /api/config/wards` returns a static list of ward names from configuration.
+It carries no user, project or complaint data and reveals only which wards the
+municipality operates in. It is public because the complaint form needs the
+register the backend reasons about — a free-text ward would produce records that
+never match ward-scoped clash detection, MCDM scoring or analytics.
 
 `authorize(...roles)` is coarse-grained by design: it answers whether a role may
 use an endpoint at all, never whether a user may touch a specific record.
@@ -86,8 +135,11 @@ Returns a Mongo filter fragment callers compose into their own query.
 | `supervisor` | `{ supervisor: user._id }` |
 | anything else | `DENY_ALL_PROJECTS` — matches nothing |
 
-The last row is fail-closed, and deliberately so: a `citizen` (or any role added
-later) sees no projects at all rather than an unfiltered list. `DENY_ALL_PROJECTS`
+The last row is fail-closed, and deliberately so: any role added later sees no
+projects at all rather than an unfiltered list. The `User.role` enum holds only
+the three roles above — there is no `citizen` account type, because the citizen
+surfaces are unauthenticated — so today that row is reached only by a token
+carrying a role the schema no longer defines. `DENY_ALL_PROJECTS`
 is `{ $nor: [{}] }` — expressed that way so it cannot be cancelled out by a
 later `_id` spread the way a `{ _id: null }` sentinel could.
 
@@ -119,6 +171,7 @@ not exist, so an id cannot be probed for existence.
 | `GET /api/docs`, `/api/docs.json` | — | — | — |
 | `POST /api/auth/register` | yes | admin | — |
 | `POST /api/auth/login` | — | — | — |
+| `GET /api/config/wards` | — | — | static lookup |
 | `POST /api/auth/logout` | yes | any | — |
 | `GET /api/auth/me` | yes | any | — |
 | `PUT /api/auth/profile` | yes | any | scoped to caller |

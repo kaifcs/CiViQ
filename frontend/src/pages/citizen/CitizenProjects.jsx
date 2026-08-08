@@ -8,7 +8,7 @@ import CitizenNav from "./CitizenNav"
 import { usePublicProjects } from "../../hooks/useResources"
 import AsyncState, { EmptyState } from "../../components/AsyncState"
 import { formatDate } from "../../components/dashboard"
-import { DEPT_STYLES, PROJECT_STATUS_CONFIG, TYPE_STYLES } from "../../components/uiStyles"
+import { deptStyle, PROJECT_STATUS_CONFIG, TYPE_STYLES } from "../../components/uiStyles"
 
 const SearchIcon = () => (
   <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round">
@@ -59,7 +59,7 @@ function ProjectCard({ project, onClick }) {
       </div>
 
       <div className="flex items-center gap-2 flex-shrink-0">
-        <Badge label={project.department || "—"} className={DEPT_STYLES[project.department] || DEPT_STYLES.Other} />
+        <Badge label={project.department || "—"} className={deptStyle(project.department)} />
         <Badge label={project.type} className={TYPE_STYLES[project.type] || TYPE_STYLES.Other} />
       </div>
 

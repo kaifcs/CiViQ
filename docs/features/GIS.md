@@ -246,10 +246,34 @@ backend clash engine, so the map and the conflict list agree about separation.
 | `UtilityLayer` | Utility assets |
 | `ConflictLayer` | Lines between clashing projects |
 | `GeoJSONLayer` | Arbitrary GeoJSON geometry |
+| `LocationMap` | One record's location, for the detail screens |
 | `HeatmapLayer` | Density surface |
 | `HeatmapLegend` | Heatmap scale |
 
 Each has a matching `*Popup` component, plus the shared `PopupCard`.
+
+## Authoring
+
+Two components write geometry; nothing else in the application does.
+
+| Component | Writes |
+|---|---|
+| `PointPicker` | One coordinate, by click or marker drag. Backs `Complaint.location.coords` on the public form and `Project.location.centerCoords` in the wizard. |
+| `GeometryEditor` | `Project.location.geoJSON` — a `LineString` or `Polygon` built from clicked vertices. |
+
+Both validate through the same helpers a value from the API passes through:
+`normalizeCoordinate` rejects an out-of-range click, and `geometryModes.buildGeometry`
+delegates to the `geojson.js` constructors, which own `[lng, lat]` ordering,
+ring closure and the minimum vertex counts. `buildGeometry` returns `null`
+until the shape is valid, and the wizard omits `geoJSON` from the payload
+entirely when it is null — so a half-drawn outline is never sent, and a project
+without a shape stores no geometry rather than an empty object the
+`UtilityLayer` would then have to guard against.
+
+Geometry persists through the ordinary `POST`/`PUT /api/projects` routes:
+`location` is whitelisted as a whole, so no endpoint was added. Editing a
+project re-parses the stored geometry back into vertices, so an edit continues
+from the saved shape instead of silently replacing it.
 
 `MarkerLayer` is generic: callers supply how to locate, style, draw and describe
 a record, so one implementation serves every point layer. Three rendering

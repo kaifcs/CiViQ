@@ -4,8 +4,10 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useProjects, useDepartmentOptions } from '../../hooks/useResources'
+import { useAuth } from '../../hooks/useAuth'
 import AsyncState from '../../components/AsyncState'
-import { DEPT_STYLES, PROJECT_STATUS_CONFIG, TYPE_STYLES } from '../../components/uiStyles'
+import { projectsApi, normaliseError } from '../../services'
+import { deptStyle, PROJECT_STATUS_CONFIG, PROJECT_STATUS_OPTIONS, TYPE_STYLES } from '../../components/uiStyles'
 import { formatDate } from '../../components/dashboard'
 
 function isThisMonth(dateStr) {
@@ -77,11 +79,18 @@ function FilterSelect({ label, value, onChange, options }) {
   )
 }
 
-function ProjectCard({ project, onClick }) {
+function ProjectCard({ project, onClick, onRestore, restoring }) {
+  // A deleted project has no detail route — every read path hides it — so the
+  // card stops being a link and offers the one action that still applies.
+  const deleted = project.isActive === false
   return (
     <div
-      onClick={onClick}
-      className="flex items-center gap-5 px-5 py-4 bg-[#FFFFFF] dark:bg-[#1C1C1F] border border-[#E5E5E5] dark:border-[#27272A] rounded-[8px] cursor-pointer transition-all hover:border-[#5E6AD2]/40 dark:hover:border-[#5E6AD2]/40 hover:bg-[#FAFAFA] dark:hover:bg-[#252529]"
+      onClick={deleted ? undefined : onClick}
+      className={`flex items-center gap-5 px-5 py-4 border rounded-[8px] transition-all ${
+        deleted
+          ? 'bg-[#F8FAFC] dark:bg-[#18181B] border-dashed border-[#CBD5E1] dark:border-[#3F3F46] opacity-90'
+          : 'bg-[#FFFFFF] dark:bg-[#1C1C1F] border-[#E5E5E5] dark:border-[#27272A] cursor-pointer hover:border-[#5E6AD2]/40 dark:hover:border-[#5E6AD2]/40 hover:bg-[#FAFAFA] dark:hover:bg-[#252529]'
+      }`}
       style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}
     >
       <div className="flex-1 min-w-0">
@@ -115,7 +124,7 @@ function ProjectCard({ project, onClick }) {
       </div>
 
       <div className="flex items-center gap-2 flex-shrink-0">
-        <Badge label={project.department} className={DEPT_STYLES[project.department] || DEPT_STYLES.PWD} />
+        <Badge label={project.department} className={deptStyle(project.department)} />
         <Badge label={project.type}       className={TYPE_STYLES[project.type] || TYPE_STYLES.Other} />
       </div>
 
@@ -139,9 +148,20 @@ function ProjectCard({ project, onClick }) {
           <span className="text-[13px] font-medium text-[#0F172A] dark:text-[#F8FAFC]">{project.ward}</span>
         </div>
         <MCDMScore score={project.mcdmScore} />
-        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" className="text-[#D1D5DB] dark:text-[#374151]" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <polyline points="9 18 15 12 9 6"/>
-        </svg>
+        {deleted ? (
+          <button
+            type="button"
+            onClick={e => { e.stopPropagation(); onRestore(project) }}
+            disabled={restoring}
+            className="h-8 px-3 text-[12px] font-medium text-[#5E6AD2] border border-[#E2E8F0] dark:border-[#27272A] rounded-[6px] hover:bg-[#EEF2FF] dark:hover:bg-[#131629] disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+          >
+            {restoring ? 'Restoring...' : 'Restore'}
+          </button>
+        ) : (
+          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" className="text-[#D1D5DB] dark:text-[#374151]" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="9 18 15 12 9 6"/>
+          </svg>
+        )}
       </div>
 
     </div>
@@ -150,8 +170,20 @@ function ProjectCard({ project, onClick }) {
 
 export default function AdminProjects() {
   const navigate = useNavigate()
-  const { data: projects, loading, error, reload } = useProjects()
+  const { deptMap } = useAuth()
+
+  // Soft-deleted projects are excluded from every read path, so seeing them is
+  // an explicit administrator opt-in rather than a client-side filter.
+  const [showDeleted, setShowDeleted] = useState(false)
+  const listParams = useMemo(
+    () => (showDeleted ? { includeDeleted: 'true' } : undefined),
+    [showDeleted]
+  )
+  const { data: projects, loading, error, reload } = useProjects(listParams)
   const departmentOptions = useDepartmentOptions()
+
+  const [restoringId, setRestoringId] = useState(null)
+  const [restoreError, setRestoreError] = useState('')
 
   const [search,       setSearch]       = useState('')
   const [filterDept,   setFilterDept]   = useState('')
@@ -182,6 +214,23 @@ export default function AdminProjects() {
     setFilterType('')
     setFilterStatus('')
     setFilterTime('')
+  }
+
+  // PATCH /api/projects/:id/status — the same route soft-delete uses, with the
+  // flag inverted. The list is re-read afterwards so the row leaves the deleted
+  // view rather than lingering with a stale flag.
+  async function handleRestore(project) {
+    if (restoringId) return
+    setRestoreError('')
+    setRestoringId(project.id)
+    try {
+      await projectsApi.setStatus(project.id, true, deptMap)
+      reload()
+    } catch (err) {
+      setRestoreError(normaliseError(err).message)
+    } finally {
+      setRestoringId(null)
+    }
   }
 
   return (
@@ -225,12 +274,7 @@ export default function AdminProjects() {
             label="Status"
             value={filterStatus}
             onChange={setFilterStatus}
-            options={[
-              { value: 'pending',  label: 'Pending' },
-              { value: 'approved', label: 'Approved' },
-              { value: 'active',   label: 'Active' },
-              { value: 'rejected', label: 'Rejected' },
-            ]}
+            options={PROJECT_STATUS_OPTIONS}
           />
           <FilterSelect
             label="Timeline"
@@ -244,6 +288,15 @@ export default function AdminProjects() {
           />
 
           <div className="flex items-center gap-3 ml-auto">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={showDeleted}
+                onChange={e => setShowDeleted(e.target.checked)}
+                className="w-3.5 h-3.5 accent-[#5E6AD2] cursor-pointer"
+              />
+              <span className="text-[13px] text-[#6B7280] dark:text-[#9CA3AF]">Include deleted</span>
+            </label>
             <span className="text-[13px] text-[#6B7280] dark:text-[#9CA3AF]">
               {filtered.length} {filtered.length === 1 ? 'project' : 'projects'}
             </span>
@@ -254,6 +307,10 @@ export default function AdminProjects() {
             )}
           </div>
         </div>
+
+        {restoreError && (
+          <p role="alert" className="text-[12px] text-[#DC2626] dark:text-[#F87171]">{restoreError}</p>
+        )}
       </div>
 
       <div className="flex flex-col gap-2 flex-1 overflow-y-auto">
@@ -274,6 +331,8 @@ export default function AdminProjects() {
               key={project.id}
               project={project}
               onClick={() => navigate(`/admin/projects/${project.id}`)}
+              onRestore={handleRestore}
+              restoring={restoringId === project.id}
             />
           ))
         )}

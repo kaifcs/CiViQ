@@ -7,11 +7,22 @@ import { useAssignableSupervisors, useDepartments, useProject, useWards } from '
 import AsyncState from '../../components/AsyncState'
 import { projectsApi, buildProjectPayload, normaliseError } from '../../services'
 // Configuration only.
-import { DEFAULT_CENTER } from '../../gis/config'
-import { isValidLatitude, isValidLongitude } from '../../gis/coordinates'
+import { DEFAULT_CENTER, DEFAULT_ZOOM } from '../../gis/config'
+import { isValidLatitude, isValidLongitude, normalizeCoordinate } from '../../gis/coordinates'
+import { coordinatesOf, geometryTypeOf, parseGeoJSON } from '../../gis/geojson'
+import { MapContainer, PointPicker, GeometryEditor, GEOMETRY_MODES, buildGeometry } from '../../gis'
 import { inputCls, labelCls } from '../../components/uiStyles'
 
+const mapBtnCls =
+  'h-8 px-2.5 text-[12px] font-medium rounded-[6px] border border-[#E2E8F0] dark:border-[#27272A] ' +
+  'text-[#0F172A] dark:text-[#F8FAFC] hover:bg-[#F8FAFC] dark:hover:bg-[#18181B] ' +
+  'disabled:opacity-40 disabled:cursor-not-allowed transition-colors'
+
 const STEPS = ['Phase', 'Identity', 'Location', 'Timeline', 'Budget', 'MCDM', 'Team']
+
+// Upper bound for the last major-work year, based on the current year.
+// Backend validation remains authoritative.
+const CURRENT_YEAR = new Date().getFullYear()
 
 function StepBar({ current }) {
   return (
@@ -124,6 +135,11 @@ export default function OfficerProjectNew() {
   // submitted empty, but the officer must be able to correct it.
   const [lat,      setLat]      = useState(String(DEFAULT_CENTER.lat))
   const [lng,      setLng]      = useState(String(DEFAULT_CENTER.lng))
+  // Project.location.geoJSON stores the actual work geometry.
+// Optional: projects without a drawn shape store no geometry.
+  const [geometryMode,     setGeometryMode]     = useState('LineString')
+  const [geometryVertices, setGeometryVertices] = useState([])
+  const [drawing,          setDrawing]          = useState(false)
   const [startDate,setStartDate]= useState('')
   const [endDate,  setEndDate]  = useState('')
   const [cost,     setCost]     = useState('')
@@ -152,11 +168,23 @@ export default function OfficerProjectNew() {
     setType(existing.type || 'Road')
     setDesc(existing.description || '')
     setAddress(existing.address || '')
-    // Kept even when it is outside the select's option list, so an edit never
-    // silently relocates a project that was filed under another ward.
+    // Preserve the stored ward and location during edits.
+    // Restore saved geometry so editing continues from the existing shape.
     if (existing.ward) setWard(existing.ward)
     if (Number.isFinite(existing.centerLat)) setLat(String(existing.centerLat))
     if (Number.isFinite(existing.centerLng)) setLng(String(existing.centerLng))
+
+    // Restore saved geometry into editable vertices.
+    const stored = parseGeoJSON(existing._raw?.location?.geoJSON)
+    if (stored) {
+      const type = geometryTypeOf(stored)
+      if (type === 'LineString' || type === 'Polygon') {
+        setGeometryMode(type)
+        // Polygon rings repeat the first point; the editor stores distinct vertices.
+        const ring = coordinatesOf(stored)
+        setGeometryVertices(type === 'Polygon' ? ring.slice(0, -1) : ring)
+      }
+    }
     setStartDate(toDateInput(existing.startDate))
     setEndDate(toDateInput(existing.endDate))
     setCost(existing.estimatedCost == null ? '' : String(existing.estimatedCost))
@@ -195,6 +223,13 @@ export default function OfficerProjectNew() {
   const [clashCount, setClashCount] = useState(0)
   const [saving, setSaving] = useState(false)
 
+  // Use valid typed coordinates for the map; otherwise fall back to the default center.
+  const pickedCoord = normalizeCoordinate({ lat: Number(lat), lng: Number(lng) })
+  const mapCenter = pickedCoord || DEFAULT_CENTER
+
+  // Only send geometry when it forms a valid shape.
+  const geometry = buildGeometry(geometryMode, geometryVertices)
+
   // Submits project create and edit requests; validation and workflow rules are enforced by the API.
   async function handleSubmit() {
     setSubmitError('')
@@ -215,7 +250,7 @@ export default function OfficerProjectNew() {
       title, type, description: desc, departmentId, phase,
       startDate, endDate, estimatedCost: cost, budgetSource: budgetSrc,
       tenderNumber: tender, contractorName: contractor, contractorFirm: firm,
-      supervisorId, ward, address, lat, lng,
+      supervisorId, ward, address, lat, lng, geoJSON: geometry,
       conditionRating: condition, incidents, lastWorkYear, tenderStatus,
       contractorAssigned, roadClosure, utilities, disruptionDays,
     })
@@ -420,11 +455,67 @@ export default function OfficerProjectNew() {
                     </div>
                   )}
                 </div>
-                <div className="rounded-[8px] bg-[#F8FAFC] dark:bg-[#18181B] border border-[#E5E5E5] dark:border-[#27272A] flex flex-col items-center justify-center gap-2" style={{ minHeight: '280px' }}>
-                  <svg width="28" height="28" fill="none" viewBox="0 0 24 24" className="text-[#D1D5DB] dark:text-[#374151]" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/>
-                  </svg>
-                  <p className="text-[12px] text-[#9CA3AF] dark:text-[#6B7280]">Interactive map — Phase 3</p>
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[12px] font-semibold text-[#0F172A] dark:text-[#F8FAFC]">Map</span>
+                    <div className="flex items-center gap-1.5 ml-auto">
+                      {drawing ? (
+                        <>
+                          <select
+                            value={geometryMode}
+                            onChange={e => { setGeometryMode(e.target.value); setGeometryVertices([]) }}
+                            className="h-8 px-2 text-[12px] rounded-[6px] border border-[#E2E8F0] dark:border-[#27272A] bg-white dark:bg-[#18181B] text-[#0F172A] dark:text-[#F8FAFC] cursor-pointer"
+                          >
+                            {Object.entries(GEOMETRY_MODES).map(([value, { label }]) => (
+                              <option key={value} value={value}>{label}</option>
+                            ))}
+                          </select>
+                          <button type="button" onClick={() => setGeometryVertices(v => v.slice(0, -1))}
+                            disabled={geometryVertices.length === 0} className={mapBtnCls}>
+                            Undo
+                          </button>
+                          <button type="button" onClick={() => setGeometryVertices([])}
+                            disabled={geometryVertices.length === 0} className={mapBtnCls}>
+                            Clear
+                          </button>
+                          <button type="button" onClick={() => setDrawing(false)} className={mapBtnCls}>
+                            Done
+                          </button>
+                        </>
+                      ) : (
+                        <button type="button" onClick={() => setDrawing(true)} className={mapBtnCls}>
+                          {geometryVertices.length > 0 ? 'Edit shape' : 'Draw shape'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="rounded-[8px] overflow-hidden border border-[#E5E5E5] dark:border-[#27272A]" style={{ height: '280px' }}>
+                    <MapContainer center={mapCenter} zoom={DEFAULT_ZOOM}>
+                      {/* One writer at a time: clicking places the centre pin,
+                          or adds a vertex, never both. */}
+                      {drawing ? (
+                        <GeometryEditor
+                          mode={geometryMode}
+                          vertices={geometryVertices}
+                          onVerticesChange={setGeometryVertices}
+                        />
+                      ) : (
+                        <PointPicker
+                          value={pickedCoord}
+                          onChange={c => { setLat(String(c.lat)); setLng(String(c.lng)) }}
+                        />
+                      )}
+                    </MapContainer>
+                  </div>
+
+                  <p className="text-[12px] text-[#6B7280] dark:text-[#9CA3AF]">
+                    {drawing
+                      ? geometry
+                        ? `${geometryVertices.length} points — shape is valid and will be saved.`
+                        : `Click the map to add points. At least ${GEOMETRY_MODES[geometryMode].minVertices} are needed.`
+                      : 'Click the map to move the centre pin. Draw a shape to record the real extent of the work.'}
+                  </p>
                 </div>
               </div>
             </div>
@@ -519,7 +610,7 @@ export default function OfficerProjectNew() {
               />
               <div>
                 <label className={labelCls}>Q3. When was the last major work done?</label>
-                <input type="number" className={inputCls} value={lastWorkYear} onChange={e => setLastWorkYear(e.target.value)} placeholder="e.g. 2011" min="1950" max="2025" />
+                <input type="number" className={inputCls} value={lastWorkYear} onChange={e => setLastWorkYear(e.target.value)} placeholder="e.g. 2011" min="1950" max={CURRENT_YEAR} />
                 <p className={hintCls}>Enter the year. If never repaired, enter construction year.</p>
               </div>
               <RadioGroup label="Q4. What is the current tender status?" name="tenderStatus" value={tenderStatus} onChange={setTenderStatus}

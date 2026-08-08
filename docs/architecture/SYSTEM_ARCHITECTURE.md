@@ -41,11 +41,13 @@ Middleware order in `src/app.js` is load-bearing.
 | 4 | `compression` | Response compression |
 | 5 | `express.json`, `express.urlencoded` | Body parsing |
 | 6 | `morgan` | HTTP access logs, written through the structured logger |
-| 7 | `rateLimit` on `/api` | 300 requests / 15 min; skips `/notifications/stream` |
+| 7 | `rateLimit` on `/api` | 1000 requests / 15 min; skips `/notifications/stream` |
 | 8 | `rateLimit` on `/api/notifications/stream` | 30 requests / min |
-| 9 | Routers | `/api/health`, `/api` (docs), and nine resource routers |
-| 10 | `notFound` | JSON 404 for unmatched routes |
-| 11 | `errorHandler` | Terminal error envelope |
+| 9 | `rateLimit` on the credential routes | 20 **failed** attempts / 15 min |
+| 10 | `rateLimit` on `POST /api/complaints` | 10 requests / hour; matched on method and path |
+| 11 | Routers | `/api/health`, `/api` (docs), and ten resource routers |
+| 12 | `notFound` | JSON 404 for unmatched routes |
+| 13 | `errorHandler` | Terminal error envelope |
 
 Correlation runs first so every later log line — including Morgan's — carries the
 request id. The 404 and error handlers are registered last, in that order.

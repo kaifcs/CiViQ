@@ -5,8 +5,9 @@
 import { useNavigate, useParams } from 'react-router-dom'
 import { useConflict, useProjects } from '../../hooks/useResources'
 import AsyncState from '../../components/AsyncState'
-import { CONFLICT_STATUS_CONFIG, DEPT_STYLES, SEVERITY_CONFIG, TYPE_STYLES, scoreColor } from '../../components/uiStyles'
-import { formatDate, formatDateLong, daysSince, MCDM_CRITERIA, criterionWidth } from '../../components/dashboard'
+import { CONFLICT_STATUS_CONFIG, deptStyle, SEVERITY_CONFIG, TYPE_STYLES, scoreColor } from '../../components/uiStyles'
+import { formatDate, formatDateLong, daysSince, MCDM_CRITERIA, criterionWidth, UNMEASURED_CRITERION_NOTE } from '../../components/dashboard'
+import { LocationMap } from '../../gis'
 
 
 
@@ -31,7 +32,7 @@ function ProjectPanel({ project, score, breakdown, isHigher }) {
       <div>
         <h3 className="text-[15px] font-semibold text-[#0F172A] dark:text-[#F8FAFC] leading-snug mb-2">{project.title}</h3>
         <div className="flex items-center gap-2 flex-wrap">
-          <span className={`inline-flex items-center text-[12px] font-medium px-2.5 py-1 rounded-full ${DEPT_STYLES[project.department] || ''}`}>{project.department}</span>
+          <span className={`inline-flex items-center text-[12px] font-medium px-2.5 py-1 rounded-full ${deptStyle(project.department)}`}>{project.department}</span>
           <span className={`inline-flex items-center text-[12px] font-medium px-2.5 py-1 rounded-full ${TYPE_STYLES[project.type] || ''}`}>{project.type}</span>
         </div>
       </div>
@@ -46,9 +47,11 @@ function ProjectPanel({ project, score, breakdown, isHigher }) {
         <div className="flex flex-col gap-2.5">
           {MCDM_CRITERIA.map(c => (
             <div key={c.label}>
-              <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center justify-between mb-1" title={c.measured === false ? UNMEASURED_CRITERION_NOTE : undefined}>
                 <span className="text-[11px] text-[#6B7280] dark:text-[#9CA3AF]">{c.label}</span>
-                <span className="text-[10px] font-semibold text-[#9CA3AF]">{c.weight}%</span>
+                <span className="text-[10px] font-semibold text-[#9CA3AF]">
+                  {c.measured === false ? `${c.weight}% · n/m` : `${c.weight}%`}
+                </span>
               </div>
               <div className="h-[4px] bg-[#F3F4F6] dark:bg-[#27272A] rounded-full overflow-hidden">
                 <div className="h-full rounded-full" style={{ width: criterionWidth(breakdown, c.key), backgroundColor: isHigher ? '#5E6AD2' : '#9CA3AF', transition: 'width 0.4s ease' }} />
@@ -143,10 +146,16 @@ export default function OfficerConflictDetail() {
 
       <Card className="p-5">
         <SL>Overlap location</SL>
-        <div className="rounded-[8px] flex flex-col items-center justify-center bg-[#F8FAFC] dark:bg-[#18181B] border border-[#E5E5E5] dark:border-[#27272A]" style={{ height: '160px' }}>
-          <svg width="24" height="24" fill="none" viewBox="0 0 24 24" className="text-[#D1D5DB] dark:text-[#374151] mb-2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-          <p className="text-[13px] text-[#9CA3AF] dark:text-[#6B7280]">{conflict.overlapDescription}</p>
-          <p className="text-[11px] text-[#D1D5DB] dark:text-[#374151] mt-2">Interactive map in Phase 3</p>
+        <div className="flex flex-col gap-2">
+          <LocationMap
+            height="160px"
+            points={[
+              { coord: conflict.projectACoords, color: '#5E6AD2', label: conflict.projectATitle },
+              { coord: conflict.projectBCoords, color: '#9CA3AF', label: conflict.projectBTitle },
+            ]}
+            emptyMessage="Neither project records coordinates, so the overlap cannot be mapped."
+          />
+          <p className="text-[12px] text-[#6B7280] dark:text-[#9CA3AF]">{conflict.overlapDescription}</p>
         </div>
       </Card>
 
