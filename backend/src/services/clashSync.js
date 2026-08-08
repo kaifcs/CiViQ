@@ -1,14 +1,41 @@
-// Keeps Conflict documents and each project's derived clash state synchronized.
+// Keeps Conflict documents and project clash state synchronized.
 const Project = require("../models/Project")
 const Conflict = require("../models/Conflict")
 const { detectClashes } = require("./clashDetection")
 
+// Atomic get-or-create; the unique pairKey index prevents concurrent duplicates.
+async function findOrCreateConflict(projectId, clash) {
+  const pairKey = Conflict.pairKeyFor(projectId, clash.projectId)
+
+  const existing = await Conflict.findOne({ pairKey })
+  if (existing) return { conflict: existing, created: false }
+
+  try {
+    const conflict = await Conflict.create({
+      project1: projectId,
+      project2: clash.projectId,
+      clashTypes: clash.clashTypes,
+      severity: clash.severity,
+    })
+    return { conflict, created: true }
+  } catch (err) {
+    if (err?.code !== 11000) throw err
+
+    // Another request won the race; reuse its conflict.
+    return {
+      conflict: await Conflict.findOne({ pairKey }),
+      created: false,
+    }
+  }
+}
+
 // Recomputes hasClash and clashes[] for affected projects.
 async function syncClashState(projectIds = []) {
-  // Preserve the caller's original ObjectId values for MongoDB filters.
   const wanted = new Map()
 
-  for (const id of projectIds) if (id) wanted.set(String(id), id)
+  for (const id of projectIds) {
+    if (id) wanted.set(String(id), id)
+  }
 
   if (wanted.size === 0) return new Map()
 
@@ -23,7 +50,6 @@ async function syncClashState(projectIds = []) {
   const byProject = new Map([...wanted.keys()].map((id) => [id, []]))
 
   for (const conflict of conflicts) {
-    // Update both projects participating in the conflict.
     for (const side of [conflict.project1, conflict.project2]) {
       byProject.get(String(side))?.push(conflict._id)
     }
@@ -49,28 +75,17 @@ async function reconcileProjectClashes(project, { pruneStale = true } = {}) {
   const created = []
 
   for (const clash of clashes) {
-    let conflict = await Conflict.findOne({
-      $or: [
-        { project1: project._id, project2: clash.projectId },
-        { project1: clash.projectId, project2: project._id },
-      ],
-    })
+    const { conflict, created: isNew } = await findOrCreateConflict(
+      project._id,
+      clash
+    )
 
-    if (!conflict) {
-      conflict = await Conflict.create({
-        project1: project._id,
-        project2: clash.projectId,
-        clashTypes: clash.clashTypes,
-        severity: clash.severity,
-      })
-
-      created.push(clash)
-    }
+    if (isNew) created.push(clash)
 
     currentIds.push(conflict._id)
   }
 
-  // Officer reschedules preserve unrelated pending conflicts.
+  // Keep unrelated pending conflicts when rescheduling.
   const stale = pruneStale
     ? await Conflict.find({
         status: "pending",
@@ -89,8 +104,8 @@ async function reconcileProjectClashes(project, { pruneStale = true } = {}) {
       status: "pending",
     })
 
-    for (const c of stale) {
-      affected.push(c.project1, c.project2)
+    for (const conflict of stale) {
+      affected.push(conflict.project1, conflict.project2)
     }
   }
 
@@ -102,4 +117,8 @@ async function reconcileProjectClashes(project, { pruneStale = true } = {}) {
   return { created, clashes }
 }
 
-module.exports = { syncClashState, reconcileProjectClashes }
+module.exports = {
+  syncClashState,
+  reconcileProjectClashes,
+  findOrCreateConflict,
+}

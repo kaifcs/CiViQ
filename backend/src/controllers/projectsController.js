@@ -1,10 +1,9 @@
 const mongoose = require("mongoose")
 const Project = require("../models/Project")
-const Conflict = require("../models/Conflict")
 const { recordAudit } = require("../services/auditService")
 const { calculateMCDM } = require("../services/mcdmEngine")
 const { detectClashes } = require("../services/clashDetection")
-const { syncClashState, reconcileProjectClashes } = require("../services/clashSync")
+const { syncClashState, reconcileProjectClashes, findOrCreateConflict } = require("../services/clashSync")
 const {
   buildClashDetectedPayload, createNotifications, notifyProjectApproved,
   notifyProjectRejected, notifyProjectAssigned, notifyProjectCompleted,
@@ -212,20 +211,9 @@ exports.createProject = async (req, res) => {
 
       const notificationPayloads = []
       for (const clash of clashes) {
-        let conflict = await Conflict.findOne({
-          $or: [
-            { project1: project._id, project2: clash.projectId },
-            { project1: clash.projectId, project2: project._id },
-          ],
-        })
-        if (!conflict) {
-          conflict = await Conflict.create({
-            project1: project._id,
-            project2: clash.projectId,
-            clashTypes: clash.clashTypes,
-            severity: clash.severity,
-          })
-        }
+        // Shared with reconcileProjectClashes; the unique pairKey index prevents
+        // concurrent duplicate conflicts.
+        await findOrCreateConflict(project._id, clash)
 
         const otherProject = projectById.get(String(clash.projectId))
         if (otherProject) {

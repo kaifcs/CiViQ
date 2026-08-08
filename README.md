@@ -345,14 +345,17 @@ removed rather than left showing a value nothing supports. Elapsed time since
 filing is still shown. Adding overdue means first deciding what a deadline is —
 a policy question, not a code change.
 
-**Some project fields are API-only.** `documents[]`, `parentProject` and
-`phaseNumber` are legitimate domain fields, writable and readable through the
-project API and documented in the OpenAPI spec, but no screen writes them.
-`documents[]` in particular would need a file upload and storage service that
-this deployment does not have; building one only to consume the field would be
-speculative. They are retained, not removed. `photoUrl` (complaints) and
-`avatar` (users) *are* consumed — by the complaint adapter and `Avatar`
-respectively — and are set through the API rather than an upload UI.
+**Some fields are API-only.** `documents[]`, `parentProject` and `phaseNumber`
+(projects) and `photoUrl` (complaints) are legitimate domain fields, writable
+and readable through the API and documented in the OpenAPI spec, but no screen
+reads or writes them. `documents[]` and `photoUrl` would both need a file
+upload and storage service that this deployment does not have; building one
+only to consume the field would be speculative. They are retained on the API,
+not removed — but the complaint adapter carries no `photos` projection for
+`photoUrl`, because a view model field nothing renders is dead weight, the same
+reason `overdue` was removed. `photoUrl` stays reachable through `_raw`.
+`avatar` (users) *is* consumed, by `Avatar`, and is set through the API rather
+than an upload UI.
 
 **One notification type has no producer.** `Notification.type` is a closed enum
 of nine values; `early_completion` is defined and reserved but nothing raises

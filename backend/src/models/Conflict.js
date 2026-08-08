@@ -1,8 +1,12 @@
-// A detected collision between two projects, and the record of its resolution.
-// The pair is unordered, so a lookup must test both orderings. The two
-// resolution sides are stored apart so the trail shows who decided what.
+// Detects a project collision. pairKey gives the unordered pair a unique identity.
+// Resolution sides stay separate to preserve who decided what.
 
 const mongoose = require("mongoose")
+
+// Canonical key makes (A,B) and (B,A) identical for the unique index.
+function canonicalPairKey(a, b) {
+  return [String(a), String(b)].sort().join("_")
+}
 
 const conflictSchema = new mongoose.Schema({
   project1:    { type: mongoose.Schema.Types.ObjectId, ref: "Project", required: true },
@@ -30,13 +34,28 @@ const conflictSchema = new mongoose.Schema({
     respondedAt:  { type: Date },
   },
   suggestedDate:   { type: Date },
-  // Whether clash detection came back clean after the reschedule.
+  // Whether clash detection passed after rescheduling.
   recheckPassed:   { type: Boolean },
   rescheduledProject: { type: mongoose.Schema.Types.ObjectId, ref: "Project", default: null },
+  // Derived from the project pair, never client-supplied.
+  pairKey: { type: String, required: true },
 }, { timestamps: true })
 
-// Pair lookup, to avoid stacking duplicate rows for one collision.
+// Recompute the key from the project references before validation.
+conflictSchema.pre("validate", function (next) {
+  if (this.project1 && this.project2) {
+    this.pairKey = canonicalPairKey(this.project1, this.project2)
+  }
+  next()
+})
+
+conflictSchema.statics.pairKeyFor = canonicalPairKey
+
+// Database-level uniqueness prevents concurrent duplicate conflicts.
+conflictSchema.index({ pairKey: 1 }, { unique: true })
+// Supports per-project clash lookups.
 conflictSchema.index({ project1: 1, project2: 1 })
 conflictSchema.index({ createdAt: -1 })
 
 module.exports = mongoose.model("Conflict", conflictSchema)
+module.exports.canonicalPairKey = canonicalPairKey

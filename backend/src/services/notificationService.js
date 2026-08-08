@@ -173,8 +173,25 @@ function publish(recipientId, event, payload, id) {
   }
 }
 
-async function createNotification({ recipient, type, title, message, link, data, linkTo }) {
-  const [resolved] = await resolveLinks([{ recipient, type, title, message, link, data, linkTo }])
+// Skips notifications sent to the actor when a producer provides one.
+// The actor is not stored; notifications only record the recipient.
+//
+// Producers opt in because some events, such as clash detection, should
+// still notify the actor.
+function dropSelfDirected(payloads) {
+  return payloads
+    .map(({ actor, ...payload }) =>
+      actor && String(actor) === String(payload.recipient) ? null : payload
+    )
+    .filter(Boolean)
+}
+
+async function createNotification({ recipient, type, title, message, link, data, linkTo, actor }) {
+  const wanted = dropSelfDirected([{ recipient, type, title, message, link, data, linkTo, actor }])
+  // The whole notification was self-directed; nothing to persist or deliver.
+  if (wanted.length === 0) return null
+
+  const [resolved] = await resolveLinks(wanted)
   const notification = await Notification.create(withDerivedMetadata(resolved))
   queueDelivery(notification)
   return notification
@@ -182,7 +199,10 @@ async function createNotification({ recipient, type, title, message, link, data,
 
 async function createNotifications(payloads) {
   if (!Array.isArray(payloads) || payloads.length === 0) return []
-  const resolved = await resolveLinks(payloads)
+  const wanted = dropSelfDirected(payloads)
+  if (wanted.length === 0) return []
+
+  const resolved = await resolveLinks(wanted)
   const created = await Notification.insertMany(resolved.map(withDerivedMetadata))
   for (const notification of created) queueDelivery(notification)
   return created
@@ -241,9 +261,12 @@ async function notifyEarlyCompletion(nextProjectOfficer, completedProject, avail
   })
 }
 
-async function notifyComplaintAssigned(officer, complaint) {
+// `actor` is the user performing the assignment: an officer who assigns a
+// complaint to themselves already knows, so they are not notified.
+async function notifyComplaintAssigned(officer, complaint, actor) {
   return createNotification({
     recipient: officer,
+    actor,
     type: "complaint_assigned",
     title: "Complaint Assigned",
     message: `Complaint ${complaint.cnrId} (${complaint.issueType}) has been assigned to you.`,
@@ -284,9 +307,12 @@ async function notifyRoleChanged(user, role) {
   })
 }
 
-async function notifyComplaintStatusChanged(officer, complaint) {
+// `actor` is the user changing the status — usually the assigned officer
+// working their own queue, who must not be notified of their own click.
+async function notifyComplaintStatusChanged(officer, complaint, actor) {
   return createNotification({
     recipient: officer,
+    actor,
     type: "complaint_status_changed",
     title: "Complaint Status Updated",
     message: `Complaint ${complaint.cnrId} is now "${complaint.status}".`,

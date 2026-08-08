@@ -247,7 +247,7 @@ exports.updateComplaint = async (req, res) => {
     // Notify only when the assignment actually changes.
     const newOfficer = complaint.assignedOfficer ? String(complaint.assignedOfficer) : null
     if (touchesAssignment && newOfficer && newOfficer !== previousOfficer) {
-      await notifyComplaintAssigned(complaint.assignedOfficer, complaint)
+      await notifyComplaintAssigned(complaint.assignedOfficer, complaint, req.user._id)
     }
     
     res.json(complaint)
@@ -284,8 +284,9 @@ exports.updateStatus = async (req, res) => {
       details: { status: complaint.status },
     })
 
+    // Pass the actor so the service can skip self-directed notifications.
     if (complaint.assignedOfficer) {
-      await notifyComplaintStatusChanged(complaint.assignedOfficer, complaint)
+      await notifyComplaintStatusChanged(complaint.assignedOfficer, complaint, req.user._id)
     }
 
     res.json(complaint)
@@ -332,9 +333,11 @@ exports.assignComplaint = async (req, res) => {
       },
     })
 
+    // Actor passed for the same reason as the other producers: an officer who
+    // assigns a complaint to themselves already knows.
     const newOfficer = complaint.assignedOfficer ? String(complaint.assignedOfficer) : null
     if (newOfficer && newOfficer !== previousOfficer) {
-      await notifyComplaintAssigned(complaint.assignedOfficer, complaint)
+      await notifyComplaintAssigned(complaint.assignedOfficer, complaint, req.user._id)
     }
 
     res.json(complaint)
