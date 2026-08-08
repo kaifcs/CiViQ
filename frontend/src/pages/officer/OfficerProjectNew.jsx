@@ -1,9 +1,10 @@
-// New project submission wizard.
+// Project submission wizard for creating and editing projects.
 
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
-import { useAssignableSupervisors, useDepartments } from '../../hooks/useResources'
+import { useAssignableSupervisors, useDepartments, useProject } from '../../hooks/useResources'
+import AsyncState from '../../components/AsyncState'
 import { projectsApi, buildProjectPayload, normaliseError } from '../../services'
 // Configuration only.
 import { DEFAULT_CENTER } from '../../gis/config'
@@ -79,12 +80,25 @@ function CheckGroup({ label, options, values, onChange }) {
   )
 }
 
+// `<input type="date">` needs YYYY-MM-DD; the API returns an ISO timestamp.
+function toDateInput(value) {
+  if (!value) return ''
+  const d = new Date(value)
+  return Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10)
+}
+
+// Backend `phase` enum -> the wizard's own vocabulary. adaptProject already
+// folds `phase1` into `phased`.
+const PHASE_TO_FORM = { standalone: 'standalone', phased: 'phased', phase1: 'phased', continuation: 'continue' }
+
 export default function OfficerProjectNew() {
   const navigate = useNavigate()
+  const { id } = useParams()
+  // Present only on /officer/projects/:id/edit.
+  const editing = Boolean(id)
   const { user, deptMap } = useAuth()
-  // No fallback: an account with no department must surface that, not silently
-  // file its work under someone else's.
-  const dept = user?.department || null
+  // `skip` when there is no id, so the create route issues no request.
+  const { data: existing, loading: loadingExisting, error: loadError, reload } = useProject(id)
   // Derived from the officer's own projects, since GET /api/users is admin-only.
   const { supervisors } = useAssignableSupervisors()
   const { data: departments } = useDepartments()
@@ -122,6 +136,42 @@ export default function OfficerProjectNew() {
   const [disruptionDays,  setDisruptionDays]  = useState('')
   const [supervisorId, setSupervisorId] = useState('')
 
+  // Re-seeded during render when the project arrives, rather than from an effect
+  // that would commit an extra render — the pattern the detail screens use.
+  const [seededFor, setSeededFor] = useState(null)
+  if (editing && existing && existing.id !== seededFor) {
+    setSeededFor(existing.id)
+    const m = existing._raw?.mcdmInputs || {}
+    setPhase(PHASE_TO_FORM[existing.phase] || 'standalone')
+    setTitle(existing.title || '')
+    setType(existing.type || 'Road')
+    setDesc(existing.description || '')
+    setAddress(existing.address || '')
+    // Kept even when it is outside the select's option list, so an edit never
+    // silently relocates a project that was filed under another ward.
+    if (existing.ward) setWard(existing.ward)
+    if (Number.isFinite(existing.centerLat)) setLat(String(existing.centerLat))
+    if (Number.isFinite(existing.centerLng)) setLng(String(existing.centerLng))
+    setStartDate(toDateInput(existing.startDate))
+    setEndDate(toDateInput(existing.endDate))
+    setCost(existing.estimatedCost == null ? '' : String(existing.estimatedCost))
+    if (existing.budgetSource) setBudgetSrc(existing.budgetSource)
+    setTender(existing.tenderNumber || '')
+    setContractor(existing.contractorName || '')
+    setFirm(existing.contractorFirm || '')
+    if (m.conditionRating) setCondition(m.conditionRating)
+    setIncidents(Array.isArray(m.incidents) ? m.incidents : [])
+    setLastWorkYear(m.lastWorkYear == null ? '' : String(m.lastWorkYear))
+    if (m.tenderStatus) setTenderStatus(m.tenderStatus)
+    setContractorAssigned(m.contractorAssigned ? 'yes' : 'no')
+    if (m.roadClosure) setRoadClosure(m.roadClosure)
+    setUtilities(Array.isArray(m.utilityDisruption) ? m.utilityDisruption : [])
+    setDisruptionDays(m.disruptionDays == null ? '' : String(m.disruptionDays))
+    setSupervisorId(existing.supervisorId || '')
+  }
+
+  const dept = (editing ? existing?.department : user?.department) || null
+
   function duration() {
     if (!startDate || !endDate) return ''
     const diff = Math.ceil((new Date(endDate) - new Date(startDate)) / 86400000)
@@ -134,13 +184,14 @@ export default function OfficerProjectNew() {
   const [clashCount, setClashCount] = useState(0)
   const [saving, setSaving] = useState(false)
 
-  // POST /api/projects. MCDM scoring and clash detection are server-side; the
-  // wizard only collects the raw answers.
+  // Submits project create and edit requests; validation and workflow rules are enforced by the API.
   async function handleSubmit() {
     setSubmitError('')
     const departmentId = (departments || []).find(d => d.code === dept)?.id
     if (!departmentId) {
-      setSubmitError('Your account has no department assigned. Contact an administrator.')
+      setSubmitError(editing
+        ? 'This project has no resolvable department. Contact an administrator.'
+        : 'Your account has no department assigned. Contact an administrator.')
       return
     }
     // centerCoords is required by the backend; catch it here so the officer sees
@@ -149,18 +200,27 @@ export default function OfficerProjectNew() {
       setSubmitError('Enter a valid latitude and longitude on the Location step.')
       return
     }
+    const payload = buildProjectPayload({
+      title, type, description: desc, departmentId, phase,
+      startDate, endDate, estimatedCost: cost, budgetSource: budgetSrc,
+      tenderNumber: tender, contractorName: contractor, contractorFirm: firm,
+      supervisorId, ward, address, lat, lng,
+      conditionRating: condition, incidents, lastWorkYear, tenderStatus,
+      contractorAssigned, roadClosure, utilities, disruptionDays,
+    })
     setSaving(true)
     try {
-      const res = await projectsApi.create(buildProjectPayload({
-        title, type, description: desc, departmentId, phase,
-        startDate, endDate, estimatedCost: cost, budgetSource: budgetSrc,
-        tenderNumber: tender, contractorName: contractor, contractorFirm: firm,
-        supervisorId, ward, address, lat, lng,
-        conditionRating: condition, incidents, lastWorkYear, tenderStatus,
-        contractorAssigned, roadClosure, utilities, disruptionDays,
-      }), deptMap)
-      setMcdmResult(res.mcdm?.outOf100 ?? res.project?.mcdmScore ?? null)
-      setClashCount(res.clashesDetected || 0)
+      if (editing) {
+        // PUT answers with the project alone — no mcdm envelope and no clash
+        // count — so the score is read from the saved document.
+        const saved = await projectsApi.update(id, payload, deptMap)
+        setMcdmResult(saved?.mcdmScore ?? null)
+        setClashCount(0)
+      } else {
+        const res = await projectsApi.create(payload, deptMap)
+        setMcdmResult(res.mcdm?.outOf100 ?? res.project?.mcdmScore ?? null)
+        setClashCount(res.clashesDetected || 0)
+      }
       setSubmitted(true)
     } catch (err) {
       setSubmitError(normaliseError(err).message)
@@ -171,6 +231,20 @@ export default function OfficerProjectNew() {
 
   const potentialClash = clashCount > 0
 
+  // An edit cannot render its fields until the project it edits has loaded.
+  if (editing && (loadingExisting || loadError)) {
+    return <AsyncState loading={loadingExisting} error={loadError} onRetry={reload} label="Loading project...">{null}</AsyncState>
+  }
+
+  if (editing && !existing) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64">
+        <p className="text-[15px] text-[#6B7280] dark:text-[#9CA3AF]">Project not found, or it is not assigned to you.</p>
+        <button onClick={() => navigate('/officer/projects')} className="mt-3 text-[13px] text-[#5E6AD2]">Back to projects</button>
+      </div>
+    )
+  }
+
   if (submitted) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-6 text-center" style={{ fontFamily: "'Inter', sans-serif" }}>
@@ -178,8 +252,14 @@ export default function OfficerProjectNew() {
           <svg width="28" height="28" fill="none" viewBox="0 0 24 24" className="text-[#5E6AD2]" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
         </div>
         <div>
-          <h2 className="text-[22px] font-bold text-[#0F172A] dark:text-[#F8FAFC] mb-2">Project submitted successfully</h2>
-          <p className="text-[15px] text-[#6B7280] dark:text-[#9CA3AF]">Your project has been sent for admin review.</p>
+          <h2 className="text-[22px] font-bold text-[#0F172A] dark:text-[#F8FAFC] mb-2">
+            {editing ? 'Project updated successfully' : 'Project submitted successfully'}
+          </h2>
+          <p className="text-[15px] text-[#6B7280] dark:text-[#9CA3AF]">
+            {editing
+              ? 'Your changes have been saved and the project has been re-scored.'
+              : 'Your project has been sent for admin review.'}
+          </p>
         </div>
         <div className="flex flex-col items-center gap-2 p-6 rounded-[12px] bg-[#F8FAFC] dark:bg-[#18181B] border border-[#E5E5E5] dark:border-[#27272A]" style={{ minWidth: '280px' }}>
           <p className="text-[13px] font-semibold text-[#6B7280] dark:text-[#9CA3AF] uppercase tracking-wide">Your MCDM Priority Score</p>
@@ -199,10 +279,17 @@ export default function OfficerProjectNew() {
             className="px-5 py-2 text-[13px] font-medium text-[#6B7280] border border-[#E2E8F0] dark:border-[#27272A] rounded-[6px] hover:bg-[#F8FAFC] dark:hover:bg-[#18181B] transition-colors">
             Back to projects
           </button>
-          <button onClick={() => { setSubmitted(false); setStep(0) }}
-            className="px-5 py-2 text-[13px] font-medium text-white bg-[#5E6AD2] rounded-[6px] hover:bg-[#4A56C1] transition-colors">
-            Submit another
-          </button>
+          {editing ? (
+            <button onClick={() => navigate(`/officer/projects/${id}`)}
+              className="px-5 py-2 text-[13px] font-medium text-white bg-[#5E6AD2] rounded-[6px] hover:bg-[#4A56C1] transition-colors">
+              View project
+            </button>
+          ) : (
+            <button onClick={() => { setSubmitted(false); setStep(0) }}
+              className="px-5 py-2 text-[13px] font-medium text-white bg-[#5E6AD2] rounded-[6px] hover:bg-[#4A56C1] transition-colors">
+              Submit another
+            </button>
+          )}
         </div>
       </div>
     )
@@ -505,7 +592,7 @@ export default function OfficerProjectNew() {
           <button onClick={handleSubmit} disabled={saving}
             className="flex items-center gap-2 h-9 px-5 text-[13px] font-medium text-white bg-[#16A34A] rounded-[6px] hover:bg-[#15803D] disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
             <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-            Submit project
+            {editing ? 'Save changes' : 'Submit project'}
           </button>
         )}
       </div>

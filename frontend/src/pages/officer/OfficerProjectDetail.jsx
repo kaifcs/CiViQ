@@ -102,7 +102,7 @@ export default function OfficerProjectDetail() {
         </div>
         <div className="flex items-center gap-2 flex-shrink-0 mt-1">
           {project.status === 'pending' && (
-            <button onClick={() => navigate(`/officer/projects/new`)}
+            <button onClick={() => navigate(`/officer/projects/${project.id}/edit`)}
               className="h-9 px-4 text-[13px] font-medium text-[#6B7280] dark:text-[#9CA3AF] border border-[#E2E8F0] dark:border-[#27272A] rounded-[6px] hover:bg-[#F8FAFC] dark:hover:bg-[#18181B] transition-colors">
               Edit project
             </button>

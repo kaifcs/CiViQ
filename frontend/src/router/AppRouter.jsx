@@ -7,44 +7,54 @@ import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-route
 import DashboardLayout from '../components/DashboardLayout'
 import { LoadingState } from '../components/AsyncState'
 import { useAuth } from '../hooks/useAuth'
-import AdminAnalytics from '../pages/admin/AdminAnalytics'
-import AdminAudit from '../pages/admin/AdminAudit'
-import AdminComplaintDetail from '../pages/admin/AdminComplaintDetail'
-import AdminComplaints from '../pages/admin/AdminComplaints'
-import AdminConflictDetail from '../pages/admin/AdminConflictDetail'
-import AdminConflicts from '../pages/admin/AdminConflicts'
-import AdminDashboard from '../pages/admin/AdminDashboard'
-import AdminDepartmentDetail from '../pages/admin/AdminDepartmentDetail'
-import AdminDepartments from '../pages/admin/AdminDepartments'
-// Map screens are the only consumers of Leaflet, so they load on demand and
-// keep the GIS bundle off the critical path for every other route.
-const AdminMap = lazy(() => import('../pages/admin/AdminMap'))
-import AdminProjectDetail from '../pages/admin/AdminProjectDetail'
-import AdminProjects from '../pages/admin/AdminProjects'
-import AdminSettings from '../pages/admin/AdminSettings'
-import AdminUserDetail from '../pages/admin/AdminUserDetail'
-import AdminUsers from '../pages/admin/AdminUsers'
+
+// Frequently visited pages (eager)
 import Login from '../pages/auth/Login'
 import CitizenHome from '../pages/citizen/CitizenHome'
-import CitizenNotFound from '../pages/citizen/CitizenNotFound'
-import CitizenProjectDetail from '../pages/citizen/CitizenProjectDetail'
-import CitizenProjects from '../pages/citizen/CitizenProjects'
-import OfficerClashRespond from '../pages/officer/OfficerClashRespond'
-import OfficerComplaintDetail from '../pages/officer/OfficerComplaintDetail'
-import OfficerComplaints from '../pages/officer/OfficerComplaints'
-import OfficerConflictDetail from '../pages/officer/OfficerConflictDetail'
-import OfficerConflicts from '../pages/officer/OfficerConflicts'
+import AdminDashboard from '../pages/admin/AdminDashboard'
 import OfficerDashboard from '../pages/officer/OfficerDashboard'
-const OfficerMap = lazy(() => import('../pages/officer/OfficerMap'))
-import OfficerProjectDetail from '../pages/officer/OfficerProjectDetail'
-import OfficerProjectNew from '../pages/officer/OfficerProjectNew'
-import OfficerProjects from '../pages/officer/OfficerProjects'
-import OfficerSettings from '../pages/officer/OfficerSettings'
 import SupervisorDashboard from '../pages/supervisor/SupervisorDashboard'
-import SupervisorSettings from '../pages/supervisor/SupervisorSettings'
-import SupervisorTaskDetail from '../pages/supervisor/SupervisorTaskDetail'
-import SupervisorTasks from '../pages/supervisor/SupervisorTasks'
-import NotificationCenter from '../pages/notifications/NotificationCenter'
+
+// Admin
+const AdminAnalytics = lazy(() => import('../pages/admin/AdminAnalytics'))
+const AdminAudit = lazy(() => import('../pages/admin/AdminAudit'))
+const AdminComplaints = lazy(() => import('../pages/admin/AdminComplaints'))
+const AdminComplaintDetail = lazy(() => import('../pages/admin/AdminComplaintDetail'))
+const AdminConflicts = lazy(() => import('../pages/admin/AdminConflicts'))
+const AdminConflictDetail = lazy(() => import('../pages/admin/AdminConflictDetail'))
+const AdminDepartments = lazy(() => import('../pages/admin/AdminDepartments'))
+const AdminDepartmentDetail = lazy(() => import('../pages/admin/AdminDepartmentDetail'))
+const AdminProjects = lazy(() => import('../pages/admin/AdminProjects'))
+const AdminProjectDetail = lazy(() => import('../pages/admin/AdminProjectDetail'))
+const AdminUsers = lazy(() => import('../pages/admin/AdminUsers'))
+const AdminUserDetail = lazy(() => import('../pages/admin/AdminUserDetail'))
+const AdminSettings = lazy(() => import('../pages/admin/AdminSettings'))
+const AdminMap = lazy(() => import('../pages/admin/AdminMap'))
+
+// Citizen
+const CitizenProjects = lazy(() => import('../pages/citizen/CitizenProjects'))
+const CitizenProjectDetail = lazy(() => import('../pages/citizen/CitizenProjectDetail'))
+const CitizenNotFound = lazy(() => import('../pages/citizen/CitizenNotFound'))
+
+// Officer
+const OfficerProjects = lazy(() => import('../pages/officer/OfficerProjects'))
+const OfficerProjectDetail = lazy(() => import('../pages/officer/OfficerProjectDetail'))
+const OfficerProjectNew = lazy(() => import('../pages/officer/OfficerProjectNew'))
+const OfficerConflicts = lazy(() => import('../pages/officer/OfficerConflicts'))
+const OfficerConflictDetail = lazy(() => import('../pages/officer/OfficerConflictDetail'))
+const OfficerComplaints = lazy(() => import('../pages/officer/OfficerComplaints'))
+const OfficerComplaintDetail = lazy(() => import('../pages/officer/OfficerComplaintDetail'))
+const OfficerClashRespond = lazy(() => import('../pages/officer/OfficerClashRespond'))
+const OfficerSettings = lazy(() => import('../pages/officer/OfficerSettings'))
+const OfficerMap = lazy(() => import('../pages/officer/OfficerMap'))
+
+// Supervisor
+const SupervisorTasks = lazy(() => import('../pages/supervisor/SupervisorTasks'))
+const SupervisorTaskDetail = lazy(() => import('../pages/supervisor/SupervisorTaskDetail'))
+const SupervisorSettings = lazy(() => import('../pages/supervisor/SupervisorSettings'))
+
+// Shared
+const NotificationCenter = lazy(() => import('../pages/notifications/NotificationCenter'))
 
 const PAGE_TITLES = {
   dashboard: 'Dashboard',
@@ -184,6 +194,8 @@ export default function AppRouter() {
         <Route path="/officer/projects" element={<RoleRoute role="officer"><OfficerLayout activeItem="projects"><OfficerProjects /></OfficerLayout></RoleRoute>} />
         <Route path="/officer/projects/new" element={<RoleRoute role="officer"><OfficerLayout activeItem="projects"><OfficerProjectNew /></OfficerLayout></RoleRoute>} />
         <Route path="/officer/projects/:id" element={<RoleRoute role="officer"><OfficerLayout activeItem="projects"><OfficerProjectDetail /></OfficerLayout></RoleRoute>} />
+        {/* Same wizard, in edit mode — see OfficerProjectNew. */}
+        <Route path="/officer/projects/:id/edit" element={<RoleRoute role="officer"><OfficerLayout activeItem="projects"><OfficerProjectNew /></OfficerLayout></RoleRoute>} />
         <Route path="/officer/projects/:id/respond" element={<RoleRoute role="officer"><OfficerLayout activeItem="projects"><OfficerClashRespond /></OfficerLayout></RoleRoute>} />
         <Route path="/officer/conflicts" element={<RoleRoute role="officer"><OfficerLayout activeItem="conflicts"><OfficerConflicts /></OfficerLayout></RoleRoute>} />
         <Route path="/officer/conflicts/:id" element={<RoleRoute role="officer"><OfficerLayout activeItem="conflicts"><OfficerConflictDetail /></OfficerLayout></RoleRoute>} />

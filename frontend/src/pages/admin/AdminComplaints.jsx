@@ -50,7 +50,6 @@ export default function AdminComplaints() {
   const [search,       setSearch]       = useState('')
   const [filterDept,   setFilterDept]   = useState('')
   const [filterStatus, setFilterStatus] = useState('')
-  const [remindSent,   setRemindSent]   = useState({})
 
   const totalCount        = complaints.length
   const unresolvedCount   = complaints.filter(c => c.status !== 'resolved').length
@@ -75,11 +74,6 @@ export default function AdminComplaints() {
     setSearch('')
     setFilterDept('')
     setFilterStatus('')
-  }
-
-  function handleRemind(e, id) {
-    e.stopPropagation()
-    setRemindSent(prev => ({ ...prev, [id]: true }))
   }
 
   return (
@@ -221,24 +215,6 @@ export default function AdminComplaints() {
                     <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: status.dot }} />
                     {status.text}
                   </span>
-                </div>
-
-                <VDivider />
-
-                <div className="flex-shrink-0">
-                  <button
-                    onClick={e => handleRemind(e, c.id)}
-                    disabled={remindSent[c.id] || c.status === 'resolved'}
-                    className={`h-8 px-3 text-[12px] font-medium rounded-[6px] border transition-colors ${
-                      remindSent[c.id]
-                        ? 'text-[#16A34A] dark:text-[#4ADE80] border-[#BBF7D0] dark:border-[#166534] bg-[#F0FDF4] dark:bg-[#0D1F14] cursor-default'
-                        : c.status === 'resolved'
-                          ? 'text-[#D1D5DB] dark:text-[#374151] border-[#E5E5E5] dark:border-[#27272A] cursor-not-allowed'
-                          : 'text-[#6B7280] dark:text-[#9CA3AF] border-[#E2E8F0] dark:border-[#27272A] hover:border-[#5E6AD2]/50 hover:text-[#5E6AD2]'
-                    }`}
-                  >
-                    {remindSent[c.id] ? '✓ Sent' : 'Remind'}
-                  </button>
                 </div>
 
                 <svg width="14" height="14" fill="none" viewBox="0 0 24 24" className="text-[#D1D5DB] dark:text-[#374151] flex-shrink-0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

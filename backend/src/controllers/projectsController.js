@@ -4,6 +4,7 @@ const Conflict = require("../models/Conflict")
 const { recordAudit } = require("../services/auditService")
 const { calculateMCDM } = require("../services/mcdmEngine")
 const { detectClashes } = require("../services/clashDetection")
+const { syncClashState, reconcileProjectClashes } = require("../services/clashSync")
 const {
   buildClashDetectedPayload, createNotifications, notifyProjectApproved,
   notifyProjectRejected, notifyProjectAssigned, notifyProjectCompleted,
@@ -81,89 +82,6 @@ const MCDM_INPUT_FIELDS = ["mcdmInputs", "startDate", "projectType", "location"]
 const CLASH_INPUT_FIELDS = ["location", "startDate", "endDate", "projectType"]
 
 const touches = (updates, fields) => fields.some((field) => updates[field] !== undefined)
-
-// Synchronizes the derived clash state for all affected projects.
-async function syncClashState(projectIds = []) {
-  // Deduplicated, keeping the caller's id form so the filter still casts.
-  const wanted = new Map()
-  for (const id of projectIds) if (id) wanted.set(String(id), id)
-  if (wanted.size === 0) return new Map()
-
-  const ids = [...wanted.values()]
-  const conflicts = await Conflict.find({
-    $or: [{ project1: { $in: ids } }, { project2: { $in: ids } }],
-  })
-    .select("project1 project2")
-    .lean()
-
-  const byProject = new Map([...wanted.keys()].map((id) => [id, []]))
-  for (const conflict of conflicts) {
-    // Both sides are credited; a side outside `wanted` is never written blind.
-    for (const side of [conflict.project1, conflict.project2]) {
-      byProject.get(String(side))?.push(conflict._id)
-    }
-  }
-
-  await Project.bulkWrite(
-    [...byProject].map(([id, clashes]) => ({
-      updateOne: {
-        filter: { _id: wanted.get(id) },
-        update: { $set: { clashes, hasClash: clashes.length > 0 } },
-      },
-    }))
-  )
-
-  return byProject
-}
-
-// Recomputes clash state after project updates.
-async function reconcileProjectClashes(project) {
-  const clashes = await detectClashes(project)
-
-  const currentIds = []
-  const created = []
-
-  for (const clash of clashes) {
-    let conflict = await Conflict.findOne({
-      $or: [
-        { project1: project._id, project2: clash.projectId },
-        { project1: clash.projectId, project2: project._id },
-      ],
-    })
-    if (!conflict) {
-      conflict = await Conflict.create({
-        project1: project._id,
-        project2: clash.projectId,
-        clashTypes: clash.clashTypes,
-        severity: clash.severity,
-      })
-      created.push(clash)
-    }
-    currentIds.push(conflict._id)
-  }
-
-  // A deleted conflict affects both linked projects.
-  const stale = await Conflict.find({
-    status: "pending",
-    _id: { $nin: currentIds },
-    $or: [{ project1: project._id }, { project2: project._id }],
-  }).select("project1 project2").lean()
-
-  // Every project whose set of conflicts may have changed.
-  const affected = [project._id, ...clashes.map((c) => c.projectId)]
-
-  if (stale.length > 0) {
-    await Conflict.deleteMany({ _id: { $in: stale.map((c) => c._id) }, status: "pending" })
-    for (const c of stale) affected.push(c.project1, c.project2)
-  }
-
-  const synced = await syncClashState(affected)
-  project.clashes = synced.get(String(project._id)) || []
-  project.hasClash = project.clashes.length > 0
-
-  return created
-}
-
 
 // GET /api/projects/public — the citizen transparency portal's project list.
 // No auth: filtered to publicly-visible statuses and shaped by
@@ -385,7 +303,9 @@ exports.updateProject = async (req, res) => {
       project.mcdmBreakdown = mcdm.breakdown
     }
     if (redetect) {
-      newClashes = await reconcileProjectClashes(project)
+      // Only the newly created pairs warrant a notification; one already on
+      // record has been announced.
+      newClashes = (await reconcileProjectClashes(project)).created
     }
     if (rescore || redetect) {
       await project.save()

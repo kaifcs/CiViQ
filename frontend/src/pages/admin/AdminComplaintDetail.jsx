@@ -50,6 +50,10 @@ const TIMELINE_STEPS = [
 
 const STATUS_ORDER = ['submitted', 'acknowledged', 'in_progress', 'resolved']
 
+// The workflow advances one step at a time, so the screen offers only the next
+// valid state rather than a free choice the backend enum would refuse.
+const NEXT_STATUS = { submitted: 'acknowledged', acknowledged: 'in_progress', in_progress: 'resolved' }
+
 function StatusTimeline({ complaint }) {
   const currentIdx = STATUS_ORDER.indexOf(complaint.status)
 
@@ -108,21 +112,20 @@ export default function AdminComplaintDetail() {
   const { data: users } = useUsers()
   const { data: departments } = useDepartments()
 
-  const [remindSent,  setRemindSent]  = useState(false)
-  const [noteText,    setNoteText]    = useState('')
-  const [noteSaved,   setNoteSaved]   = useState(false)
-  const [escalated,   setEscalated]   = useState(false)
-  const [showNoteBox, setShowNoteBox] = useState(false)
+  const [showNoteInput, setShowNoteInput] = useState(false)
 
   // Re-seeded during render when a different complaint loads, rather than from
   // an effect that would commit an extra render each time.
-  const [officerId,   setOfficerId]   = useState('')
-  const [deptId,      setDeptId]      = useState('')
-  const [seededFor,   setSeededFor]   = useState(null)
+  const [officerId,      setOfficerId]      = useState('')
+  const [deptId,         setDeptId]         = useState('')
+  const [resolutionNote, setResolutionNote] = useState('')
+  const [seededFor,      setSeededFor]      = useState(null)
   if (complaint && complaint.id !== seededFor) {
     setSeededFor(complaint.id)
     setOfficerId(complaint.assignedOfficer ? String(complaint.assignedOfficer) : '')
     setDeptId(complaint._raw?.assignedDepartment ? String(complaint._raw.assignedDepartment) : '')
+    setResolutionNote(complaint.resolutionNote || '')
+    setShowNoteInput(false)
   }
 
   const assign = useMutation(
@@ -131,6 +134,31 @@ export default function AdminComplaintDetail() {
       [id, deptMap]
     )
   )
+
+  // PATCH /api/complaints/:id/status — authorises admin, writes a
+  // `complaint_status_updated` audit entry and notifies the assigned officer.
+  const advance = useMutation(
+    useCallback(
+      ({ status, note }) => complaintsApi.setStatus(id, status, note, deptMap),
+      [id, deptMap]
+    )
+  )
+
+  const submitStatus = useCallback(async (next, note) => {
+    // Resolving without a note leaves no record of what was done, so the note
+    // box opens instead of the request being sent.
+    if (next === 'resolved' && !String(note ?? '').trim()) {
+      setShowNoteInput(true)
+      return
+    }
+    const result = await advance.run({ status: next, note: note?.trim() || undefined })
+    // The response is the updated complaint, so the screen reflects what the
+    // database holds rather than what was requested.
+    if (result.ok) {
+      setData(result.data)
+      setShowNoteInput(false)
+    }
+  }, [advance, setData])
 
   const submitAssignment = useCallback(async () => {
     // PATCH /api/complaints/:id/assign answers with the updated complaint, and
@@ -158,6 +186,7 @@ export default function AdminComplaintDetail() {
   }
 
   const status = COMPLAINT_STATUS_CONFIG[complaint.status] || COMPLAINT_STATUS_CONFIG.submitted
+  const nextStatus = NEXT_STATUS[complaint.status]
 
   return (
     <div className="flex flex-col gap-5" style={{ fontFamily: "'Inter', sans-serif" }}>
@@ -195,62 +224,57 @@ export default function AdminComplaintDetail() {
           <p className="text-[13px] text-[#6B7280] dark:text-[#9CA3AF] mt-1">{complaint.address}</p>
         </div>
 
+        {/* The only workflow write on this header. Advancing to `resolved`
+            requires a resolution note, which is what the officer screens ask
+            for too, so the record reads the same whoever closed it. */}
         <div className="flex items-center gap-2 flex-shrink-0">
-          {escalated ? (
-            <span className="text-[13px] font-medium text-[#DC2626] dark:text-[#F87171] flex items-center gap-1.5">
+          {nextStatus ? (
+            <button
+              onClick={() => submitStatus(nextStatus, resolutionNote)}
+              disabled={advance.saving}
+              className={`h-9 px-4 text-[13px] font-medium text-white rounded-[6px] disabled:opacity-60 disabled:cursor-not-allowed transition-colors ${
+                nextStatus === 'resolved'
+                  ? 'bg-[#16A34A] hover:bg-[#15803D]'
+                  : 'bg-[#5E6AD2] hover:bg-[#4A56C1]'
+              }`}
+            >
+              {advance.saving
+                ? 'Saving...'
+                : `Mark ${COMPLAINT_STATUS_CONFIG[nextStatus]?.text || nextStatus}`}
+            </button>
+          ) : (
+            <span className="text-[13px] font-medium text-[#16A34A] dark:text-[#4ADE80] flex items-center gap-1.5">
               <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-              Escalated
+              Resolved
             </span>
-          ) : (
-            <button
-              onClick={() => setEscalated(true)}
-              className="h-9 px-4 text-[13px] font-medium text-[#DC2626] border border-[#FECACA] dark:border-[#7F1D1D] rounded-[6px] hover:bg-[#FEF2F2] dark:hover:bg-[#1F0A0A] transition-colors"
-            >
-              Escalate
-            </button>
-          )}
-          <button
-            onClick={() => setShowNoteBox(!showNoteBox)}
-            className="h-9 px-4 text-[13px] font-medium text-[#6B7280] dark:text-[#9CA3AF] border border-[#E2E8F0] dark:border-[#27272A] rounded-[6px] hover:bg-[#F8FAFC] dark:hover:bg-[#18181B] transition-colors"
-          >
-            Add note
-          </button>
-          {remindSent ? (
-            <span className="h-9 px-4 text-[13px] font-medium text-[#16A34A] dark:text-[#4ADE80] border border-[#BBF7D0] dark:border-[#166534] rounded-[6px] bg-[#F0FDF4] dark:bg-[#0D1F14] flex items-center">
-              ✓ Reminder sent
-            </span>
-          ) : (
-            <button
-              onClick={() => setRemindSent(true)}
-              disabled={complaint.status === 'resolved'}
-              className="h-9 px-4 text-[13px] font-medium text-white bg-[#5E6AD2] rounded-[6px] hover:bg-[#4A56C1] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              Send reminder
-            </button>
           )}
         </div>
       </div>
 
-      {showNoteBox && (
+      {advance.error && (
+        <p className="text-[13px] text-[#DC2626] dark:text-[#F87171]">{advance.error.message}</p>
+      )}
+
+      {showNoteInput && (
         <Card>
-          <SectionLabel>Internal note</SectionLabel>
+          <SectionLabel>Resolution note (required to mark as resolved)</SectionLabel>
           <textarea
-            value={noteText}
-            onChange={e => setNoteText(e.target.value)}
-            placeholder="Add an internal note visible only to admins..."
+            value={resolutionNote}
+            onChange={e => setResolutionNote(e.target.value)}
+            placeholder="Describe how this complaint was resolved..."
             rows={3}
             className="w-full px-3 py-2.5 text-[13px] rounded-[8px] border border-[#E2E8F0] dark:border-[#27272A] bg-[#FFFFFF] dark:bg-[#18181B] text-[#0F172A] dark:text-[#F8FAFC] placeholder:text-[#9CA3AF] focus:outline-none focus:border-[#5E6AD2] focus:ring-2 focus:ring-[#5E6AD2]/10 resize-none transition-all"
           />
           <div className="flex justify-end gap-2 mt-3">
-            <button onClick={() => setShowNoteBox(false)} className="px-4 py-2 text-[13px] font-medium text-[#6B7280] border border-[#E2E8F0] dark:border-[#27272A] rounded-[6px] hover:bg-[#F8FAFC] dark:hover:bg-[#18181B] transition-colors">
+            <button onClick={() => setShowNoteInput(false)} disabled={advance.saving} className="px-4 py-2 text-[13px] font-medium text-[#6B7280] border border-[#E2E8F0] dark:border-[#27272A] rounded-[6px] hover:bg-[#F8FAFC] dark:hover:bg-[#18181B] disabled:opacity-60 disabled:cursor-not-allowed transition-colors">
               Cancel
             </button>
             <button
-              onClick={() => { setNoteSaved(true); setShowNoteBox(false) }}
-              disabled={!noteText.trim()}
-              className="px-4 py-2 text-[13px] font-medium text-white bg-[#5E6AD2] rounded-[6px] hover:bg-[#4A56C1] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              onClick={() => submitStatus('resolved', resolutionNote)}
+              disabled={!resolutionNote.trim() || advance.saving}
+              className="px-4 py-2 text-[13px] font-medium text-white bg-[#16A34A] rounded-[6px] hover:bg-[#15803D] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              Save note
+              {advance.saving ? 'Saving...' : 'Confirm resolution'}
             </button>
           </div>
         </Card>
@@ -275,12 +299,6 @@ export default function AdminComplaintDetail() {
             <div className="pt-3 mt-1">
               <p className="text-[11px] font-semibold text-[#6B7280] dark:text-[#9CA3AF] uppercase tracking-[0.06em] mb-1.5">Resolution note</p>
               <p className="text-[13px] text-[#0F172A] dark:text-[#F8FAFC] leading-relaxed">{complaint.resolutionNote}</p>
-            </div>
-          )}
-          {noteSaved && noteText && (
-            <div className="pt-3 mt-1 border-t border-[#F3F4F6] dark:border-[#27272A]">
-              <p className="text-[11px] font-semibold text-[#6B7280] dark:text-[#9CA3AF] uppercase tracking-[0.06em] mb-1.5">Internal note</p>
-              <p className="text-[13px] text-[#0F172A] dark:text-[#F8FAFC] leading-relaxed">{noteText}</p>
             </div>
           )}
         </Card>

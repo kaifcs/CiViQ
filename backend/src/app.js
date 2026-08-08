@@ -1,6 +1,4 @@
-// Express application: middleware, routes and error handling.
-// Middleware order is load-bearing: correlation first, then routes, then the
-// 404 and error handlers last.
+// Express application middleware, routes, and error handling.
 
 const express = require("express")
 const cors = require("cors")
@@ -56,7 +54,7 @@ app.use(
   "/api",
   rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 300,
+    max: 1000,
     standardHeaders: true,
     legacyHeaders: false,
     handler: rateLimited,
@@ -77,9 +75,7 @@ app.use(
   })
 )
 
-// Stricter budget to slow credential stuffing. Successful logins do not count,
-// and /auth/me is outside it so ordinary page loads are unaffected. Password
-// change also verifies a secret, so it shares the same budget.
+// Stricter limit for credential-sensitive endpoints.
 app.use(
   ["/api/auth/login", "/api/auth/register", "/api/auth/password"],
   rateLimit({

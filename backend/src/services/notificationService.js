@@ -214,12 +214,18 @@ async function notifyProjectApproved(officer, project) {
   })
 }
 
+// Omit the date when suggestedDate is unavailable.
 async function notifyProjectRejected(officer, project, suggestedDate) {
+  const parsed = suggestedDate == null ? null : new Date(suggestedDate)
+  const suggested = parsed && !Number.isNaN(parsed.getTime()) ? parsed : null
+
   return createNotification({
     recipient: officer,
     type: "project_rejected",
     title: "Project Rescheduled",
-    message: `Your project "${project.title}" has been rescheduled. Suggested start: ${new Date(suggestedDate).toLocaleDateString()}.`,
+    message: suggested
+      ? `Your project "${project.title}" has been rescheduled. Suggested start: ${suggested.toLocaleDateString()}.`
+      : `Your project "${project.title}" has been rescheduled. Open it for the reason and next steps.`,
     linkTo: { kind: NOTIFICATION_LINK_KINDS.PROJECT, id: project._id },
     data: { projectId: project._id, suggestedDate }
   })

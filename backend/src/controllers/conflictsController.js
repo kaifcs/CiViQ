@@ -4,8 +4,12 @@ const mongoose = require("mongoose")
 const Conflict = require("../models/Conflict")
 const Project = require("../models/Project")
 const { recordAudit } = require("../services/auditService")
-const { getSuggestedStartDate, detectClashes } = require("../services/clashDetection")
-const { notifyProjectApproved, notifyProjectRejected } = require("../services/notificationService")
+const { getSuggestedStartDate } = require("../services/clashDetection")
+const { reconcileProjectClashes } = require("../services/clashSync")
+const {
+  notifyProjectApproved, notifyProjectRejected,
+  buildClashDetectedPayload, createNotifications,
+} = require("../services/notificationService")
 const { parsePagination, setPaginationHeaders } = require("../utils/pagination")
 const { canAccessProject } = require("../middleware/ownership")
 const { serialiseConflict, serialiseConflicts } = require("../utils/serializers")
@@ -208,22 +212,65 @@ exports.officerRespond = async (req, res) => {
     project.endDate = new Date(start.getTime() + durationMs)
     project.status = "pending"
 
-    // Run against the in-memory project, so the new date is scored before save.
-    const newClashes = await detectClashes(project)
+    // Reconcile clashes before saving the rescheduled project.
+    // Officer responses preserve unrelated pending conflicts.
+    const { created, clashes: newClashes } = await reconcileProjectClashes(project, {
+      pruneStale: false,
+    })
+
     conflict.recheckPassed = newClashes.length === 0
-    conflict.officerResponse = { action, customDate, respondedBy: req.user._id, respondedAt: new Date() }
+    conflict.officerResponse = {
+      action,
+      customDate,
+      respondedBy: req.user._id,
+      respondedAt: new Date(),
+    }
     conflict.status = "resolved_rejected"
 
     await project.save()
     await conflict.save()
+
     await recordAudit({
       req,
       action: "conflict_responded",
       targetType: "Conflict",
       targetId: conflict._id,
-      details: { action, customDate, newStartDate: project.startDate, recheckPassed: conflict.recheckPassed },
+      details: {
+        action,
+        customDate,
+        newStartDate: project.startDate,
+        recheckPassed: conflict.recheckPassed,
+      },
     })
 
-    res.json({ conflict, recheckPassed: conflict.recheckPassed, newClashes })
-  } catch (err) { serverError(res, err, "conflictsController:") }
+    // Notify officers only for newly created conflicts.
+    if (created.length > 0) {
+      const others = await Project.find({
+        _id: { $in: created.map((c) => c.projectId) },
+      })
+
+      const payloads = []
+
+      for (const other of others) {
+        if (project.officer) {
+          payloads.push(buildClashDetectedPayload(project.officer, project, other))
+        }
+
+        // Notify the counterpart officer from their project's perspective.
+        if (other.officer && String(other.officer) !== String(project.officer)) {
+          payloads.push(buildClashDetectedPayload(other.officer, other, project))
+        }
+      }
+
+      await createNotifications(payloads)
+    }
+
+    res.json({
+      conflict,
+      recheckPassed: conflict.recheckPassed,
+      newClashes,
+    })
+  } catch (err) {
+    serverError(res, err, "conflictsController:")
+  }
 }
