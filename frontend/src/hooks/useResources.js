@@ -9,12 +9,13 @@ import {
   notificationsApi,
 } from "../services"
 
-// Public project data needs no department index.
+// Public project data needs no department index; the response also includes
+// pagination so callers know when the backend cap applies.
 export function usePublicProjects(params) {
   return useApi(
-    useCallback(() => publicProjectsApi.list(params), [params]),
+    useCallback(() => publicProjectsApi.listPaged(params), [params]),
     [params],
-    { initialData: [] }
+    { initialData: { items: [], pagination: null } }
   )
 }
 

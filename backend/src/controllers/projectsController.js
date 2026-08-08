@@ -22,11 +22,12 @@ const { ERROR_CODES, badRequest, conflictError, notFound, sendWriteError, server
 
 const DECIDABLE_STATUS = "pending"
 
-// What the unauthenticated transparency portal may see: work the city has
-// committed to, in progress, finished, or rescheduled. Pending is still under
-// internal review and rejected never happened, so neither is public.
+// Public projects include only committed or active work; pending and rejected stay internal.
 const PUBLIC_PROJECT_STATUSES = ["approved", "active", "completed", "rescheduled"]
 const publicProjectFilter = { ...NOT_SOFT_DELETED, status: { $in: PUBLIC_PROJECT_STATUSES } }
+
+// Cap unauthenticated public reads so the list cannot grow without bound.
+const MAX_UNPAGINATED = 200
 
 // Progress applies only after approval and before completion.
 const PROGRESSABLE_STATUSES = ["approved", "active"]
@@ -90,13 +91,17 @@ exports.getPublicProjects = async (req, res) => {
   try {
     const page = parsePagination(req.query)
     let q = Project.find(publicProjectFilter).populate("department", "name code").sort("-createdAt")
-    if (page.enabled) q = q.skip(page.skip).limit(page.limit)
+    q = page.enabled ? q.skip(page.skip).limit(page.limit) : q.limit(MAX_UNPAGINATED)
 
     const [projects, total] = await Promise.all([
       q.lean(),
-      page.enabled ? Project.countDocuments(publicProjectFilter) : null,
+      Project.countDocuments(publicProjectFilter),
     ])
+
     if (page.enabled) setPaginationHeaders(res, total, page)
+    // Always reported, so a caller can tell a capped read from a complete one.
+    else res.set("X-Total-Count", String(total))
+
     res.json(serialisePublicProjects(projects))
   } catch (err) { serverError(res, err, "projectsController:") }
 }

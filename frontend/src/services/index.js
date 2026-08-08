@@ -155,9 +155,14 @@ export const projectsApi = {
 
 // Public project data requires no authentication.
 export const publicProjectsApi = {
-  async list(params) {
-    const { data } = await apiClient.get("/projects/public", { params })
-    return (data || []).map(adaptPublicProject)
+  // Paged shape rather than a bare array: the backend caps an unpaginated read,
+  // so the caller needs the total to tell a complete list from a truncated one.
+  async listPaged(params) {
+    const response = await apiClient.get("/projects/public", { params })
+    return {
+      items: (response.data || []).map(adaptPublicProject),
+      pagination: readPagination(response),
+    }
   },
 
   async get(id) {

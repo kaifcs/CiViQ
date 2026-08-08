@@ -73,6 +73,7 @@ export const AUDIT_ACTION_LABELS = {
   complaint_assigned: 'Assigned complaint',
   profile_updated: 'Updated own profile',
   password_changed: 'Changed own password',
+  user_created: 'Created account',
   user_updated: 'Updated user',
   user_status_updated: 'Changed user active state',
   department_created: 'Created department',

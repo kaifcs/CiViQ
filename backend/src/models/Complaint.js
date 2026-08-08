@@ -12,8 +12,8 @@ const complaintSchema = new mongoose.Schema({
     address:    { type: String },
     ward:       { type: String },
     coords: {
-      lat: { type: Number, required: true },
-      lng: { type: Number, required: true },
+      lat: { type: Number, required: true, min: -90, max: 90 },
+      lng: { type: Number, required: true, min: -180, max: 180 },
     }
   },
   photoUrl:    { type: String },

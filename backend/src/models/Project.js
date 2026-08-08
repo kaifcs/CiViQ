@@ -35,9 +35,11 @@ const projectSchema = new mongoose.Schema({
     city:           { type: String, default: "Ghaziabad" },
     state:          { type: String, default: "Uttar Pradesh" },
     address:        { type: String },
+    // Validate coordinates at the schema level so create, update and seed paths
+    // share the same bounds; clash detection relies on valid latitude/longitude.
     centerCoords: {
-      lat: { type: Number, required: true },
-      lng: { type: Number, required: true },
+      lat: { type: Number, required: true, min: -90, max: 90 },
+      lng: { type: Number, required: true, min: -180, max: 180 },
     },
     shape:          { type: String, enum: ["corridor","circle","rectangle","polygon"] },
     length:         { type: Number },

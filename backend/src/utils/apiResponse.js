@@ -88,6 +88,10 @@ function sendWriteError(res, err, { resource = "record", context } = {}) {
     const messages = Object.values(err.errors).map((e) => e.message)
     return badRequest(res, messages.join(", "), ERROR_CODES.VALIDATION_ERROR, messages)
   }
+  // Validate coordinates at the schema level so all write paths share the same bounds.
+  if (err?.name === "CastError") {
+    return badRequest(res, `Invalid value for ${err.path}`, ERROR_CODES.VALIDATION_ERROR)
+  }
   return serverError(res, err, context)
 }
 

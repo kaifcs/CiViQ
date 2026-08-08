@@ -39,6 +39,16 @@ exports.register = async (req, res) => {
       phone,
     })
 
+    // Account creation grants access, so it is audited like later account changes.
+    // Record only the role; targetId identifies the account, and passwords never enter the audit trail.
+    await recordAudit({
+      req,
+      action: "user_created",
+      targetType: "User",
+      targetId: user._id,
+      details: { role: user.role },
+    })
+
     return res.status(201).json({
       success: true,
       message: "Account created successfully",

@@ -31,7 +31,7 @@ a Mongoose ref, so an entry survives the deletion of whatever it describes.
 
 ## Recorded actions
 
-Nineteen actions are written by the current implementation.
+Twenty actions are written by the current implementation.
 
 | Action | Source | `targetType` | `details` |
 |---|---|---|---|
@@ -49,6 +49,7 @@ Nineteen actions are written by the current implementation.
 | `complaint_assigned` | `complaintsController.assignComplaint` | Complaint | `{ assignedDepartment, assignedOfficer }` |
 | `profile_updated` | `authController.updateProfile` | User | — |
 | `password_changed` | `authController.changePassword` | User | — |
+| `user_created` | `authController.register` | User | `{ role }` |
 | `user_updated` | `usersController.updateUser` | User | `{ fields }`, plus `{ role: { from, to } }` when the role changed |
 | `user_status_updated` | `usersController.updateUserStatus` | User | `{ isActive }` |
 | `department_created` | `departmentController.createDepartment` | Department | `{ name, code }` |

@@ -88,7 +88,13 @@ function ProjectCard({ project, onClick }) {
 
 export default function CitizenProjects() {
   const navigate = useNavigate()
-  const { data: projects, loading, error, reload } = usePublicProjects()
+  const { data, loading, error, reload } = usePublicProjects()
+  const projects = data?.items
+
+  // Search and filters only see fetched rows, so pagination metadata is surfaced
+  // instead of making a capped result look complete.
+  const total = data?.pagination?.total ?? null
+  const truncated = total !== null && Number.isFinite(total) && total > (projects?.length ?? 0)
 
   const [search, setSearch] = useState("")
   const [filterType, setFilterType] = useState("")
@@ -168,6 +174,13 @@ export default function CitizenProjects() {
             </div>
           </div>
         </div>
+
+        {truncated && (
+          <div className="text-[13px] text-[#92400E] bg-[#FFFBEB] border border-[#FDE68A] rounded-[8px] px-3 py-2">
+            Showing the {projects.length} most recent of {total} projects. Search and
+            filters apply only to these.
+          </div>
+        )}
 
         <AsyncState loading={loading} error={error} onRetry={reload} label="Loading projects...">
           {filtered.length === 0 ? (

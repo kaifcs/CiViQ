@@ -312,7 +312,8 @@ module.exports = {
       tags: ["Projects"], summary: "List public projects (PUBLIC — no authentication)",
       description:
         "The citizen transparency portal's project list. Scoped to `status` in `approved`, `active`, `completed` or `rescheduled` — a project still `pending` review or `rejected` is never returned — and to `isActive: true`. " +
-        "The response is whitelisted by `serialisePublicProject`, not redacted from the full document: only `id`, `title`, `description`, `department` (code and name), `projectType`, `status`, `progress`, `startDate`, `endDate`, `actualEndDate` and `location` (ward, zone, address, city, state, centerCoords) are present. Officer, supervisor, MCDM score, clash state and every other internal field are absent, not merely hidden.",
+        "The response is whitelisted by `serialisePublicProject`, not redacted from the full document: only `id`, `title`, `description`, `department` (code and name), `projectType`, `status`, `progress`, `startDate`, `endDate`, `actualEndDate` and `location` (ward, zone, address, city, state, centerCoords) are present. Officer, supervisor, MCDM score, clash state and every other internal field are absent, not merely hidden.\n\n" +
+        "**Capped at 200 records without `?page`/`?limit`**, the same ceiling the complaint list and the audit trail apply, so this unauthenticated endpoint cannot be used to pull an unbounded collection in one request. `X-Total-Count` is sent on every response — paginated or not — so a truncated read is never silent: compare it against the array length, and page through for the rest.",
       security: [],
       parameters: PAGED,
       responses: { 200: { description: "Public projects, newest first.", headers: PAGE_HEADERS, ...json({ type: "array", items: ref("PublicProject") }) }, 429: res$("RateLimited"), 500: res$("ServerError") },

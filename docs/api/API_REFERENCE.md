@@ -267,6 +267,10 @@ full document: only `id`, `title`, `description`, `department` (`code`,
 every other internal field are absent from the shape entirely. Supports
 `?page` and `?limit`.
 
+Capped at 200 records without `?page`/`?limit`, the same ceiling the complaint
+list and the audit trail apply. `X-Total-Count` is sent on every response,
+paginated or not, so a truncated read can be told from a complete one.
+
 ### GET /api/projects/public/:id
 **public**
 

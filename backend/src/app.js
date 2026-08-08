@@ -36,7 +36,16 @@ app.set("trust proxy", parseTrustProxy(process.env.TRUST_PROXY))
 app.use(requestContext)
 
 app.use(helmet())
-app.use(cors({ origin: process.env.CLIENT_URL || "http://localhost:5173" }))
+// Expose pagination and correlation headers to cross-origin browser clients;
+// otherwise JavaScript cannot read them.
+app.use(cors({
+  origin: process.env.CLIENT_URL || "http://localhost:5173",
+  exposedHeaders: [
+    "X-Total-Count", "X-Page", "X-Limit",
+    "X-Total-Pages", "X-Has-Next", "X-Has-Previous",
+    "X-Request-Id",
+  ],
+}))
 app.use(compression())
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
