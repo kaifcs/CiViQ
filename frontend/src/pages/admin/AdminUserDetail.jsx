@@ -96,12 +96,13 @@ export default function AdminUserDetail() {
     .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
     .slice(0, 5)
 
-  const completedProjects = userProjects.filter(p => p.status === 'approved' || p.progress === 100).length
-  const completionRate    = userProjects.length > 0 ? Math.round((completedProjects / userProjects.length) * 100) : 0
+  // Matches the backend definition of a completed project.
+  const completedProjects = userProjects.filter(p => p.status === 'completed').length
+  const completionRate = userProjects.length > 0
+    ? Math.round((completedProjects / userProjects.length) * 100)
+    : 0
 
-  // PATCH /api/users/:id/status. A rejection — deactivating oneself, or the last
-  // active administrator — leaves the account untouched on the server, so the
-  // displayed status is left as it was and the backend's reason is shown.
+  // Keep the current status if the backend rejects the update.
   async function handleDeactivate() {
     if (deactivating) return
     setActionError('')

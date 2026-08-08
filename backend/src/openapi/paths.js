@@ -188,6 +188,29 @@ module.exports = {
     },
   },
 
+  "/api/config/wards": {
+    get: {
+      tags: ["Config"], summary: "List the municipal ward register (auth)",
+      description:
+        "Read-only lookup configuration, served from `config/staticConfig.wards`. There is no ward collection and no way to modify the register through the API — it is redrawn by municipal notification, not by an operator.\n\n" +
+        "Client ward selectors read this rather than carrying their own copy, so the values offered are always the ones the backend reasons about. `Project.location.ward` drives clash-detection candidate selection, the MCDM condition criterion and every ward analytic; a value outside this register degrades all three, which is why the list is served rather than duplicated.",
+      responses: {
+        200: {
+          description: "The ward register, in register order.",
+          ...json({
+            type: "object",
+            properties: {
+              success: { type: "boolean", example: true },
+              count: { type: "integer", example: 9 },
+              wards: { type: "array", items: { type: "string" }, example: ["Ward 3", "Ward 5", "Ward 6"] },
+            },
+          }),
+        },
+        ...ENV_GUARDS,
+      },
+    },
+  },
+
   "/api/departments": {
     get: {
       tags: ["Departments"], summary: "List departments (auth)",

@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
-import { useAssignableSupervisors, useDepartments, useProject } from '../../hooks/useResources'
+import { useAssignableSupervisors, useDepartments, useProject, useWards } from '../../hooks/useResources'
 import AsyncState from '../../components/AsyncState'
 import { projectsApi, buildProjectPayload, normaliseError } from '../../services'
 // Configuration only.
@@ -102,6 +102,9 @@ export default function OfficerProjectNew() {
   // Derived from the officer's own projects, since GET /api/users is admin-only.
   const { supervisors } = useAssignableSupervisors()
   const { data: departments } = useDepartments()
+  // GET /api/config/wards — the backend's ward register, so this selector
+  // cannot offer a ward clash detection and the ward analytics do not know.
+  const { data: wards } = useWards()
   const [submitError, setSubmitError] = useState('')
 
   const [step, setStep] = useState(0)
@@ -113,7 +116,9 @@ export default function OfficerProjectNew() {
   const [type,     setType]     = useState('Road')
   const [desc,     setDesc]     = useState('')
   const [address,  setAddress]  = useState('')
-  const [ward,     setWard]     = useState('Ward 12')
+  // Seeded from the register once it loads, rather than from a literal — see
+  // the effect-free default below.
+  const [ward,     setWard]     = useState('')
   // Project.location.centerCoords is required by the backend and is what every
   // GIS layer plots. Seeded from the configured city centre so it is never
   // submitted empty, but the officer must be able to correct it.
@@ -171,6 +176,12 @@ export default function OfficerProjectNew() {
   }
 
   const dept = (editing ? existing?.department : user?.department) || null
+
+  // Default to the first available ward.
+  if (!ward && wards.length > 0) setWard(wards[0])
+
+  // Preserve the current ward even if it is no longer in the lookup.
+  const wardOptions = ward && !wards.includes(ward) ? [ward, ...wards] : wards
 
   function duration() {
     if (!startDate || !endDate) return ''
@@ -364,8 +375,11 @@ export default function OfficerProjectNew() {
                   </div>
                   <div>
                     <label className={labelCls}>Ward</label>
-                    <select value={ward} onChange={e => setWard(e.target.value)} style={{ paddingRight: '32px' }} className={`${inputCls} cursor-pointer`}>
-                      {['Ward 3', 'Ward 7', 'Ward 9', 'Ward 12', 'Ward 15', 'Ward 18', 'Ward 22'].map(w => <option key={w} value={w}>{w}</option>)}
+                    <select value={ward} onChange={e => setWard(e.target.value)} style={{ paddingRight: '32px' }}
+                      disabled={wardOptions.length === 0}
+                      className={`${inputCls} cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed`}>
+                      {wardOptions.length === 0 && <option value="">Loading wards…</option>}
+                      {wardOptions.map(w => <option key={w} value={w}>{w}</option>)}
                     </select>
                   </div>
                   <div className="grid grid-cols-2 gap-3">

@@ -7,7 +7,7 @@ import { useAuth } from "./useAuth"
 import { useNotificationCenter } from "./useNotificationCenter"
 import {
   projectsApi, conflictsApi, complaintsApi, usersApi,
-  auditApi, dashboardApi, departmentsApi, publicProjectsApi,
+  auditApi, dashboardApi, departmentsApi, publicProjectsApi, configApi,
 } from "../services"
 
 // The citizen transparency portal. Unauthenticated, so unlike useProjects()
@@ -118,6 +118,12 @@ export function useDepartmentOptions() {
 export function useNotifications() {
   const { data, loading, error, reload } = useNotificationCenter()
   return { data, loading, error, reload }
+}
+
+// The municipal ward register, served from the backend's lookup configuration
+// so no selector hardcodes a vocabulary the backend reasons about.
+export function useWards() {
+  return useApi(useCallback(() => configApi.wards(), []), [], { initialData: [] })
 }
 
 export function useDepartments() {

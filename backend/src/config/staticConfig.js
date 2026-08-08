@@ -1,10 +1,19 @@
-// Domain tuning constants for clash detection and MCDM scoring. These are
-// policy, not implementation, and changing any value changes real
-// recommendations. `mcdmWeights` must total 1.0 to keep `score` on its 0-10 scale.
-
+// Policy configuration for clash detection and MCDM scoring.
 module.exports = {
-  // Recovery period after a work completes, before neighbouring work may start.
-  // Keys match the Project.projectType enum, so no lookup falls back.
+  // Supported municipal wards.
+  wards: [
+    "Ward 3",
+    "Ward 5",
+    "Ward 6",
+    "Ward 8",
+    "Ward 9",
+    "Ward 12",
+    "Ward 14",
+    "Ward 18",
+    "Ward 21",
+  ],
+
+  // Recovery period after project completion (days).
   bufferDays: {
     road:        14,
     water:       10,
@@ -14,7 +23,7 @@ module.exports = {
     other:        7,
   },
 
-  // Geographic buffer by project type (meters)
+  // Geographic buffer by project type (meters).
   geoBuffer: {
     road:        30,
     water:       15,
@@ -24,35 +33,34 @@ module.exports = {
     other:       15,
   },
 
-  // Size buffer addition (meters)
+  // Additional buffer based on project size (meters).
   sizeBuffer: [
-    { maxArea:  5000,  extra:  0 },
-    { maxArea: 20000,  extra: 10 },
-    { maxArea: 50000,  extra: 20 },
+    { maxArea: 5000, extra: 0 },
+    { maxArea: 20000, extra: 10 },
+    { maxArea: 50000, extra: 20 },
     { maxArea: 100000, extra: 30 },
     { maxArea: Infinity, extra: 40 },
   ],
 
-  // Work type conflict matrix
-  // incompatible / conditional / compatible
+  // Compatibility between project types.
   conflictMatrix: {
-    road:        { road:"incompatible", water:"incompatible", electricity:"conditional", sewage:"incompatible", parks:"conditional",  other:"conditional" },
-    water:       { road:"incompatible", water:"incompatible", electricity:"compatible",  sewage:"incompatible", parks:"compatible",   other:"conditional" },
-    electricity: { road:"conditional",  water:"compatible",   electricity:"incompatible",sewage:"compatible",   parks:"compatible",   other:"conditional" },
-    sewage:      { road:"incompatible", water:"incompatible", electricity:"compatible",  sewage:"incompatible", parks:"compatible",   other:"conditional" },
-    parks:       { road:"conditional",  water:"compatible",   electricity:"compatible",  sewage:"compatible",   parks:"incompatible", other:"conditional" },
-    other:       { road:"conditional",  water:"conditional",  electricity:"conditional", sewage:"conditional",  parks:"conditional",  other:"conditional" },
+    road:        { road: "incompatible", water: "incompatible", electricity: "conditional", sewage: "incompatible", parks: "conditional", other: "conditional" },
+    water:       { road: "incompatible", water: "incompatible", electricity: "compatible", sewage: "incompatible", parks: "compatible", other: "conditional" },
+    electricity: { road: "conditional", water: "compatible", electricity: "incompatible", sewage: "compatible", parks: "compatible", other: "conditional" },
+    sewage:      { road: "incompatible", water: "incompatible", electricity: "compatible", sewage: "incompatible", parks: "compatible", other: "conditional" },
+    parks:       { road: "conditional", water: "compatible", electricity: "compatible", sewage: "compatible", parks: "incompatible", other: "conditional" },
+    other:       { road: "conditional", water: "conditional", electricity: "conditional", sewage: "conditional", parks: "conditional", other: "conditional" },
   },
 
-  // Seasonal calendar for Ghaziabad
+  // Seasonal calendar.
   seasonal: {
     city: "Ghaziabad",
-    monsoon:    [6,7,8,9],
-    drySeason:  [10,11,12,1,2,3],
-    preMonsoon: [4,5],
+    monsoon: [6, 7, 8, 9],
+    drySeason: [10, 11, 12, 1, 2, 3],
+    preMonsoon: [4, 5],
   },
 
-  // Infrastructure lifecycle (years)
+  // Expected infrastructure lifespan (years).
   lifecycle: {
     road:        10,
     water:       20,
@@ -62,14 +70,14 @@ module.exports = {
     other:       10,
   },
 
-  // MCDM weights
+  // MCDM criterion weights (must total 1.0).
   mcdmWeights: {
-    conditionSeverity:    0.26,
-    populationImpact:     0.21,
-    seasonalCompatibility:0.16,
-    executionReadiness:   0.16,
-    citizenDisruption:    0.10,
-    infrastructureAge:    0.08,
-    economicValue:        0.03,
+    conditionSeverity:     0.26,
+    populationImpact:      0.21,
+    seasonalCompatibility: 0.16,
+    executionReadiness:    0.16,
+    citizenDisruption:     0.10,
+    infrastructureAge:     0.08,
+    economicValue:         0.03,
   },
 }

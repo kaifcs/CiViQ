@@ -39,6 +39,14 @@ export const authApi = {
   },
 }
 
+// Complaint queue shared across all staff roles.
+export const configApi = {
+  async wards() {
+    const { data } = await apiClient.get("/config/wards")
+    return data.wards || []
+  },
+}
+
 export const departmentsApi = {
   async list() {
     const { data } = await apiClient.get("/departments")

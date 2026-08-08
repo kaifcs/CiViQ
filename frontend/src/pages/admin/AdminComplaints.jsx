@@ -1,20 +1,15 @@
-// Complaint queue across the whole municipality. Complaints carry no ownership
-// filter — any staff member may see any complaint — so this list is unscoped
-// and assignment is a routing decision.
+// Complaint queue shared across all staff roles.
 
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useComplaints, useDepartmentOptions } from '../../hooks/useResources'
+import { useComplaints, useDashboardComplaints, useDepartmentOptions } from '../../hooks/useResources'
 import AsyncState from '../../components/AsyncState'
 import { COMPLAINT_STATUS_CONFIG, DEPT_STYLES } from '../../components/uiStyles'
-import { formatDateLong, daysSince } from '../../components/dashboard'
+import { formatDateLong, daysSince, monthKey } from '../../components/dashboard'
 
-
-function isResolvedThisMonth(c) {
-  if (!c.resolvedAt) return false
-  const d = new Date(c.resolvedAt)
-  return d.getMonth() === 0 && d.getFullYear() === 2025
-}
+// Label for the current reporting month.
+const currentMonthLabel = () =>
+  new Date().toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })
 
 function FilterSelect({ label, value, onChange, options }) {
   return (
@@ -45,16 +40,22 @@ const VDivider = () => (
 export default function AdminComplaints() {
   const navigate = useNavigate()
   const { data: complaints, loading, error, reload } = useComplaints()
+  // Dashboard statistics are provided by the analytics endpoint.
+  const { data: stats, loading: loadingStats, error: statsError } = useDashboardComplaints()
   const departmentOptions = useDepartmentOptions()
 
   const [search,       setSearch]       = useState('')
   const [filterDept,   setFilterDept]   = useState('')
   const [filterStatus, setFilterStatus] = useState('')
 
-  const totalCount        = complaints.length
-  const unresolvedCount   = complaints.filter(c => c.status !== 'resolved').length
-  const overdueCount      = complaints.filter(c => c.overdue).length
-  const resolvedThisMonth = complaints.filter(isResolvedThisMonth).length
+  // Read the current month's resolved count from the backend.
+  const resolvedThisMonth = useMemo(() => {
+    const key = monthKey(new Date())
+    return (stats?.resolvedMonthly || []).find(m => m.period === key)?.count ?? 0
+  }, [stats])
+
+  // A figure that could not be counted reads as unknown rather than as zero.
+  const statValue = (value) => (statsError ? '—' : loadingStats ? '…' : value ?? 0)
 
   const filtered = useMemo(() => {
     return complaints.filter(c => {
@@ -80,12 +81,12 @@ export default function AdminComplaints() {
     <AsyncState loading={loading} error={error} onRetry={reload} label="Loading complaints...">
     <div className="flex flex-col gap-5 h-full" style={{ fontFamily: "'Inter', sans-serif" }}>
 
+      {/* Dashboard metrics are provided by the analytics endpoint. */}
       <div className="flex gap-3 flex-shrink-0">
         {[
-          { label: 'Total',               sub: 'All time',     value: totalCount,         danger: false },
-          { label: 'Unresolved',          sub: 'Needs action', value: unresolvedCount,    danger: true  },
-          { label: 'Overdue',             sub: 'Past deadline',value: overdueCount,       danger: true  },
-          { label: 'Resolved this month', sub: 'January 2025', value: resolvedThisMonth,  danger: false },
+          { label: 'Total',               sub: 'All time',          value: statValue(stats?.total), danger: false },
+          { label: 'Unresolved',          sub: 'Needs action',      value: statValue(stats?.open),  danger: true  },
+          { label: 'Resolved this month', sub: currentMonthLabel(), value: statValue(resolvedThisMonth), danger: false },
         ].map(s => (
           <div
             key={s.label}

@@ -60,6 +60,7 @@ module.exports = {
   tags: [
     { name: "Health", description: "Infrastructure health probe" },
     { name: "Auth", description: "Registration, login, logout, current user" },
+    { name: "Config", description: "Read-only lookup configuration. Served from static configuration, not a collection — there is no create, update or delete." },
     { name: "Departments", description: "Department management. Reads are open to any authenticated role, because departments are referenced by id elsewhere; writes are admin only." },
     { name: "Users", description: "User management (admin only)" },
     { name: "Projects", description: "Project lifecycle, MCDM scoring and clash detection" },

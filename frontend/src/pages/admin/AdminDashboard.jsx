@@ -79,7 +79,6 @@ export default function AdminDashboard() {
     { label: 'Complaints',         value: summary?.complaints?.total ?? 0,          sub: `${summary?.complaints?.open ?? 0} unresolved` },
     { label: 'Departments',        value: summary?.departments?.total ?? 0,         sub: `${summary?.departments?.active ?? 0} active` },
     { label: 'Officers',           value: summary?.users?.byRole?.officer ?? 0,     sub: 'Field engineers' },
-    { label: 'Citizens',           value: summary?.users?.byRole?.citizen ?? 0,     sub: 'Registered residents' },
   ], [summary])
 
   const projectsByDepartment = useMemo(

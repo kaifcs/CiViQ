@@ -30,3 +30,6 @@ Thumbs.db
 # Vite cache
 .vite
 frontend/.vite
+
+# AI Tools
+.claudeignore

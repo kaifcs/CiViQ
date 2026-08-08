@@ -92,6 +92,7 @@ app.use("/api/health", require("./routes/health"))
 app.use("/api", require("./routes/docs"))
 
 app.use("/api/auth", require("./routes/auth"))
+app.use("/api/config", require("./routes/config"))
 app.use("/api/departments", require("./routes/departments"))
 app.use("/api/projects", require("./routes/projects"))
 app.use("/api/conflicts", require("./routes/conflicts"))
