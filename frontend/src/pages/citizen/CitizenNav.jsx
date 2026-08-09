@@ -61,7 +61,7 @@ function CitizenHeader() {
               {link.label}
             </NavLink>
           ))}
-          <Button to="/login" variant="secondary" size="sm" className="ml-3">Staff sign in</Button>
+          <Button to="/login" variant="secondary" size="sm" className="ml-3">Staff Login</Button>
         </nav>
 
         <button
@@ -90,7 +90,7 @@ function CitizenHeader() {
               </NavLink>
             ))}
             <Button to="/login" variant="secondary" size="md" onClick={() => setOpen(false)} className="mt-2 w-full">
-              Staff sign in
+              Staff Login
             </Button>
           </Container>
         </div>
@@ -110,7 +110,7 @@ const footerGroups = [
   },
   {
     title: "For staff",
-    links: [{ label: "Staff sign in", path: "/login" }],
+    links: [{ label: "Staff Login", path: "/login" }],
   },
 ]
 
@@ -123,7 +123,10 @@ function CitizenFooter() {
         <div className="grid gap-8 sm:gap-10 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           <div className="lg:col-span-2 flex flex-col gap-3 max-w-[380px]">
             <CiviqLogo size={24} />
-            <p className="text-[13px] font-medium text-[#475569]">Plan together. Build once.</p>
+            <p className="text-[13px] leading-relaxed text-[#64748B]">
+              The Smart Urban Project Coordination Platform for Ghaziabad Municipal Corporation.
+              Plan together. Build once.
+            </p>
           </div>
 
           {footerGroups.map((group) => (

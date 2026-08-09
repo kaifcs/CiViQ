@@ -206,7 +206,7 @@ export default function CitizenHome() {
                 and route resident complaints.
               </p>
             </div>
-            <Button to="/login" variant="onDark" size="lg" className="w-full md:w-auto">Staff sign in</Button>
+            <Button to="/login" variant="onDark" size="lg" className="w-full md:w-auto">Staff Login</Button>
           </div>
         </Container>
       </section>

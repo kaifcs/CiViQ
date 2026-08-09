@@ -160,7 +160,7 @@ backend/
     helpers/         response doubles, fixtures, per-file test database
 frontend/
   src/
-    components/      shared UI, plus the dashboard/ and notifications/ modules
+    components/      shared UI, plus the dashboard/, notifications/ and public/ modules
     context/         authentication and notification state
     gis/             map primitives, layers and styles
     hooks/           data-fetching hooks

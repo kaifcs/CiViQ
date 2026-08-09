@@ -97,7 +97,7 @@ Only dependencies that the application actually uses are listed.
 | --- | --- |
 | **React 19** | UI layer for the three staff role sections and the public portal |
 | **Vite 8** | Dev server and production build, with route-level code splitting |
-| **React Router 7** | Route table in `router/AppRouter.jsx`; dashboards eager, the rest `lazy()` |
+| **React Router 7** | Route table in `router/AppRouter.jsx`; dashboards, login and the citizen landing page eager, the rest `lazy()` |
 | **Tailwind CSS 3** | All styling; shared class dictionaries live in `components/uiStyles.js` |
 | **Axios** | HTTP client wrapped by `services/apiClient.js`, which injects the JWT |
 | **Leaflet 1.9** | Map rendering for every GIS surface |
@@ -207,8 +207,9 @@ routes/  ──► middleware/ (protect · authorize · ownership) ──► con
 
 `src/router/AppRouter.jsx` is the route table, organised into role-prefixed
 sections (`/admin`, `/officer`, `/supervisor`) plus the unauthenticated citizen
-routes. Dashboards and login load eagerly; everything else is `lazy()`, and the map
-routes specifically so Leaflet stays off the critical path.
+routes. The three role dashboards, login and the citizen landing page load eagerly;
+everything else is `lazy()`, which keeps Leaflet off the critical path because every
+screen that imports `gis/` sits behind a lazy route.
 
 `src/services/` is the contract boundary. `apiClient.js` injects the JWT, and on a
 401 clears the session and dispatches a `civiq:auth-expired` event rather than
@@ -216,13 +217,14 @@ importing `AuthContext` directly. **All backend→view-model projection lives in
 `adapters.js`** — enum casing, the conflict vocabulary rename, the MCDM 0–10 → 0–100
 conversion, and `UNAVAILABLE_FIELDS` for UI fields with no backend source.
 
-Four shared modules exist so nothing is redeclared per screen:
+Five shared modules exist so nothing is redeclared per screen:
 
 | Module | Owns |
 | --- | --- |
 | `components/dashboard` | charts, sortable tables, filters, CSV export, formatters, status **labels** |
 | `components/uiStyles.js` | status / department / type / role **Tailwind classes** |
 | `components/notifications` | list, item and dropdown, all reading one provider via `useNotificationCenter` |
+| `components/public` | light-first primitives for the citizen portal and sign-in screen; no `dark:` variants |
 | `src/gis` | Leaflet primitives, layer styles and configuration, marker **colours** |
 
 Client-side route guards are **UX only**; real enforcement is backend RBAC.
@@ -711,6 +713,8 @@ frontend/
     components/      shared UI
       dashboard/     charts, tables, filters, CSV export, formatters
       notifications/ notification list, item and navbar dropdown
+      public/        light-first primitives for the citizen portal and sign-in screen
+      Brand.jsx      CIVIQ mark and wordmark, shared by portal, sign-in and sidebar
       uiStyles.js    Tailwind class dictionaries shared by list/detail screens
 ```
 
@@ -856,8 +860,8 @@ Both packages ship a `.env.example`. Never commit real values.
 | Health check | http://localhost:5000/api/health |
 
 Public entry points need no account: `/` and `/home` (portal), `/projects` and
-`/projects/:id` (approved work), `/complaints/new` and `/complaints/track`. Staff sign
-in at `/login`, reachable from the portal header's "Staff Login" action, and are routed
+`/projects/:id` (approved work), `/complaints/new` and `/complaints/track`. Staff Login at
+`/login`, reachable from the portal header's "Staff Login" action, and are routed
 to their role's dashboard.
 
 <hr/>

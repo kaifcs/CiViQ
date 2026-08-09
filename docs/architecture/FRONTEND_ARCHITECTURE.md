@@ -186,9 +186,11 @@ the role does not match.
 Route guarding is a navigation concern only. The backend independently decides
 what a user may read or write and is the sole authority.
 
-`AdminMap` and `OfficerMap` are the only `lazy()` routes, wrapped in a single
-`Suspense` boundary. They are the only consumers of Leaflet, so the GIS bundle
-stays off the critical path for every other route.
+Every route is `lazy()` except `Login`, `CitizenHome` and the three role
+dashboards, all under a single `Suspense` boundary. Leaflet is reached only by
+lazy routes — the two map screens, the project, complaint and conflict detail
+screens, the officer project wizard, and the citizen project detail and
+complaint form — so the GIS bundle stays off the critical path.
 
 ## Components — `src/components/`
 
@@ -196,7 +198,8 @@ stays off the critical path for every other route.
 |---|---|
 | `DashboardLayout` | Shell for authenticated roles; owns sidebar collapse and dark mode |
 | `Navbar` | Page title, theme toggle, notification bell, account menu |
-| `Sidebar` | Role-aware primary navigation |
+| `Sidebar` | Role-aware primary navigation; its logo navigates to the signed-in role's own dashboard |
+| `Brand.jsx` | `CiviqMark` and `CiviqWordmark`, shared by the citizen shell, the sign-in screen and the sidebar |
 | `Avatar` | Photo or initials, fixed size token set |
 | `Card` | Project summary card |
 | `AsyncState` | `LoadingState`, `ErrorState` and empty states |
@@ -205,6 +208,17 @@ stays off the critical path for every other route.
 Two sub-modules have their own barrels: `components/dashboard/` (charts,
 sortable tables, filters, CSV export, formatters) and
 `components/notifications/` (list, item, dropdown).
+
+`components/public/` holds the light-first primitives used only by the citizen
+portal and the sign-in screen — `ui.jsx` (layout, buttons, badges, status pill,
+progress meter, form field, notice) and `controlStyles.js` (form-control classes
+and the shared focus ring). Nothing in it carries a `dark:` variant, and no
+authenticated screen imports it. It is imported directly rather than through a
+barrel.
+
+The sidebar logo calls the same `onNavigate('dashboard')` handler as the
+Dashboard nav item, so `AppRouter`'s per-role layout decides the destination and
+no route is duplicated.
 
 ## GIS — `src/gis/`
 
@@ -235,8 +249,8 @@ Every registered route renders a built screen.
 ## Build
 
 Vite with `@vitejs/plugin-react`. The configuration is minimal: chunking is left
-to Vite's defaults, which already separate the Leaflet-dependent map routes
-because those are the only lazy imports.
+to Vite's defaults, which emit the Leaflet-dependent code as its own chunk
+because every module that imports `gis/` is behind a lazy route.
 
 Tailwind runs through PostCSS with autoprefixer. The theme is unextended —
 colours are literal hex values at each call site, centralised for shared cases in

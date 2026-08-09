@@ -298,16 +298,17 @@ exporting both a value and a component breaks react-refresh.
 
 ### Loading
 
-`AdminMap` and `OfficerMap` are the only routes loaded with `lazy()`, and the
-only consumers of Leaflet. The GIS bundle therefore stays off the critical path
-for every other route.
+Leaflet is imported only by screens behind a `lazy()` route: `AdminMap` and
+`OfficerMap`, the project, complaint and conflict detail screens for admin and
+officer, `OfficerProjectNew`, and the citizen `CitizenProjectDetail` and
+`CitizenComplaintNew`. The GIS bundle therefore stays off the critical path —
+the eagerly loaded routes are `Login`, `CitizenHome` and the three role
+dashboards, none of which import Leaflet.
 
-Two files outside the map screens import from `gis/`:
-`pages/officer/OfficerProjectNew.jsx` takes `DEFAULT_CENTER` from `gis/config`
-and `isValidLatitude` / `isValidLongitude` from `gis/coordinates`, and
-`components/uiStyles.js` takes `PROJECT_STATUS_COLORS` from `gis/projectStyles`.
-All three modules are pure configuration and helpers, so neither import drags
-Leaflet into the initial bundle.
+One module on the eager path does import from `gis/`: `components/uiStyles.js`
+takes `PROJECT_STATUS_COLORS` from `gis/projectStyles`. That file is pure
+configuration with no imports of its own, so it does not drag Leaflet into the
+initial bundle.
 
 ## Test coverage
 
