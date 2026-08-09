@@ -4,7 +4,7 @@
 
 const User = require("../models/User")
 const { generateToken } = require("../utils/token")
-const { validateRegisterInput, validateLoginInput } = require("../utils/validators")
+const { validateRegisterInput, validateLoginInput, isString } = require("../utils/validators")
 const { pickWritable } = require("../utils/writableFields")
 const { recordAudit } = require("../services/auditService")
 const { ERROR_CODES, badRequest, conflictError, fail, unauthorized } = require("../utils/apiResponse")
@@ -109,12 +109,17 @@ exports.logout = async (req, res) => {
   })
 }
 
-// PUT /api/auth/profile — self-service, distinct from the admin-only
-// PUT /api/users/:id: a caller can only ever reach their own record here, and
-// the writable set excludes role, department, isActive and email.
+// Self-service profile update; only the caller's own record is reachable.
 exports.updateProfile = async (req, res) => {
   try {
     const updates = pickWritable(req.body, PROFILE_WRITABLE_FIELDS)
+
+    // Writable fields are strings, so reject non-strings before trim or Mongoose casting.
+    for (const field of PROFILE_WRITABLE_FIELDS) {
+      if (updates[field] !== undefined && !isString(updates[field])) {
+        return badRequest(res, `${field} must be a string`)
+      }
+    }
 
     if (updates.fullName !== undefined && !updates.fullName.trim()) {
       return badRequest(res, "Full name cannot be empty")
@@ -138,14 +143,12 @@ exports.updateProfile = async (req, res) => {
   }
 }
 
-// PUT /api/auth/password — self-service password change. Independent of user
-// management: there is still no endpoint through which one account can set
-// another's password.
+// Self-service password change; no account can change another user's password.
 exports.changePassword = async (req, res) => {
   try {
     const { currentPassword, newPassword, confirmPassword } = req.body
 
-    if (!currentPassword || !newPassword) {
+    if (!isString(currentPassword) || !isString(newPassword) || !currentPassword || !newPassword) {
       return badRequest(res, "Current and new password are required")
     }
     if (newPassword.length < 8) {
@@ -155,9 +158,7 @@ exports.changePassword = async (req, res) => {
       return badRequest(res, "New password and confirmation do not match")
     }
 
-    // req.user carries no password (protect selects it out); re-read with it.
-    // A wrong current password is a validation failure, not a 401: the caller's
-    // session is already authenticated, and apiClient logs out on any 401.
+    // req.user excludes password; wrong current password is a validation error, not 401.
     const user = await User.findById(req.user._id).select("+password")
     if (!user || !(await user.matchPassword(currentPassword))) {
       return badRequest(res, "Current password is incorrect")
@@ -166,9 +167,7 @@ exports.changePassword = async (req, res) => {
     user.password = newPassword
     await user.save()
 
-    // No session store or token version exists to revoke: a JWT carries only
-    // the user id, so the currently-signed-in device stays logged in, matching
-    // how a role change takes effect without forcing a fresh login.
+    // JWTs have no revocation state, so the current device stays signed in.
     await recordAudit({ req, action: "password_changed", targetType: "User", targetId: user._id })
 
     return res.status(200).json({ success: true, message: "Password updated successfully" })

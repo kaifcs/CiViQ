@@ -74,6 +74,9 @@ exports.getComplaints = async (req, res) => {
     const { status, department, assignedOfficer, issueType, from, to, search } = req.query
     const filter = {}
 
+    // Assignment fields are redacted publicly, so related filters are dropped.
+    const staffCaller = Boolean(req.user)
+
     // Express parses ?status[$ne]=x into an object, which would reach the query
     // as a Mongo operator, so every scalar filter is validated or coerced first.
     if (status) {
@@ -82,7 +85,7 @@ exports.getComplaints = async (req, res) => {
       }
       filter.status = status
     }
-    if (department) filter.assignedDepartment = String(department)
+    if (department && staffCaller) filter.assignedDepartment = String(department)
     if (issueType) {
       if (!ISSUE_TYPES.includes(issueType)) {
         return badRequest(res, `issueType must be one of: ${ISSUE_TYPES.join(", ")}`)
@@ -90,7 +93,7 @@ exports.getComplaints = async (req, res) => {
       filter.issueType = issueType
     }
 
-    if (assignedOfficer) {
+    if (assignedOfficer && staffCaller) {
       if (!mongoose.Types.ObjectId.isValid(assignedOfficer)) {
         return badRequest(res, "Invalid assigned officer ID")
       }
