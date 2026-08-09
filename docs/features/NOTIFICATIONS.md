@@ -52,12 +52,25 @@ the role they think they have must be told regardless of preferences.
 | Project rejected | `projectsController.rejectProject`, `conflictsController.resolveConflict` | Owning officer |
 | Project assigned | `projectsController.updateProject` | Newly assigned supervisor |
 | Project completed | `projectsController.updateProgress` | Owning officer |
-| Complaint assigned | `complaintsController.assignComplaint` | Newly assigned officer |
+| Complaint assigned | `complaintsController.assignComplaint`, `complaintsController.updateComplaint` | Newly assigned officer |
 | Complaint status changed | `complaintsController.updateStatus` | Assigned officer |
 | Role changed | `usersController.updateUser` | The affected user |
 
 Each fires only on an actual transition. Re-saving the same supervisor, the same
 role or a project already at 100% progress produces nothing.
+
+## Self-directed notifications
+
+A producer may pass an `actor` — the user performing the action. When it equals
+the recipient, `dropSelfDirected` discards the payload before anything is
+persisted or delivered, so an officer working their own complaint queue is not
+told about their own clicks. The complaint producers pass it; the field is
+stripped from the payload and never stored, so `Notification` still records only
+a recipient.
+
+Opting in per producer is deliberate rather than a global rule: clash detection
+notifies the submitting officer about their own submission on purpose, because
+the clash is news even though they caused it.
 
 ## Links
 

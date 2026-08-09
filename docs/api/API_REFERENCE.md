@@ -152,11 +152,15 @@ Account creation is an administrative act, not self-service.
 
 | Field | Required | Rule |
 |---|---|---|
-| `fullName` | yes | Non-empty |
-| `email` | yes | Must match the email pattern |
-| `password` | yes | Minimum 8 characters |
+| `fullName` | yes | String, non-empty |
+| `email` | yes | String matching the email pattern |
+| `password` | yes | String, minimum 8 characters |
 | `role` | yes | `officer` or `supervisor` only |
 | `phone` | no | |
+
+The string fields are checked by type, not by coercion, and a non-string returns
+400. Coercion would be the hole: `["real@civiq.test"]` stringifies to a
+valid-looking address and would otherwise pass the pattern.
 
 `admin` cannot be created here, so no single request both creates
 a principal and grants it unrestricted access; promote an account with
@@ -175,6 +179,11 @@ Body `{ email, password }`. Returns `{ success, message, token, user }`.
 An unknown email, a wrong password and an inactive account all return the same
 401 with the message `Invalid email or password`, so the endpoint cannot be used
 to enumerate accounts. `lastLogin` is updated on success.
+
+`email` and `password` must both be non-empty strings. A missing field and a
+field of the wrong type both return 400 with the same message, `Email and
+password are required`, so a wrong type is not distinguishable from a missing
+one and the endpoint does not become a probe for how it parses input.
 
 ### POST /api/auth/logout
 **auth**
@@ -195,6 +204,10 @@ admin-only `PUT /api/users/:id`, which can edit any account. Writable:
 `fullName`, `phone`, `avatar`. `role`, `department`, `isActive` and `email`
 are not reachable through this endpoint at all, so there is no path from a
 self-service update to a privilege change.
+
+All three writable fields are schema strings, so a non-string returns 400
+`<field> must be a string` and nothing is written. `fullName` must also be
+non-blank after trimming.
 
 Returns `{ success, user }` with the updated record. Records a
 `profile_updated` audit entry.
@@ -320,7 +333,9 @@ Validation: the department must exist and be active; a supplied
 supervisor); a supplied `supervisor` must exist, be active and hold the
 `supervisor` role, because `PUT /:id/progress` is gated on that role and any
 other assignee would leave the project impossible to complete; `endDate` cannot
-precede `startDate`. The same rules apply to `PUT /api/projects/:id`.
+precede `startDate`; `location.centerCoords.lat` must be within `[-90, 90]` and
+`location.centerCoords.lng` within `[-180, 180]`. The same rules apply to
+`PUT /api/projects/:id`.
 
 The request runs MCDM scoring and clash detection. Returns `201`:
 
@@ -487,12 +502,19 @@ way, but `serialiseComplaint` removes `assignedOfficer`, `assignedDepartment`,
 there is no session. `location.ward` is kept, so the public aggregate views
 still work. An authenticated caller of any role receives the full document.
 
+The two filters that narrow by internal allocation are gated on the same rule:
+without a session `department` and `assignedOfficer` are **ignored**, because
+membership of a filtered result set would prove the assignment the redaction
+just removed, and `X-Total-Count` would report an exact count of it. They are
+dropped rather than rejected, as server-owned fields are on the write side, so
+an ignored filter cannot be probed by watching for a validation error either.
+
 | Query | Effect |
 |---|---|
 | `status` | Exact match; a value outside the enum returns 400 |
-| `department` | Matches `assignedDepartment` |
+| `department` | **auth only** — matches `assignedDepartment`; ignored without a session |
 | `issueType` | Exact match; a value outside the enum returns 400 |
-| `assignedOfficer` | ObjectId; invalid values return 400 |
+| `assignedOfficer` | **auth only** — ObjectId, invalid values return 400; ignored without a session |
 | `from`, `to` | `createdAt` range |
 | `search` | Case-insensitive across `cnrId`, `description`, `location.address`, `location.ward`; input is escaped before use as a regular expression |
 | `page`, `limit` | Pagination |

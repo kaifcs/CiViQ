@@ -100,7 +100,7 @@ The central entity.
 | Phasing | `phase` (`standalone`/`phase1`/`continuation`), `parentProject` (self-ref), `phaseNumber` |
 | Timeline | `startDate` (req), `endDate` (req), `actualEndDate` |
 | Budget | `estimatedCost`, `budgetSource`, `tenderNumber`, `contractorName`, `contractorFirm` |
-| Location | `roadName`, `neighbourhood`, `ward`, `zone`, `city` (default `Ghaziabad`), `state` (default `Uttar Pradesh`), `address`, `centerCoords.lat` (req), `centerCoords.lng` (req), `shape`, `length`, `width`, `area`, `buffer`, `geoJSON` |
+| Location | `roadName`, `neighbourhood`, `ward`, `zone`, `city` (default `Ghaziabad`), `state` (default `Uttar Pradesh`), `address`, `centerCoords.lat` (req, `-90`–`90`), `centerCoords.lng` (req, `-180`–`180`), `shape`, `length`, `width`, `area`, `buffer`, `geoJSON` |
 | MCDM | `mcdmScore`, `mcdmBreakdown`, `mcdmInputs` |
 | Status | `status`, `progress` (default 0) |
 | Team | `officer`, `supervisor`, `projectManager`, `createdBy` (req) |
@@ -188,7 +188,7 @@ the duplicates can be resolved by hand first.
 | `cnrId` | String | Unique; public tracking reference, generated |
 | `issueType` | String | Required; `pothole`, `streetlight`, `water_leak`, `garbage`, `drainage`, `other` |
 | `description` | String | Required |
-| `location` | Object | `address`, `ward`, `coords.lat` (req), `coords.lng` (req) |
+| `location` | Object | `address`, `ward`, `coords.lat` (req, `-90`–`90`), `coords.lng` (req, `-180`–`180`) |
 | `photoUrl` | String | |
 | `status` | String | `submitted` (default), `acknowledged`, `in_progress`, `resolved` |
 | `assignedDepartment` | String | Department id held as a string |

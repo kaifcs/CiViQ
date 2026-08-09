@@ -52,12 +52,19 @@ the endpoint did not paginate.
 
 ### API modules
 
-`authApi`, `departmentsApi`, `usersApi`, `projectsApi`, `conflictsApi`,
-`complaintsApi`, `notificationsApi`, `auditApi`, `dashboardApi`.
+`authApi`, `configApi`, `departmentsApi`, `usersApi`, `projectsApi`,
+`publicProjectsApi`, `conflictsApi`, `complaintsApi`, `notificationsApi`,
+`auditApi`, `dashboardApi`.
 
 Each unwraps the envelope its endpoint uses, so callers always receive plain
 data: `dashboardApi` returns `data.data`; `usersApi` returns `data.users`;
 `projectsApi` returns the bare array or document.
+
+`publicProjectsApi.listPaged` and `complaintsApi.listPaged` return
+`{ items, pagination }` rather than a bare array. Both endpoints cap an
+unpaginated read at 200 records, so the caller needs `readPagination`'s total to
+tell a truncated list from a complete one; `CitizenProjects` uses it to say how
+many of the total it is showing rather than presenting a capped list as whole.
 
 `buildProjectPayload(form)` translates the project wizard's flat form state into
 the backend schema, including the `projectType` label → enum mapping and the

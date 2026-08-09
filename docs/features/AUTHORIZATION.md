@@ -222,9 +222,13 @@ The consequences are visible in the implementation:
   caller never receives `assignedOfficer`, `assignedDepartment`, `photoUrl`,
   `resolutionNote`, `location.coords` or `location.address`, so the public view
   exposes neither the reporter's exact whereabouts nor the internal workload.
-  See *Complaint payload redaction* below. The list is also **capped at 200
-  records** without `?page`/`?limit`, so being public does not make it a way to
-  pull an unbounded collection in one request.
+  See *Complaint payload redaction* below. The `?department` and
+  `?assignedOfficer` filters are gated on the same rule and **ignored without a
+  session**, so the redaction cannot be reversed by filtering: membership of a
+  filtered result would prove the assignment, and `X-Total-Count` would count it
+  exactly. The list is also **capped at 200 records** without `?page`/`?limit`,
+  so being public does not make it a way to pull an unbounded collection in one
+  request.
 - `GET /stats` returns city-wide counts only — no documents. It is what the
   public dashboard reads instead of counting a downloaded table, and it
   discloses strictly less than the list: every figure summarises `status`,

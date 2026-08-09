@@ -162,7 +162,9 @@ Complaint reads are **redacted for an unauthenticated caller**:
 `assignedOfficer`, `assignedDepartment`, `photoUrl`, `resolutionNote`,
 `location.coords` and `location.address` are omitted, and `location.ward` is
 kept. The tracking screen therefore shows no handling detail, and says so rather
-than rendering the missing fields as empty.
+than rendering the missing fields as empty. The `?department` and
+`?assignedOfficer` list filters are ignored without a session, so the redaction
+cannot be reversed by filtering for a match.
 
 ## GIS
 
