@@ -8,7 +8,7 @@ const {
 const NON_STRINGS = {
   object: { $ne: null },
   array: ["value"],
-  arrayEmail: ["[real@civiq.test](mailto:real@civiq.test)"],
+  arrayEmail: ["real@civiq.test"],
   number: 12345,
   boolean: true,
   null: null,
@@ -16,7 +16,7 @@ const NON_STRINGS = {
 
 const validRegister = {
   fullName: "Full Name",
-  email: "[person@civiq.test](mailto:person@civiq.test)",
+  email: "person@civiq.test",
   password: "civiq12345",
   role: "officer",
 }
@@ -49,7 +49,7 @@ test("regression: an array that coerces to a valid email is still rejected", () 
   assert.equal(
     validateRegisterInput({
       ...validRegister,
-      email: ["[real@civiq.test](mailto:real@civiq.test)"],
+      email: ["real@civiq.test"],
     }),
     "A valid email address is required"
   )
@@ -60,7 +60,7 @@ test("login rejects a non-string email or password", async (t) => {
     await t.test(field, () => {
       for (const [label, value] of Object.entries(NON_STRINGS)) {
         const message = validateLoginInput({
-          email: "[person@civiq.test](mailto:person@civiq.test)",
+          email: "person@civiq.test",
           password: "civiq12345",
           [field]: value,
         })
@@ -81,7 +81,7 @@ test("every login failure converges on one message", () => {
       password: "civiq12345",
     }))
     messages.add(validateLoginInput({
-      email: "[person@civiq.test](mailto:person@civiq.test)",
+      email: "person@civiq.test",
       password: value,
     }))
   }
@@ -98,7 +98,7 @@ test("valid input still passes", () => {
   assert.equal(validateRegisterInput(validRegister), null)
   assert.equal(
     validateLoginInput({
-      email: "[person@civiq.test](mailto:person@civiq.test)",
+      email: "person@civiq.test",
       password: "civiq12345",
     }),
     null
@@ -133,7 +133,7 @@ test("the established validation rules are unchanged", () => {
   )
   assert.equal(
     validateLoginInput({
-      email: "[person@civiq.test](mailto:person@civiq.test)",
+      email: "person@civiq.test",
       password: "",
     }),
     "Email and password are required"

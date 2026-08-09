@@ -188,6 +188,8 @@ export default function AdminComplaintDetail() {
 
   const status = COMPLAINT_STATUS_CONFIG[complaint.status] || COMPLAINT_STATUS_CONFIG.submitted
   const nextStatus = NEXT_STATUS[complaint.status]
+  // No acknowledged timestamp exists, so workflow position is the only source.
+  const hasAcknowledged = STATUS_ORDER.indexOf(complaint.status) >= STATUS_ORDER.indexOf('acknowledged')
 
   return (
     <div className="flex flex-col gap-5" style={{ fontFamily: "'Inter', sans-serif" }}>
@@ -289,7 +291,7 @@ export default function AdminComplaintDetail() {
           <InfoRow label="Department"   value={complaint.department} />
           <InfoRow label="Ward"         value={complaint.ward} />
           <InfoRow label="Filed on"     value={formatDateTime(complaint.filedAt)} />
-          <InfoRow label="Acknowledged" value={complaint.acknowledgedAt ? formatDateTime(complaint.acknowledgedAt) : 'Not yet'} />
+          <InfoRow label="Acknowledged" value={hasAcknowledged ? 'Yes' : 'Not yet'} />
           <InfoRow label="Resolved on"  value={complaint.resolvedAt ? formatDateLong(complaint.resolvedAt) : 'Not yet'} />
           {complaint.resolutionNote && (
             <div className="pt-3 mt-1">

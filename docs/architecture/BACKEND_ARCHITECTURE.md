@@ -198,7 +198,8 @@ notifications return the document or a bare array.
 
 `sendWriteError` translates Mongoose write failures: duplicate key (`11000`)
 becomes 409 `DUPLICATE_RESOURCE`, a `ValidationError` becomes 400
-`VALIDATION_ERROR`, anything else becomes 500.
+`VALIDATION_ERROR`, a `CastError` becomes 400 `VALIDATION_ERROR` carrying only
+the rejected path name, anything else becomes 500.
 
 ## Pagination
 

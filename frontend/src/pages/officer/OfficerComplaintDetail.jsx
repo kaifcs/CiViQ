@@ -108,6 +108,8 @@ export default function OfficerComplaintDetail() {
 
   const status = COMPLAINT_STATUS_CONFIG[currentStatus] || COMPLAINT_STATUS_CONFIG.submitted
   const currentIndex = STATUS_ORDER.indexOf(currentStatus)
+  // No acknowledged timestamp exists, so workflow position is the only source.
+  const hasAcknowledged = currentIndex >= STATUS_ORDER.indexOf('acknowledged')
 
   // PATCH /api/complaints/:id/status
   async function handleUpdateStatus(nextStatus) {
@@ -193,7 +195,7 @@ export default function OfficerComplaintDetail() {
           <InfoRow label="Issue type" value={complaint.issueType} />
           <InfoRow label="Ward" value={complaint.ward} />
           <InfoRow label="Filed on" value={formatDateTime(complaint.filedAt)} />
-          <InfoRow label="Acknowledged" value={complaint.acknowledgedAt ? formatDateTime(complaint.acknowledgedAt) : 'Not yet'} />
+          <InfoRow label="Acknowledged" value={hasAcknowledged ? 'Yes' : 'Not yet'} />
           <InfoRow label="Resolved" value={currentStatus === 'resolved' ? 'Yes' : 'Not yet'} />
           {(noteSaved || complaint.resolutionNote) && (
             <div className="pt-3 mt-1 border-t border-[#F3F4F6] dark:border-[#27272A]">

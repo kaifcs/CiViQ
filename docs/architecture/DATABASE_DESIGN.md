@@ -157,15 +157,29 @@ unique index is what ultimately rejects a duplicate.
 | `suggestedDate` | Date | Proposed new start for the rescheduled project |
 | `recheckPassed` | Boolean | Whether re-running clash detection after the reschedule came back clear |
 | `rescheduledProject` | ObjectId ref Project | Default `null` |
+| `pairKey` | String | Required; canonical identity of the project pair, derived never supplied |
 
 The two resolution sides are stored separately so the record shows who decided
 what, rather than a single overwritten outcome.
 
-Because the pair is unordered, code searching for an existing conflict must test
-both orderings — `projectsController.createProject` does so with an `$or`.
+The pair is unordered, so `pairKey` gives it one identity: the two ids sorted
+and joined, computed by `Conflict.pairKeyFor` in a `pre("validate")` hook. `(A,B)`
+and `(B,A)` therefore produce the same key, and a conflict is looked up by that
+single value rather than by testing both orderings.
 
-**Indexes:** `{ project1: 1, project2: 1 }` for pair lookup, `{ createdAt: -1 }`
-for listing.
+Creation goes through `clashSync.findOrCreateConflict`, which reads by `pairKey`
+and, on a duplicate-key error from a concurrent caller, re-reads and returns the
+row that won. Application code never writes `pairKey` itself.
+
+**Indexes:** `{ pairKey: 1 }` **unique** — the database-level guarantee that one
+project pair cannot hold two conflicts, including under concurrent creation;
+`{ project1: 1, project2: 1 }` for pair lookup, `{ createdAt: -1 }` for listing.
+
+Databases created before `pairKey` existed need `npm run migrate:conflict-pairkey`
+once. It backfills the key and creates the unique index, and is idempotent. It
+does not merge or delete data: if two rows already describe the same pair in
+either order it reports them and exits non-zero, leaving the index uncreated so
+the duplicates can be resolved by hand first.
 
 ## Complaint
 
