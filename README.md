@@ -774,7 +774,7 @@ npm run lint:fix                   # ESLint with --fix
 npm run migrate:conflict-pairkey   # backfill pairKey on pre-existing conflicts
 ```
 
-### Demo accounts
+### Demo Login
 
 Created by `npm run seed` — ten accounts in all: one admin, two supervisors and seven
 officers, one per department.
