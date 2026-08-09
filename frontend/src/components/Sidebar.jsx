@@ -2,6 +2,8 @@
 // role cannot use is a convenience only — the backend independently refuses any
 // request the role is not entitled to make.
 
+import { CiviqMark, CiviqWordmark } from './Brand'
+
 function NavItem({ icon, label, active = false, count, countColor = 'muted', collapsed = false, onClick }) {
   return (
     <button
@@ -84,49 +86,6 @@ const supervisorNav = [
   { id: 'settings',  label: 'Settings',  icon: I.settings,  count: undefined, countColor: 'muted' },
 ]
 
-function CiviqLogo({ size = 34, dark = false }) {
-  const road = dark ? '#FFFFFF' : '#0D2145'
-  const lane = dark ? 'rgba(255,255,255,0.35)' : 'rgba(13,33,69,0.35)'
-  return (
-    <svg width={size} height={size} viewBox="0 0 28 28" fill="none">
-      <rect x="0"    y="11.5" width="28"  height="5"    fill={road} rx="0.5"/>
-      <rect x="11.5" y="0"    width="5"   height="28"   fill={road} rx="0.5"/>
-      <rect x="0"    y="10"   width="10.5" height="1.5" fill={lane}/>
-      <rect x="17.5" y="10"   width="10.5" height="1.5" fill={lane}/>
-      <rect x="0"    y="16.5" width="10.5" height="1.5" fill={lane}/>
-      <rect x="17.5" y="16.5" width="10.5" height="1.5" fill={lane}/>
-      <rect x="10"   y="0"    width="1.5" height="10.5" fill={lane}/>
-      <rect x="16.5" y="0"    width="1.5" height="10.5" fill={lane}/>
-      <rect x="10"   y="17.5" width="1.5" height="10.5" fill={lane}/>
-      <rect x="16.5" y="17.5" width="1.5" height="10.5" fill={lane}/>
-      <circle cx="14" cy="14" r="3.5" fill="#5E6AD2"/>
-      <circle cx="14" cy="14" r="1.5" fill="white"/>
-    </svg>
-  )
-}
-
-// Hand-placed dotless "ı" glyphs with brand-coloured accent dots above them.
-function LogoWordmark({ size = 34, dark = false }) {
-  const textColor = dark ? '#FFFFFF' : '#0D2145'
-  return (
-    <svg
-      viewBox="0 0 108 28"
-      height={size}
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      style={{ display: 'block', flexShrink: 0 }}
-    >
-      <text x="0"  y="22" fontFamily="'Inter', sans-serif" fontSize="24" fontWeight="800" letterSpacing="-0.5" fill={textColor}>C</text>
-      <text x="19" y="22" fontFamily="'Inter', sans-serif" fontSize="24" fontWeight="800" fill={textColor}>ı</text>
-      <circle cx="22" cy="3" r="2.5" fill="#5E6AD2"/>
-      <text x="26" y="22" fontFamily="'Inter', sans-serif" fontSize="24" fontWeight="800" fill={textColor}>V</text>
-      <text x="44" y="22" fontFamily="'Inter', sans-serif" fontSize="24" fontWeight="800" fill={textColor}>ı</text>
-      <circle cx="48" cy="3" r="2.5" fill="#5E6AD2"/>
-      <text x="51" y="22" fontFamily="'Inter', sans-serif" fontSize="24" fontWeight="800" fill={textColor}>Q</text>
-    </svg>
-  )
-}
-
 export default function Sidebar({
   role = 'admin',
   activeItem = 'dashboard',
@@ -149,10 +108,22 @@ export default function Sidebar({
 
       <div className={[
         'flex items-center h-24 flex-shrink-0',
-        collapsed ? 'justify-center px-0' : 'px-4 gap-3',
+        collapsed ? 'justify-center px-0' : 'px-3',
       ].join(' ')}>
-        <CiviqLogo size={LOGO_SIZE} dark={darkMode} />
-        {!collapsed && <LogoWordmark size={LOGO_SIZE} dark={darkMode} />}
+        {/* Routes through the same handler as the nav, so each role lands on its own dashboard. */}
+        <button
+          onClick={() => onNavigate?.('dashboard')}
+          title="Go to dashboard"
+          aria-label="Go to dashboard"
+          className={[
+            'flex items-center p-1 rounded-[8px] transition-opacity hover:opacity-80',
+            'focus:outline-none focus-visible:ring-2 focus-visible:ring-[#5E6AD2]',
+            collapsed ? '' : 'gap-3',
+          ].join(' ')}
+        >
+          <CiviqMark size={LOGO_SIZE} tone={darkMode ? 'onDark' : 'onLight'} />
+          {!collapsed && <CiviqWordmark size={LOGO_SIZE} tone={darkMode ? 'onDark' : 'onLight'} />}
+        </button>
       </div>
 
       <div className={[

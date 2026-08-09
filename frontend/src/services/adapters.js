@@ -48,6 +48,10 @@ export const ISSUE_TYPE_OPTIONS = Object.entries(ISSUE_TYPE_LABEL).map(
   ([value, label]) => ({ value, label })
 )
 
+// Mirrors the backend's public project filter, so the portal never presents a
+// status GET /projects/public cannot return.
+export const PUBLIC_PROJECT_STATUSES = ["approved", "active", "completed", "rescheduled"]
+
 // Backend conflict status -> UI status.
 const CONFLICT_STATUS = {
   pending: "unresolved",

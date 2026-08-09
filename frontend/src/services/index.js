@@ -6,10 +6,11 @@ import {
   adaptUser, adaptProject, adaptConflict, adaptComplaint,
   adaptAuditLog, adaptNotification, adaptDepartment, departmentIndex,
   adaptPublicProject, PROJECT_TYPE_VALUE, ROLES, roleLabel, ISSUE_TYPE_OPTIONS,
+  PUBLIC_PROJECT_STATUSES,
 } from "./adapters"
 
 export { normaliseError, readPagination, TOKEN_KEY, USER_KEY, PROJECT_TYPE_VALUE }
-export { ROLES, roleLabel, ISSUE_TYPE_OPTIONS }
+export { ROLES, roleLabel, ISSUE_TYPE_OPTIONS, PUBLIC_PROJECT_STATUSES }
 // Pure form -> backend projection.
 export { buildProjectPayload } from "./adapters"
 export { openNotificationStream } from "./notificationStream"

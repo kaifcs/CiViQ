@@ -1,39 +1,10 @@
 // Shared shell for the public read-only Citizen portal.
 
-import { Link, NavLink } from "react-router-dom"
-
-function CiviqLogoIcon({ size = 28 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 28 28" fill="none">
-      <rect x="0" y="11.5" width="28" height="5" fill="#0D2145" rx="0.5"/>
-      <rect x="11.5" y="0" width="5" height="28" fill="#0D2145" rx="0.5"/>
-      <rect x="0" y="10" width="10.5" height="1.5" fill="rgba(13,33,69,0.35)"/>
-      <rect x="17.5" y="10" width="10.5" height="1.5" fill="rgba(13,33,69,0.35)"/>
-      <rect x="0" y="16.5" width="10.5" height="1.5" fill="rgba(13,33,69,0.35)"/>
-      <rect x="17.5" y="16.5" width="10.5" height="1.5" fill="rgba(13,33,69,0.35)"/>
-      <rect x="10" y="0" width="1.5" height="10.5" fill="rgba(13,33,69,0.35)"/>
-      <rect x="16.5" y="0" width="1.5" height="10.5" fill="rgba(13,33,69,0.35)"/>
-      <rect x="10" y="17.5" width="1.5" height="10.5" fill="rgba(13,33,69,0.35)"/>
-      <rect x="16.5" y="17.5" width="1.5" height="10.5" fill="rgba(13,33,69,0.35)"/>
-      <circle cx="14" cy="14" r="3.5" fill="#5E6AD2"/>
-      <circle cx="14" cy="14" r="1.5" fill="white"/>
-    </svg>
-  )
-}
-
-function CiviqWordmark({ size = 28 }) {
-  return (
-    <svg viewBox="0 0 108 28" height={size} fill="none" xmlns="http://www.w3.org/2000/svg" style={{ display: "block" }}>
-      <text x="0" y="22" fontFamily="Inter, sans-serif" fontSize="24" fontWeight="800" letterSpacing="-0.5" fill="#0D2145">C</text>
-      <text x="19" y="22" fontFamily="Inter, sans-serif" fontSize="24" fontWeight="800" fill="#0D2145">i</text>
-      <circle cx="22" cy="3" r="2.5" fill="#5E6AD2"/>
-      <text x="26" y="22" fontFamily="Inter, sans-serif" fontSize="24" fontWeight="800" fill="#0D2145">V</text>
-      <text x="44" y="22" fontFamily="Inter, sans-serif" fontSize="24" fontWeight="800" fill="#0D2145">i</text>
-      <circle cx="48" cy="3" r="2.5" fill="#5E6AD2"/>
-      <text x="51" y="22" fontFamily="Inter, sans-serif" fontSize="24" fontWeight="800" fill="#0D2145">Q</text>
-    </svg>
-  )
-}
+import { useState } from "react"
+import { Link, NavLink, useLocation } from "react-router-dom"
+import CiviqLogo, { CiviqMark } from "../../components/Brand"
+import { Button, Container } from "../../components/public/ui"
+import { FOCUS_RING } from "../../components/public/controlStyles"
 
 // Public navigation.
 const navLinks = [
@@ -43,67 +14,160 @@ const navLinks = [
   { label: "Track complaint", path: "/complaints/track" },
 ]
 
-function CitizenHeader() {
+const linkCls = (active) =>
+  [
+    "px-3 py-2 rounded-[7px] text-[14px] transition-colors duration-150",
+    FOCUS_RING,
+    active
+      ? "bg-[#EEF2FF] text-[#3F4899] font-semibold"
+      : "text-[#475569] hover:bg-[#F1F5F9] hover:text-[#0F172A] font-normal",
+  ].join(" ")
+
+function MenuIcon({ open }) {
   return (
-    <header className="bg-white border-b border-[#E5E5E5] sticky top-0 z-50">
-      <div className="max-w-[1200px] mx-auto px-6 h-16 flex items-center justify-between">
-        <Link to="/home" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
-          <CiviqLogoIcon size={28} />
-          <CiviqWordmark size={28} />
-        </Link>
-        <span className="hidden md:block text-[12px] font-medium text-[#9CA3AF] uppercase tracking-[0.06em]">Ghaziabad Municipal Corporation</span>
-        <nav className="flex items-center gap-1">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+      {open ? (
+        <><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></>
+      ) : (
+        <><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></>
+      )}
+    </svg>
+  )
+}
+
+function CitizenHeader() {
+  const { pathname } = useLocation()
+  const [open, setOpen] = useState(false)
+
+  const isActive = (path) =>
+    path === "/home" ? pathname === "/" || pathname === "/home" : pathname.startsWith(path)
+
+  return (
+    // Above Leaflet's control corners (z-index 1000) so map chrome cannot scroll over the header.
+    <header className="sticky top-0 z-[1100] bg-[#FFFFFF]/95 backdrop-blur-[6px] border-b border-[#E2E8F0]">
+      <Container className="h-16 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3 min-w-0">
+          <Link to="/home" className={`rounded-[6px] hover:opacity-80 transition-opacity ${FOCUS_RING}`} aria-label="CIVIQ home">
+            <CiviqLogo size={26} />
+          </Link>
+          <span className="hidden lg:block pl-3 border-l border-[#E2E8F0] text-[11px] font-semibold uppercase tracking-[0.08em] leading-tight text-[#94A3B8]">
+            Ghaziabad Municipal<br />Corporation
+          </span>
+        </div>
+
+        <nav className="hidden md:flex items-center gap-1" aria-label="Public portal">
           {navLinks.map((link) => (
-            <NavLink
-              key={link.path}
-              to={link.path}
-              end={link.path === "/home"}
-              className={({ isActive }) =>
-                [
-                  "px-3 py-1.5 rounded-[6px] text-[14px] transition-all duration-150",
-                  isActive
-                    ? "bg-[#EBEBEB] text-[#0F172A] font-semibold"
-                    : "text-[#6B7280] hover:bg-[#F3F3F3] hover:text-[#0F172A] font-normal",
-                ].join(" ")
-              }
-            >
+            <NavLink key={link.path} to={link.path} className={() => linkCls(isActive(link.path))}>
               {link.label}
             </NavLink>
           ))}
-          <Link
-            to="/login"
-            className="ml-2 px-3 py-1.5 rounded-[6px] text-[14px] font-medium text-[#5E6AD2] border border-[#5E6AD2]/30 hover:bg-[#EEF2FF] transition-all duration-150"
-          >
-            Staff Login
-          </Link>
+          <Button to="/login" variant="secondary" size="sm" className="ml-3">Staff sign in</Button>
         </nav>
-      </div>
+
+        <button
+          type="button"
+          onClick={() => setOpen((value) => !value)}
+          aria-expanded={open}
+          aria-controls="citizen-mobile-nav"
+          aria-label={open ? "Close menu" : "Open menu"}
+          className={`md:hidden inline-flex h-10 w-10 -mr-1 items-center justify-center rounded-[8px] text-[#475569] hover:bg-[#F1F5F9] transition-colors ${FOCUS_RING}`}
+        >
+          <MenuIcon open={open} />
+        </button>
+      </Container>
+
+      {open && (
+        <div id="citizen-mobile-nav" className="md:hidden border-t border-[#E2E8F0] bg-[#FFFFFF]">
+          <Container className="py-3 flex flex-col gap-1">
+            {navLinks.map((link) => (
+              <NavLink
+                key={link.path}
+                to={link.path}
+                onClick={() => setOpen(false)}
+                className={() => `${linkCls(isActive(link.path))} block`}
+              >
+                {link.label}
+              </NavLink>
+            ))}
+            <Button to="/login" variant="secondary" size="md" onClick={() => setOpen(false)} className="mt-2 w-full">
+              Staff sign in
+            </Button>
+          </Container>
+        </div>
+      )}
     </header>
   )
 }
 
+const footerGroups = [
+  {
+    title: "For residents",
+    links: [
+      { label: "Browse projects", path: "/projects" },
+      { label: "Report an issue", path: "/complaints/new" },
+      { label: "Track a complaint", path: "/complaints/track" },
+    ],
+  },
+  {
+    title: "For staff",
+    links: [{ label: "Staff sign in", path: "/login" }],
+  },
+]
+
 function CitizenFooter() {
   const year = new Date().getFullYear()
+
   return (
-    <footer className="bg-white border-t border-[#E5E5E5] mt-auto">
-      <div className="max-w-[1200px] mx-auto px-6 py-8">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-          <div>
-            <p className="text-[13px] font-semibold text-[#0D2145]">CIVIQ</p>
-            <p className="text-[11px] text-[#9CA3AF]">Plan together. Build once.</p>
+    <footer className="mt-auto bg-[#FFFFFF] border-t border-[#E2E8F0]">
+      <Container className="py-10 sm:py-12">
+        <div className="grid gap-8 sm:gap-10 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="lg:col-span-2 flex flex-col gap-3 max-w-[380px]">
+            <CiviqLogo size={24} />
+            <p className="text-[13px] font-medium text-[#475569]">Plan together. Build once.</p>
           </div>
-          <p className="text-[12px] text-[#9CA3AF]">© {year} Ghaziabad Municipal Corporation</p>
+
+          {footerGroups.map((group) => (
+            <nav key={group.title} aria-label={group.title} className="flex flex-col gap-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#94A3B8]">{group.title}</p>
+              <ul className="flex flex-col gap-2">
+                {group.links.map((link) => (
+                  <li key={link.path}>
+                    <Link to={link.path} className={`rounded-[4px] text-[13px] text-[#475569] hover:text-[#5E6AD2] transition-colors ${FOCUS_RING}`}>
+                      {link.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+          ))}
         </div>
-      </div>
+
+        <div className="mt-10 pt-6 border-t border-[#F1F5F9] flex flex-col sm:flex-row items-center justify-between gap-3">
+          <p className="text-[12px] text-[#94A3B8]">© {year} Ghaziabad Municipal Corporation</p>
+          <span className="flex items-center gap-2 text-[12px] text-[#94A3B8]">
+            <CiviqMark size={16} />
+            Public transparency portal
+          </span>
+        </div>
+      </Container>
     </footer>
   )
 }
 
 export default function CitizenNav({ children }) {
   return (
-    <div className="min-h-screen bg-[#F7F7F7] flex flex-col">
+    <div className="min-h-screen flex flex-col overflow-x-hidden bg-[#F8FAFC] text-[#0F172A]">
+      <a
+        href="#main-content"
+        className={`sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[1200] focus:rounded-[8px] focus:bg-[#0D2145] focus:px-4 focus:py-2 focus:text-[13px] focus:font-medium focus:text-[#FFFFFF] ${FOCUS_RING}`}
+      >
+        Skip to content
+      </a>
+
       <CitizenHeader />
-      <main className="flex-1">{children}</main>
+
+      <main id="main-content" className="flex-1">{children}</main>
+
       <CitizenFooter />
     </div>
   )

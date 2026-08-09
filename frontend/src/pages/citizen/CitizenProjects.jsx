@@ -3,91 +3,88 @@
 // keeps pending and rejected projects out of this list.
 
 import { useMemo, useState } from "react"
-import { useNavigate } from "react-router-dom"
+import { Link } from "react-router-dom"
 import CitizenNav from "./CitizenNav"
 import { usePublicProjects } from "../../hooks/useResources"
 import AsyncState, { EmptyState } from "../../components/AsyncState"
 import { formatDate } from "../../components/dashboard"
 import { deptStyle, PROJECT_STATUS_CONFIG, TYPE_STYLES } from "../../components/uiStyles"
+import {
+  Badge, Button, Container, Eyebrow, Notice, ProgressMeter, StatusPill, Surface,
+} from "../../components/public/ui"
+import { inputCls, selectChevron, selectCls } from "../../components/public/controlStyles"
+import { PUBLIC_PROJECT_STATUSES } from "../../services"
+
+const STATUS_OPTIONS = PUBLIC_PROJECT_STATUSES.map((value) => ({
+  value,
+  label: PROJECT_STATUS_CONFIG[value].text,
+}))
+
+const TYPE_OPTIONS = ["Road", "Water", "Sewage", "Electrical", "Parks"].map((value) => ({ value, label: value }))
 
 const SearchIcon = () => (
-  <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round">
+  <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" aria-hidden="true">
     <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
   </svg>
 )
 
-function FilterSelect({ label, value, onChange, options }) {
+function FilterSelect({ id, label, value, onChange, options }) {
   return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      style={{ minWidth: "160px" }}
-      className="h-9 px-3 text-[13px] rounded-[8px] border border-[#E2E8F0] bg-[#FFFFFF] text-[#0F172A] focus:outline-none focus:border-[#5E6AD2] focus:ring-2 focus:ring-[#5E6AD2]/10 transition-all cursor-pointer"
-    >
-      <option value="">{label}: All</option>
-      {options.map((o) => (
-        <option key={o.value} value={o.value}>{o.label}</option>
-      ))}
-    </select>
-  )
-}
-
-function Badge({ label, className }) {
-  return <span className={`inline-flex items-center text-[12px] font-medium px-2.5 py-1 rounded-full ${className}`}>{label}</span>
-}
-
-function StatusBadge({ status }) {
-  const c = PROJECT_STATUS_CONFIG[status] || PROJECT_STATUS_CONFIG.pending
-  return (
-    <span className={`inline-flex items-center gap-1.5 text-[13px] font-semibold px-3 py-1 rounded-full ${c.bg} ${c.color}`}>
-      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: c.dot }} />
-      {c.text}
-    </span>
-  )
-}
-
-function ProjectCard({ project, onClick }) {
-  return (
-    <div
-      onClick={onClick}
-      className="flex flex-col md:flex-row md:items-center gap-4 md:gap-5 px-5 py-4 bg-[#FFFFFF] border border-[#E5E5E5] rounded-[8px] cursor-pointer transition-all hover:border-[#5E6AD2]/40 hover:bg-[#FAFAFA]"
-      style={{ boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}
-    >
-      <div className="flex-1 min-w-0">
-        <p className="text-[14px] font-semibold text-[#0F172A] truncate leading-snug">{project.title}</p>
-        <p className="text-[12px] text-[#6B7280] mt-0.5">{project.departmentFull} · {project.ward || "Ghaziabad"}</p>
-      </div>
-
-      <div className="flex items-center gap-2 flex-shrink-0">
-        <Badge label={project.department || "—"} className={deptStyle(project.department)} />
-        <Badge label={project.type} className={TYPE_STYLES[project.type] || TYPE_STYLES.Other} />
-      </div>
-
-      <div className="hidden md:block w-px h-8 bg-[#E5E5E5] flex-shrink-0" />
-
-      <div className="flex-shrink-0 w-[110px]">
-        <StatusBadge status={project.status} />
-      </div>
-
-      <div className="hidden md:block w-px h-8 bg-[#E5E5E5] flex-shrink-0" />
-
-      <div className="flex items-center gap-4 flex-shrink-0">
-        <div className="flex flex-col items-end gap-0.5">
-          <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-wide">Timeline</span>
-          <span className="text-[13px] font-medium text-[#0F172A]">
-            {formatDate(project.startDate)} – {formatDate(project.endDate)}
-          </span>
-        </div>
-        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" className="text-[#D1D5DB]" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <polyline points="9 18 15 12 9 6"/>
-        </svg>
-      </div>
+    <div className="flex flex-col gap-1.5 min-w-0 flex-1 sm:flex-none sm:w-[170px]">
+      <label htmlFor={id} className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#94A3B8]">{label}</label>
+      <select
+        id={id}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        style={selectChevron}
+        className={`${selectCls} h-10`}
+      >
+        <option value="">All</option>
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>{o.label}</option>
+        ))}
+      </select>
     </div>
   )
 }
 
+function ProjectCard({ project }) {
+  const location = [project.ward, project.zone].filter(Boolean).join(" · ")
+  return (
+    <Surface as="article" interactive className="flex flex-col">
+      <Link
+        to={`/projects/${project.id}`}
+        className="flex flex-col gap-4 p-5 h-full rounded-[10px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5E6AD2]/45 focus-visible:ring-offset-1"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <StatusPill config={PROJECT_STATUS_CONFIG[project.status] || PROJECT_STATUS_CONFIG.pending} size="sm" />
+          <span className="text-[12px] text-[#94A3B8] tabular-nums whitespace-nowrap">
+            {formatDate(project.startDate)} – {formatDate(project.endDate)}
+          </span>
+        </div>
+
+        <div className="flex flex-col gap-1.5 flex-1">
+          <h2 className="text-[15.5px] font-semibold text-[#0D2145] leading-snug line-clamp-2">{project.title}</h2>
+          <p className="text-[12.5px] text-[#64748B]">
+            {project.departmentFull || "Department not listed"}
+            {location ? ` · ${location}` : ""}
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-1.5">
+          {project.department && <Badge className={deptStyle(project.department)}>{project.department}</Badge>}
+          <Badge className={TYPE_STYLES[project.type] || TYPE_STYLES.Other}>{project.type}</Badge>
+        </div>
+
+        <div className="pt-3.5 border-t border-[#F1F5F9]">
+          <ProgressMeter value={project.progress} />
+        </div>
+      </Link>
+    </Surface>
+  )
+}
+
 export default function CitizenProjects() {
-  const navigate = useNavigate()
   const { data, loading, error, reload } = usePublicProjects()
   const projects = data?.items
 
@@ -118,82 +115,75 @@ export default function CitizenProjects() {
 
   return (
     <CitizenNav>
-      <div className="max-w-[1200px] mx-auto px-6 py-8 flex flex-col gap-4" style={{ fontFamily: "'Inter', sans-serif" }}>
-        <div>
-          <h1 className="text-[24px] font-semibold text-[#0F172A]">Infrastructure Projects</h1>
-          <p className="text-[13px] text-[#6B7280] mt-1">
+      <div className="bg-[#FFFFFF] border-b border-[#E2E8F0]">
+        <Container className="py-10 sm:py-12 flex flex-col gap-3">
+          <Eyebrow>Public register</Eyebrow>
+          <h1 className="text-[28px] sm:text-[34px] font-bold text-[#0D2145] tracking-[-0.03em] leading-tight">
+            Infrastructure projects
+          </h1>
+          <p className="text-[14.5px] text-[#64748B] leading-relaxed max-w-[62ch]">
             Infrastructure projects the city has approved, started, finished or rescheduled.
           </p>
-        </div>
+        </Container>
+      </div>
 
-        <div className="flex flex-col gap-3">
+      <Container className="py-6 sm:py-8 flex flex-col gap-5">
+        <Surface className="p-4 sm:p-5 flex flex-col gap-4">
           <div className="relative flex items-center">
-            <span className="absolute left-3 text-[#9CA3AF] pointer-events-none flex items-center"><SearchIcon /></span>
+            <span className="absolute left-3.5 text-[#94A3B8] pointer-events-none flex items-center"><SearchIcon /></span>
+            <label htmlFor="project-search" className="sr-only">Search projects by name</label>
             <input
-              type="text"
+              id="project-search"
+              type="search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search projects by name..."
-              className="w-full h-10 pl-10 pr-4 text-[14px] rounded-[8px] border border-[#E2E8F0] bg-[#FFFFFF] text-[#0F172A] placeholder:text-[#9CA3AF] focus:outline-none focus:border-[#5E6AD2] focus:ring-2 focus:ring-[#5E6AD2]/10 transition-all"
+              className={`${inputCls} pl-11`}
             />
           </div>
 
-          <div className="flex items-center gap-3 flex-wrap">
-            <FilterSelect
-              label="Type"
-              value={filterType}
-              onChange={setFilterType}
-              options={[
-                { value: "Road", label: "Road" },
-                { value: "Water", label: "Water" },
-                { value: "Sewage", label: "Sewage" },
-                { value: "Electrical", label: "Electrical" },
-                { value: "Parks", label: "Parks" },
-              ]}
-            />
-            <FilterSelect
-              label="Status"
-              value={filterStatus}
-              onChange={setFilterStatus}
-              options={[
-                { value: "approved", label: "Approved" },
-                { value: "active", label: "Active" },
-                { value: "completed", label: "Completed" },
-                { value: "rescheduled", label: "Rescheduled" },
-              ]}
-            />
-            <div className="flex items-center gap-3 ml-auto">
-              <span className="text-[13px] text-[#6B7280]">
+          <div className="flex flex-col sm:flex-row sm:items-end gap-4">
+            <div className="flex gap-3 flex-1 min-w-0">
+              <FilterSelect id="filter-type" label="Type" value={filterType} onChange={setFilterType} options={TYPE_OPTIONS} />
+              <FilterSelect id="filter-status" label="Status" value={filterStatus} onChange={setFilterStatus} options={STATUS_OPTIONS} />
+            </div>
+
+            <div className="flex items-center justify-between sm:justify-end gap-3 sm:pb-2">
+              <span className="text-[13px] text-[#64748B]" aria-live="polite">
                 {filtered.length} {filtered.length === 1 ? "project" : "projects"}
               </span>
               {hasFilters && (
-                <button onClick={clearFilters} className="text-[13px] text-[#5E6AD2] hover:text-[#4A56C1] font-medium transition-colors">
-                  Clear filters
-                </button>
+                <Button variant="quiet" size="sm" onClick={clearFilters}>Clear filters</Button>
               )}
             </div>
           </div>
-        </div>
+        </Surface>
 
         {truncated && (
-          <div className="text-[13px] text-[#92400E] bg-[#FFFBEB] border border-[#FDE68A] rounded-[8px] px-3 py-2">
+          <Notice tone="warning">
             Showing the {projects.length} most recent of {total} projects. Search and
             filters apply only to these.
-          </div>
+          </Notice>
         )}
 
         <AsyncState loading={loading} error={error} onRetry={reload} label="Loading projects...">
           {filtered.length === 0 ? (
-            <EmptyState title="No projects found" hint="Try a different search or filter." />
+            <Surface className="py-4">
+              <EmptyState
+                title="No projects found"
+                hint={hasFilters ? "Try a different search or filter." : "Nothing has been published to the portal yet."}
+                action={hasFilters ? <Button variant="secondary" size="sm" onClick={clearFilters}>Clear filters</Button> : null}
+              />
+            </Surface>
           ) : (
-            <div className="flex flex-col gap-2">
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
               {filtered.map((p) => (
-                <ProjectCard key={p.id} project={p} onClick={() => navigate(`/projects/${p.id}`)} />
+                <ProjectCard key={p.id} project={p} />
               ))}
             </div>
           )}
         </AsyncState>
-      </div>
+      </Container>
     </CitizenNav>
   )
 }

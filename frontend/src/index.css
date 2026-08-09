@@ -10,3 +10,29 @@
 * {
   font-family: 'Inter', sans-serif;
 }
+
+/* Entrance used by the public landing hero only. */
+@keyframes civiq-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.civiq-rise {
+  animation: civiq-rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.civiq-rise-delay {
+  animation-delay: 0.09s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
