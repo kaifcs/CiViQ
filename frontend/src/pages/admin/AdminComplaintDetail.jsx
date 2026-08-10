@@ -5,6 +5,7 @@
 import { useCallback, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useComplaint, useUsers, useDepartments } from '../../hooks/useResources'
+import { useOwnsPageHeading } from '../../hooks/usePageHeading'
 import { useAuth } from '../../hooks/useAuth'
 import { useMutation } from '../../hooks/useApi'
 import { complaintsApi } from '../../services'
@@ -46,7 +47,7 @@ const TIMELINE_STEPS = [
   { key: 'submitted',    label: 'Submitted',    dateKey: 'filedAt' },
   { key: 'acknowledged', label: 'Acknowledged', dateKey: 'acknowledgedAt' },
   { key: 'in_progress',  label: 'In Progress',  dateKey: null },
-  { key: 'resolved',     label: 'Resolved',     dateKey: 'resolvedAt' },
+  { key: 'resolved',     label: 'Resolved',     dateKey: null },
 ]
 
 const STATUS_ORDER = ['submitted', 'acknowledged', 'in_progress', 'resolved']
@@ -112,6 +113,10 @@ export default function AdminComplaintDetail() {
   // Both are admin-only endpoints, and this is an admin-only route.
   const { data: users } = useUsers()
   const { data: departments } = useDepartments()
+
+  // The complaint is the subject of this page, so its heading below is the h1
+  // once it has loaded. Until then the shell's navbar title stays the heading.
+  useOwnsPageHeading(Boolean(complaint))
 
   const [showNoteInput, setShowNoteInput] = useState(false)
 
@@ -216,9 +221,9 @@ export default function AdminComplaintDetail() {
               {status.text}
             </span>
           </div>
-          <h2 className="text-[20px] font-bold text-[#0F172A] dark:text-[#F8FAFC]">
+          <h1 className="text-[20px] font-bold text-[#0F172A] dark:text-[#F8FAFC]">
             {complaint.issueType}
-          </h2>
+          </h1>
           <p className="text-[13px] text-[#6B7280] dark:text-[#9CA3AF] mt-1">{complaint.address}</p>
         </div>
 
@@ -292,9 +297,9 @@ export default function AdminComplaintDetail() {
           <InfoRow label="Ward"         value={complaint.ward} />
           <InfoRow label="Filed on"     value={formatDateTime(complaint.filedAt)} />
           <InfoRow label="Acknowledged" value={hasAcknowledged ? 'Yes' : 'Not yet'} />
-          {/* `updatedAt` under its own name rather than "Resolved on": the
-              adapter's resolvedAt is only a proxy for it, so labelling it as a
-              resolution time would overstate what the schema stores. */}
+          {/* `updatedAt` under its own name rather than "Resolved on". The schema
+              stores no resolution timestamp, and this value moves on any later
+              edit, so naming it a resolution time would be wrong. */}
           <InfoRow label="Last updated" value={formatDateLong(complaint.updatedAt)} />
           {complaint.resolutionNote && (
             <div className="pt-3 mt-1">

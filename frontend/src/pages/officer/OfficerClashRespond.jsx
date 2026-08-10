@@ -5,6 +5,7 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useConflicts, useProject, useProjects } from '../../hooks/useResources'
+import { useOwnsPageHeading } from '../../hooks/usePageHeading'
 import AsyncState from '../../components/AsyncState'
 import { conflictsApi } from '../../services'
 import { formatDateLong } from '../../components/dashboard'
@@ -17,6 +18,10 @@ export default function OfficerClashRespond() {
   const { data: conflicts } = useConflicts()
   const { data: allProjects } = useProjects()
   const conflict = (conflicts || []).find((entry) => (entry.projectAId === id || entry.projectBId === id) && entry.status === 'pending_response')
+
+  // Claimed on exactly the condition that renders a heading below. The
+  // no-pending-clash branch shows none, so the shell keeps the h1 there.
+  useOwnsPageHeading(Boolean(project && conflict))
 
   const [customDate, setCustomDate] = useState('')
   const [dateError, setDateError] = useState('')
@@ -86,13 +91,13 @@ export default function OfficerClashRespond() {
         </div>
         {recheckResult === 'clean' ? (
           <div>
-            <h2 className="text-[22px] font-bold text-[#0F172A] dark:text-[#F8FAFC] mb-2">Response submitted successfully</h2>
+            <h1 className="text-[22px] font-bold text-[#0F172A] dark:text-[#F8FAFC] mb-2">Response submitted successfully</h1>
             <p className="text-[14px] text-[#6B7280] dark:text-[#9CA3AF]">New start date: <span className="font-semibold">{acceptedSuggested ? formatDateLong(suggestedDate) : formatDateLong(customDate)}</span></p>
             <p className="text-[13px] text-[#16A34A] dark:text-[#4ADE80] mt-2">No clashes detected with the new date. Admin will review and approve.</p>
           </div>
         ) : (
           <div>
-            <h2 className="text-[22px] font-bold text-[#0F172A] dark:text-[#F8FAFC] mb-2">New clash detected</h2>
+            <h1 className="text-[22px] font-bold text-[#0F172A] dark:text-[#F8FAFC] mb-2">New clash detected</h1>
             {/* Same source as the success branch: customDate is unset on the
                 accept path. */}
             <p className="text-[14px] text-[#6B7280] dark:text-[#9CA3AF]">
@@ -118,7 +123,7 @@ export default function OfficerClashRespond() {
       </button>
 
       <div>
-        <h2 className="text-[22px] font-bold text-[#0F172A] dark:text-[#F8FAFC]">Respond to rejection</h2>
+        <h1 className="text-[22px] font-bold text-[#0F172A] dark:text-[#F8FAFC]">Respond to rejection</h1>
         <p className="text-[13px] text-[#6B7280] dark:text-[#9CA3AF] mt-1">Choose a new start date for your project to resolve the clash.</p>
       </div>
 

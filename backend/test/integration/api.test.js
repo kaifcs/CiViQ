@@ -1232,6 +1232,76 @@ test("API regression", async (t) => {
       assert.equal(stored.status, "resolved", "the status must be unchanged by an assignment")
     })
 
+    await t2.test("competing status writes cannot reopen a resolved complaint", async () => {
+      const ATTEMPTS = 8
+
+      for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
+        const doc = await Complaint.create({
+          issueType: "pothole",
+          description: "Sunken slab on the approach road",
+          location: { ward: "Ward 12", coords: { lat: 28.67, lng: 77.45 } },
+          status: "in_progress",
+        })
+        scratch.push(doc._id)
+        const id = String(doc._id)
+
+        const [toResolved, toSubmitted] = await Promise.all([
+          call(`/complaints/${id}/status`, {
+            token: tokens.admin, method: "PATCH", body: { status: "resolved", note: "Slab relaid" },
+          }),
+          call(`/complaints/${id}/status`, {
+            token: tokens.admin, method: "PATCH", body: { status: "submitted" },
+          }),
+        ])
+
+        const stored = await Complaint.findById(id).lean()
+        assert.equal(
+          stored.status,
+          "resolved",
+          `attempt ${attempt}: a concurrent backward write reopened a resolved complaint`
+        )
+
+        // Resolving is never refused: its filter cannot exclude a live complaint.
+        assert.equal(toResolved.status, 200, `attempt ${attempt}: the resolve was refused`)
+
+        // The backward write either landed first (legal) or lost the race (409).
+        assert.ok(
+          [200, 409].includes(toSubmitted.status),
+          `attempt ${attempt}: unexpected status ${toSubmitted.status} for the backward write`
+        )
+        if (toSubmitted.status === 409) {
+          assert.equal(toSubmitted.body.error.code, "CONFLICT")
+          assert.match(toSubmitted.body.message, /cannot be moved back/)
+        }
+      }
+    })
+
+    // PUT carries the same rule, so the wider update route is not a way round it.
+    await t2.test("competing writes through PUT /:id cannot reopen either", async () => {
+      const doc = await Complaint.create({
+        issueType: "garbage",
+        description: "Uncollected waste behind the market",
+        location: { ward: "Ward 12", coords: { lat: 28.67, lng: 77.45 } },
+        status: "in_progress",
+      })
+      scratch.push(doc._id)
+      const id = String(doc._id)
+
+      const [toResolved, toSubmitted] = await Promise.all([
+        call(`/complaints/${id}/status`, {
+          token: tokens.admin, method: "PATCH", body: { status: "resolved", note: "Cleared" },
+        }),
+        call(`/complaints/${id}`, {
+          token: tokens.admin, method: "PUT", body: { status: "acknowledged" },
+        }),
+      ])
+
+      assert.equal((await Complaint.findById(id).lean()).status, "resolved",
+        "a concurrent PUT reopened a resolved complaint")
+      assert.equal(toResolved.status, 200)
+      assert.ok([200, 409].includes(toSubmitted.status))
+    })
+
     // Scoped to the ids this case created, so nothing another test relies on
     // is swept up.
     t2.after(() => Complaint.deleteMany({ _id: { $in: scratch } }))

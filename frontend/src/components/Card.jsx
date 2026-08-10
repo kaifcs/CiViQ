@@ -1,4 +1,8 @@
-
+// The dashboard stat tile: a label, a large figure and an optional sub-label.
+// Reached through components/dashboard/StatGrid rather than directly, so the five
+// dashboards cannot lay tiles out differently from one another. `valueColor` only
+// distinguishes bad news from everything else, keeping the palette a fixed token
+// set instead of a free-form colour prop.
 
 const ACCENT = '#5E6AD2'
 

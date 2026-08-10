@@ -43,6 +43,23 @@ function blocksStatusChange(currentStatus, nextStatus) {
   return `A ${TERMINAL_STATUS} complaint cannot be moved back to ${nextStatus}`
 }
 
+function terminalStatusFilter(nextStatus) {
+  if (nextStatus === undefined || nextStatus === TERMINAL_STATUS) return {}
+  return { status: { $ne: TERMINAL_STATUS } }
+}
+
+async function refuseMissedWrite(res, id, nextStatus) {
+  const current = await Complaint.findById(id).select("status").lean()
+  if (!current) return notFound(res, "Complaint not found", ERROR_CODES.COMPLAINT_NOT_FOUND)
+  return conflictError(
+    res,
+    blocksStatusChange(current.status, nextStatus)
+      // The filter matched nothing while the complaint exists, so the stored
+      // status was terminal when the write ran.
+      || `A ${TERMINAL_STATUS} complaint cannot be moved back to ${nextStatus}`
+  )
+}
+
 // Assignment is restricted to authorized roles and shared across both routes.
 const ASSIGNMENT_ROLES = ["admin", "officer"]
 exports.ASSIGNMENT_ROLES = ASSIGNMENT_ROLES
@@ -237,21 +254,15 @@ exports.updateComplaint = async (req, res) => {
     const refError = await validateAssignmentRefs(updates)
     if (refError) return badRequest(res, refError)
 
-    // Read before write: the terminal-status guard needs the stored status, and
-    // the notification below needs the previous assignment to detect a change.
-    const before = await Complaint.findById(req.params.id).select("status assignedOfficer")
-    if (!before) return notFound(res, "Complaint not found", ERROR_CODES.COMPLAINT_NOT_FOUND)
+    const before = await Complaint.findById(req.params.id).select("assignedOfficer").lean()
+    const previousOfficer = before?.assignedOfficer ? String(before.assignedOfficer) : null
 
-    const refusal = blocksStatusChange(before.status, updates.status)
-    if (refusal) return conflictError(res, refusal)
-
-    const previousOfficer = before.assignedOfficer ? String(before.assignedOfficer) : null
-
-    const complaint = await Complaint.findByIdAndUpdate(req.params.id, updates, {
-      new: true,
-      runValidators: true,
-    })
-    if (!complaint) return notFound(res, "Complaint not found", ERROR_CODES.COMPLAINT_NOT_FOUND)
+    const complaint = await Complaint.findOneAndUpdate(
+      { _id: req.params.id, ...terminalStatusFilter(updates.status) },
+      updates,
+      { new: true, runValidators: true }
+    )
+    if (!complaint) return refuseMissedWrite(res, req.params.id, updates.status)
 
     await recordAudit({
       req,
@@ -283,21 +294,18 @@ exports.updateStatus = async (req, res) => {
       return badRequest(res, `status must be one of: ${COMPLAINT_STATUSES.join(", ")}`)
     }
 
-    const before = await Complaint.findById(req.params.id).select("status")
-    if (!before) return notFound(res, "Complaint not found", ERROR_CODES.COMPLAINT_NOT_FOUND)
-
-    const refusal = blocksStatusChange(before.status, status)
-    if (refusal) return conflictError(res, refusal)
-
     const updates = { status }
     const note = req.body.note !== undefined ? req.body.note : req.body.resolutionNote
     if (note !== undefined) updates.resolutionNote = note
 
-    const complaint = await Complaint.findByIdAndUpdate(req.params.id, updates, {
-      new: true,
-      runValidators: true,
-    })
-    if (!complaint) return notFound(res, "Complaint not found", ERROR_CODES.COMPLAINT_NOT_FOUND)
+    // The terminal rule travels in the filter, so the database refuses a
+    // backwards transition even when two requests race for the same complaint.
+    const complaint = await Complaint.findOneAndUpdate(
+      { _id: req.params.id, ...terminalStatusFilter(status) },
+      updates,
+      { new: true, runValidators: true }
+    )
+    if (!complaint) return refuseMissedWrite(res, req.params.id, status)
 
     await recordAudit({
       req,

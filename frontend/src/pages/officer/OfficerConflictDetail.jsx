@@ -4,6 +4,7 @@
 
 import { useNavigate, useParams } from 'react-router-dom'
 import { useConflict, useProjects } from '../../hooks/useResources'
+import { useOwnsPageHeading } from '../../hooks/usePageHeading'
 import AsyncState from '../../components/AsyncState'
 import { CONFLICT_STATUS_CONFIG, deptStyle, SEVERITY_CONFIG, TYPE_STYLES, scoreColor } from '../../components/uiStyles'
 import { formatDate, formatDateLong, daysSince, MCDM_CRITERIA, criterionWidth, UNMEASURED_CRITERION_NOTE } from '../../components/dashboard'
@@ -69,6 +70,7 @@ export default function OfficerConflictDetail() {
   const navigate = useNavigate()
   const { data: conflict, loading, error, reload } = useConflict(id)
   const { data: projects } = useProjects()
+  useOwnsPageHeading(Boolean(conflict))
 
   if (loading || error) {
     return <AsyncState loading={loading} error={error} onRetry={reload} label="Loading conflict..." >{null}</AsyncState>
@@ -123,7 +125,7 @@ export default function OfficerConflictDetail() {
           </span>
           <span className="text-[12px] text-[#9CA3AF] dark:text-[#6B7280]">Detected {days}d ago</span>
         </div>
-        <h2 className="text-[20px] font-bold text-[#0F172A] dark:text-[#F8FAFC]">{conflict.projectADept} ↔ {conflict.projectBDept} Clash</h2>
+        <h1 className="text-[20px] font-bold text-[#0F172A] dark:text-[#F8FAFC]">{conflict.projectADept} ↔ {conflict.projectBDept} Clash</h1>
         <p className="text-[13px] text-[#6B7280] dark:text-[#9CA3AF] mt-1">{conflict.overlapDescription}</p>
       </div>
 

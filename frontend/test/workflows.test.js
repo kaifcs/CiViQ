@@ -13,6 +13,7 @@ import { isGeometry } from "../src/gis/geojson.js"
 import {
   adaptComplaint, ROLES, ISSUE_TYPE_OPTIONS, UNAVAILABLE_FIELDS, buildProjectPayload,
 } from "../src/services/adapters.js"
+import { dashboardPathFor } from "../src/router/dashboardPaths.js"
 
 // Reads backend schemas directly so frontend vocabulary stays in sync with API enums.
 const backendSource = (path) =>
@@ -200,92 +201,236 @@ test("a complaint carries no overdue flag, because nothing in the schema dates o
   assert.ok(!UNAVAILABLE_FIELDS.complaint.includes("overdue"))
 })
 
-test("resolvedAt is derived only for a resolved complaint", () => {
+test("resolvedAt is never derived from updatedAt, whatever the status", () => {
   const updatedAt = "2026-03-01T00:00:00.000Z"
-  assert.equal(
-    adaptComplaint({ _id: "c", status: "resolved", updatedAt }, new Map()).resolvedAt,
-    updatedAt
-  )
-  assert.equal(
-    adaptComplaint({ _id: "c", status: "in_progress", updatedAt }, new Map()).resolvedAt,
-    null
-  )
+
+  for (const status of ["submitted", "acknowledged", "in_progress", "resolved"]) {
+    const complaint = adaptComplaint({ _id: "c", status, updatedAt }, new Map())
+    assert.equal(
+      complaint.resolvedAt,
+      null,
+      `resolvedAt was derived for a ${status} complaint; the schema stores no such timestamp`
+    )
+    // The real field stays available under its own name.
+    assert.equal(complaint.updatedAt, updatedAt)
+    assert.notEqual(
+      complaint.resolvedAt,
+      complaint.updatedAt,
+      "resolvedAt must never equal updatedAt, or the UI can present one as the other"
+    )
+  }
+
+  // Declared alongside the other fields with no backend source, so the absence
+  // is documented rather than looking like an oversight.
+  assert.ok(UNAVAILABLE_FIELDS.complaint.includes("resolvedAt"))
+  assert.ok(UNAVAILABLE_FIELDS.complaint.includes("acknowledgedAt"))
 })
 
-test("resolvedAt is a proxy for updatedAt, and updatedAt is available unaliased", () => {
-  const complaint = adaptComplaint(
-    { _id: "c", status: "resolved", updatedAt: "2026-03-01T00:00:00.000Z" },
-    new Map()
-  )
-  assert.equal(complaint.updatedAt, "2026-03-01T00:00:00.000Z")
-  assert.equal(complaint.resolvedAt, complaint.updatedAt, "resolvedAt must be nothing more than updatedAt")
+function timelineStep(screen, key) {
+  const source = frontendSource(screen)
+  const table = source.match(/const TIMELINE_STEPS = \[([\s\S]*?)\n\]/)
+  assert.ok(table, `${screen} has no TIMELINE_STEPS table`)
 
-  // Editing a resolved complaint moves both, which is exactly why the screens
-  // must not label this as an authoritative resolution time.
-  const edited = adaptComplaint(
-    { _id: "c", status: "resolved", updatedAt: "2026-04-09T00:00:00.000Z" },
-    new Map()
-  )
-  assert.notEqual(edited.resolvedAt, complaint.resolvedAt)
+  const row = table[1]
+    .split("\n")
+    .find((line) => new RegExp(`key:\\s*['"]${key}['"]`).test(line))
+  assert.ok(row, `${screen} has no '${key}' row in TIMELINE_STEPS`)
+  return { source, row }
+}
 
-  // The complaint detail screen must not present it as one.
+const COMPLAINT_DETAIL_SCREENS = [
+  "pages/admin/AdminComplaintDetail.jsx",
+  "pages/officer/OfficerComplaintDetail.jsx",
+]
+
+// The resolved step is the one that used to render `updatedAt` under a "Resolved"
+// heading. Both complaint screens must mark it as reached without dating it.
+test("no complaint screen dates the resolved timeline step", () => {
+  for (const screen of COMPLAINT_DETAIL_SCREENS) {
+    const { source, row } = timelineStep(screen, "resolved")
+
+    assert.ok(
+      !/dateKey:\s*['"]resolvedAt['"]/.test(row),
+      `${screen} dates the resolved step from resolvedAt, which the schema does not store`
+    )
+    // Stronger than banning one name: the step may carry no date field at all,
+    // so substituting any other stored timestamp fails too.
+    assert.ok(
+      !/dateKey:\s*['"]/.test(row),
+      `${screen} gives the resolved step a dateKey; no stored field records when a complaint was resolved`
+    )
+    assert.match(
+      row,
+      /dateKey:\s*null/,
+      `${screen} must use dateKey: null for the resolved step, the same representation as in_progress`
+    )
+
+    // The renderer has to honour null, or the table above would be decorative.
+    assert.match(
+      source,
+      /step\.dateKey \? complaint\[step\.dateKey\] : null/,
+      `${screen} must skip the date when a step declares dateKey: null`
+    )
+
+    // Steps that do have an authoritative source keep it.
+    assert.match(
+      timelineStep(screen, "submitted").row,
+      /dateKey:\s*['"]filedAt['"]/,
+      `${screen} lost the submitted timestamp, which is a real stored value (createdAt)`
+    )
+  }
+})
+
+// The information card names the value it actually shows.
+test("the complaint information card reports updatedAt under its own name", () => {
   const detail = frontendSource("pages/admin/AdminComplaintDetail.jsx")
   assert.ok(
     !/label="Resolved on"/.test(detail),
     'the "Resolved on" label overstates a timestamp the schema does not store'
   )
-  assert.ok(/label="Last updated"/.test(detail), "the row must name the value it actually shows")
-
-  // And it is still not invented anywhere: acknowledgement has no source at all.
-  assert.equal(complaint.acknowledgedAt, null)
-  assert.ok(UNAVAILABLE_FIELDS.complaint.includes("acknowledgedAt"))
+  assert.match(detail, /label="Last updated"/, "the row must name the value it actually shows")
 })
 
-test("every authenticated screen has exactly one h1, supplied by the shell", () => {
-  const shell = frontendSource("components/DashboardLayout.jsx")
-  assert.equal(
-    (shell.match(/<h1[\s>]/g) || []).length,
-    1,
-    "the shell must contribute exactly one h1"
-  )
-  assert.ok(
-    /<h1 className="sr-only">\{pageTitle\}<\/h1>/.test(shell),
-    "the shell's h1 must carry the page title"
-  )
-
-  const navbar = frontendSource("components/Navbar.jsx")
-  assert.ok(
-    !/<h1[\s>]/.test(navbar),
-    "the Navbar title repeats across a whole section, so it is chrome and not the page heading"
-  )
-
-  // No authenticated page may add a second one.
+test("no authenticated screen reads a complaint resolvedAt", () => {
   for (const file of authenticatedPages()) {
     const source = readFileSync(file, "utf8")
-    assert.equal(
-      (source.match(/<h1[\s>]/g) || []).length,
-      0,
-      `${basename(file)} adds a second h1 on top of the shell's`
-    )
+    for (const [hit] of source.matchAll(/[\w$]*[.?]*resolvedAt/g)) {
+      assert.match(
+        hit,
+        /resolution\?\.resolvedAt$/,
+        `${basename(file)} reads ${hit}; only Conflict stores a resolution timestamp`
+      )
+    }
   }
 })
 
-test("the authenticated shell stacks its navbar above Leaflet", () => {
+// One meaningful h1 per authenticated screen, and it describes that screen.
+//
+// The shell's visible navbar title is the h1 by default, which covers list
+// screens and the loading, error and not-found states of every screen. A detail
+// screen claims the h1 through useOwnsPageHeading once its entity has loaded, and
+// the navbar steps down to a paragraph — so a project page reads "Bridge Repair",
+// not "Projects", and the same string is never announced twice.
+test("the shell owns the page h1 unless a screen claims it", () => {
+  const shell = frontendSource("components/DashboardLayout.jsx")
+  const navbar = frontendSource("components/Navbar.jsx")
+
+  // The shell contributes no heading of its own — no sr-only duplicate of the
+  // title the navbar already displays.
+  assert.equal(
+    (shell.match(/<h1[\s>]/g) || []).length,
+    0,
+    "the shell must not emit its own h1; the navbar title is the heading"
+  )
+  assert.ok(
+    !/sr-only/.test(shell),
+    "a visually hidden shell heading duplicates the visible navbar title in the accessibility tree"
+  )
+  assert.match(
+    shell,
+    /titleAsHeading=\{!pageOwnsHeading\}/,
+    "the shell must tell the navbar whether it still owns the heading"
+  )
+  assert.match(
+    shell,
+    /<PageHeadingContext\.Provider value=\{setPageOwnsHeading\}>/,
+    "screens need the claim setter to be able to take the heading"
+  )
+
+  // The navbar title is a real heading when the shell owns it, and chrome when
+  // it does not.
+  assert.match(
+    navbar,
+    /const Title = titleAsHeading \? "h1" : "p"/,
+    "the visible page title must carry heading semantics when it is the page heading"
+  )
+  assert.match(navbar, /<Title className=/, "the navbar must render through the computed tag")
+
+  // Claiming and rendering an h1 have to agree, in both directions: a screen that
+  // renders a heading must have claimed it (or there would be two h1s), and a
+  // screen that claims must render one (or there would be none).
+  for (const file of authenticatedPages()) {
+    const source = readFileSync(file, "utf8")
+    const headings = (source.match(/<h1[\s>]/g) || []).length
+    const claims = /useOwnsPageHeading\(/.test(source)
+
+    if (claims) {
+      assert.ok(
+        headings > 0,
+        `${basename(file)} claims the page heading but renders no h1, leaving the screen with none`
+      )
+      // Gated on the entity, so loading and not-found states fall back to the
+      // navbar heading instead of having none.
+      assert.match(
+        source,
+        /useOwnsPageHeading\(Boolean\(/,
+        `${basename(file)} must claim on the presence of its entity, so transient states keep a heading`
+      )
+    } else {
+      assert.equal(
+        headings,
+        0,
+        `${basename(file)} renders an h1 without claiming it, so it competes with the navbar heading`
+      )
+    }
+  }
+})
+
+// The className of the nearest enclosing div, so an assertion can be tied to the
+// element that actually wraps a given child rather than to the file as a whole.
+function wrapperClassNameOf(source, child) {
+  const at = source.indexOf(child)
+  assert.ok(at > -1, `${child} not found`)
+  const opens = [...source.slice(0, at).matchAll(/<div className="([^"]*)"/g)]
+  assert.ok(opens.length > 0, `no enclosing div found for ${child}`)
+  return opens[opens.length - 1][1]
+}
+
+// Leaflet's panes reach 700 and its control corners 1000. The map renders inside
+// the shell's content region, so the navbar's dropdowns (z-50) and their
+// click-away backdrops (z-40) only clear it because the navbar sits in a raised
+// stacking context. This pins that structure, not merely the presence of a large
+// number somewhere in the file.
+test("the navbar wrapper is the shell's only stacking context above Leaflet", () => {
   const LEAFLET_CEILING = 1000
   const shell = frontendSource("components/DashboardLayout.jsx")
 
-  const declared = [...shell.matchAll(/z-\[(\d+)\]/g)].map((m) => Number(m[1]))
-  assert.ok(declared.length > 0, "the shell declares no z-index at all, so Leaflet would paint over it")
-  assert.ok(
-    declared.some((z) => z > LEAFLET_CEILING),
-    `the navbar wrapper must sit above Leaflet's ${LEAFLET_CEILING}; found ${declared.join(", ")}`
+  const navbarWrapper = wrapperClassNameOf(shell, "<Navbar")
+
+  // Positioned, or the z-index is inert and would not contain the dropdowns.
+  assert.match(
+    navbarWrapper,
+    /\brelative\b/,
+    `the navbar wrapper must be positioned, otherwise z-index does not apply: "${navbarWrapper}"`
   )
 
-  // It has to be a stacking context, or the z-index would not contain the
-  // absolutely-positioned dropdowns and the fixed backdrops inside it.
+  const raised = Number((navbarWrapper.match(/z-\[(\d+)\]/) || [])[1])
   assert.ok(
-    /className="relative z-\[\d+\][^"]*"/.test(shell),
-    "the raised wrapper must be positioned, otherwise z-index does not apply"
+    Number.isFinite(raised),
+    `the navbar wrapper declares no z-index, so Leaflet would paint over it: "${navbarWrapper}"`
+  )
+  assert.ok(
+    raised > LEAFLET_CEILING,
+    `the navbar wrapper must sit above Leaflet's ${LEAFLET_CEILING}; found ${raised}`
+  )
+
+  // The content region hosts the map, so it must not carry the same guard —
+  // raising it would put the map back over the navbar.
+  const contentWrapper = wrapperClassNameOf(shell, "<PageHeadingContext.Provider")
+  assert.ok(
+    !/z-\[/.test(contentWrapper),
+    `the map/content region must not carry the navbar's stacking guard: "${contentWrapper}"`
+  )
+
+  // Exactly one element in the shell may outrank Leaflet, so the guard cannot be
+  // duplicated onto another region.
+  const aboveCeiling = [...shell.matchAll(/z-\[(\d+)\]/g)]
+    .map((m) => Number(m[1]))
+    .filter((z) => z > LEAFLET_CEILING)
+  assert.deepEqual(
+    aboveCeiling,
+    [raised],
+    "only the navbar wrapper may sit above Leaflet in the shell"
   )
 
   // The public portal solved this first; the two must not drift apart.
@@ -297,18 +442,73 @@ test("the authenticated shell stacks its navbar above Leaflet", () => {
   )
 })
 
-// --- /login is not reachable with a live session ---------------------------
-test("the sign-in route redirects an authenticated visitor to their own dashboard", () => {
+// --- one role-to-dashboard mapping, and /login cannot loop -----------------
+
+// The mapping is a pure module now, so this is a behavioural test rather than a
+// search for the right source text.
+test("every role resolves to its own dashboard, and an unknown role to none", () => {
+  assert.equal(dashboardPathFor("admin"), "/admin/dashboard")
+  assert.equal(dashboardPathFor("officer"), "/officer/dashboard")
+  assert.equal(dashboardPathFor("supervisor"), "/supervisor/dashboard")
+
+  // Every account type the backend can issue has a home.
+  for (const role of ROLES) {
+    assert.ok(dashboardPathFor(role), `${role} has no dashboard path`)
+  }
+
+  // Anything else resolves to null rather than to "/login", which as a fallback
+  // made the sign-in guard redirect to the page it was already on.
+  for (const unknown of ["citizen", "", null, undefined, "ADMIN"]) {
+    assert.equal(
+      dashboardPathFor(unknown),
+      null,
+      `an unrecognised role (${String(unknown)}) must not resolve to a path`
+    )
+  }
+})
+
+test("the sign-in route redirects a live session without ever looping", () => {
   const router = frontendSource("router/AppRouter.jsx")
+  const login = frontendSource("pages/auth/Login.jsx")
 
-  assert.ok(/<Route path="\/login" element={<LoginRoute \/>} \/>/.test(router),
-    "/login must go through the guard, not straight to the form")
+  assert.match(
+    router,
+    /<Route path="\/login" element=\{<LoginRoute \/>\} \/>/,
+    "/login must go through the guard, not straight to the form"
+  )
 
-  const guard = router.slice(router.indexOf("function LoginRoute"))
-  assert.ok(/if \(loading\) return null/.test(guard),
-    "deciding before the session restore finishes would bounce a signed-in user on every refresh")
-  assert.ok(/if \(user\) return <Navigate to={getDashboardPath\(\)} replace \/>/.test(guard),
-    "the redirect must reuse getDashboardPath rather than repeating the role-to-route mapping")
-  assert.ok(/return <Login \/>/.test(guard),
-    "an unauthenticated visitor must still reach the form")
+  const loginGuard = router.slice(router.indexOf("function LoginRoute"))
+  assert.match(
+    loginGuard,
+    /if \(loading\) return null/,
+    "deciding before the session restore finishes would bounce a signed-in user on every refresh"
+  )
+  // Guarded on a resolved path, so a role with no dashboard renders the form
+  // instead of navigating to /login from /login.
+  assert.match(
+    loginGuard,
+    /if \(home\) return <Navigate to=\{home\} replace \/>/,
+    "the sign-in guard must redirect only when a dashboard exists, or an unknown role loops"
+  )
+  assert.match(loginGuard, /return <Login \/>/, "an unauthenticated visitor must still reach the form")
+
+  const roleGuard = router.slice(router.indexOf("function RoleRoute"), router.indexOf("function LoginRoute"))
+  assert.match(
+    roleGuard,
+    /getDashboardPath\(\) \|\| '\/login'/,
+    "a session whose role has no dashboard must still have somewhere to be sent"
+  )
+
+  // Both callers read the shared table; neither repeats it.
+  assert.match(login, /dashboardPathFor\(/, "Login must read the shared mapping")
+  for (const role of ROLES) {
+    assert.ok(
+      !new RegExp(`'/${role}/dashboard'`).test(login),
+      `Login repeats the ${role} path instead of reading the shared mapping`
+    )
+    assert.ok(
+      !new RegExp(`'/${role}/dashboard'`).test(frontendSource("context/AuthContext.jsx")),
+      `AuthContext repeats the ${role} path instead of reading the shared mapping`
+    )
+  }
 })

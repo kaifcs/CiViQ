@@ -3,6 +3,7 @@ import { AuthContext } from './auth-context'
 import { authApi, departmentsApi, departmentIndex, normaliseError, TOKEN_KEY, USER_KEY } from '../services'
 import { adaptUser } from '../services/adapters'
 import { AUTH_EXPIRED_EVENT } from '../services/apiClient'
+import { dashboardPathFor } from '../router/dashboardPaths'
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
@@ -106,10 +107,7 @@ export function AuthProvider({ children }) {
   const isSupervisor = user?.role === 'supervisor'
 
   function getDashboardPath() {
-    if (isAdmin) return '/admin/dashboard'
-    if (isOfficer) return '/officer/dashboard'
-    if (isSupervisor) return '/supervisor/dashboard'
-    return '/login'
+    return dashboardPathFor(user?.role)
   }
 
   return (

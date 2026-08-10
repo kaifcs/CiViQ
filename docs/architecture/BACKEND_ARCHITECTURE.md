@@ -223,8 +223,12 @@ genuinely returns everything in scope when unpaginated. See
 
 All four capped endpoints send `X-Total-Count` on **every** response, paginated
 or not, so a truncated read is never mistaken for a complete one: compare the
-header against the array length. Truncation keeps the newest records, since
-every capped list sorts `-createdAt`.
+header against the array length. `GET /api/complaints`,
+`GET /api/projects/public` and `GET /api/audit` sort `-createdAt` with no way to
+change it, so truncation there keeps the newest records. `GET /api/notifications`
+defaults to that order but honours `sortBy` (`createdAt`, `priority`, `read`) and
+`order`, so its cap keeps the first 50 of the requested ordering rather than
+always the newest.
 
 Metadata travels in headers because several list endpoints return a bare array,
 and moving it into the body would be a breaking change: `X-Total-Count`,

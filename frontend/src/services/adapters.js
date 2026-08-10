@@ -4,7 +4,7 @@
 // UI fields with no backend source.
 export const UNAVAILABLE_FIELDS = {
   project: ["approvedAt"],
-  complaint: ["acknowledgedAt"],
+  complaint: ["acknowledgedAt", "resolvedAt"],
   auditLog: ["resourceTitle", "description"],
 }
 
@@ -273,7 +273,7 @@ export function adaptComplaint(c, deptMap) {
     acknowledgedAt: null,
     // No deadline exists in the complaint schema.
     updatedAt: c.updatedAt,
-    resolvedAt: c.status === "resolved" ? c.updatedAt : null,
+    resolvedAt: null,
     resolutionNote: c.resolutionNote || null,
     _raw: c,
   }

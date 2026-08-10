@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useComplaint } from '../../hooks/useResources'
+import { useOwnsPageHeading } from '../../hooks/usePageHeading'
 import AsyncState from '../../components/AsyncState'
 import { complaintsApi } from '../../services'
 import { COMPLAINT_STATUS_CONFIG, deptStyle } from '../../components/uiStyles'
@@ -18,7 +19,7 @@ const TIMELINE_STEPS = [
   { key: 'submitted', label: 'Submitted', dateKey: 'filedAt' },
   { key: 'acknowledged', label: 'Acknowledged', dateKey: 'acknowledgedAt' },
   { key: 'in_progress', label: 'In Progress', dateKey: null },
-  { key: 'resolved', label: 'Resolved', dateKey: 'resolvedAt' },
+  { key: 'resolved', label: 'Resolved', dateKey: null },
 ]
 
 const STATUS_ORDER = ['submitted', 'acknowledged', 'in_progress', 'resolved']
@@ -79,6 +80,7 @@ export default function OfficerComplaintDetail() {
   const navigate = useNavigate()
 
   const { data: complaint, loading, error, reload } = useComplaint(id)
+  useOwnsPageHeading(Boolean(complaint))
   // Both are edited before saving, so they stay as state. Re-seeded during
   // render when a different complaint loads, rather than from an effect that
   // would commit an extra render each time.
@@ -151,7 +153,7 @@ export default function OfficerComplaintDetail() {
               {status.text}
             </span>
           </div>
-          <h2 className="text-[20px] font-bold text-[#0F172A] dark:text-[#F8FAFC]">{complaint.issueType}</h2>
+          <h1 className="text-[20px] font-bold text-[#0F172A] dark:text-[#F8FAFC]">{complaint.issueType}</h1>
           <p className="text-[13px] text-[#6B7280] dark:text-[#9CA3AF] mt-1">{complaint.address}</p>
         </div>
 

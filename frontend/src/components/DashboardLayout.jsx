@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Navbar from './Navbar'
 import Sidebar from './Sidebar'
+import { PageHeadingContext } from './page-heading-context'
 
 const THEME_KEY = 'civiq_theme'
 
@@ -20,6 +21,8 @@ export default function DashboardLayout({
 }) {
   const [darkMode,  setDarkMode]  = useState(() => localStorage.getItem(THEME_KEY) === 'dark')
   const [collapsed, setCollapsed] = useState(false)
+
+  const [pageOwnsHeading, setPageOwnsHeading] = useState(false)
 
   useEffect(() => {
     localStorage.setItem(THEME_KEY, darkMode ? 'dark' : 'light')
@@ -57,6 +60,7 @@ export default function DashboardLayout({
               <div className="relative z-[1100] flex-shrink-0 bg-[#FFFFFF] dark:bg-[#171717] rounded-t-[10px]">
                 <Navbar
                   pageTitle={pageTitle}
+                  titleAsHeading={!pageOwnsHeading}
                   pageAction={pageAction}
                   notificationsPath={notificationsPath}
                   darkMode={darkMode}
@@ -68,8 +72,9 @@ export default function DashboardLayout({
               </div>
 
               <div className="flex-1 overflow-y-auto px-8 py-8">
-                <h1 className="sr-only">{pageTitle}</h1>
-                {children}
+                <PageHeadingContext.Provider value={setPageOwnsHeading}>
+                  {children}
+                </PageHeadingContext.Provider>
               </div>
 
             </div>

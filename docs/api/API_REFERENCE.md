@@ -89,9 +89,13 @@ except where an endpoint caps an unpaginated read:
 
 Each of those four sends `X-Total-Count` on **every** response, paginated or
 not, so truncation is never silent: compare it against the array length and page
-through for the rest. The cap keeps the newest records — all four sort
-`-createdAt`. On `/api/notifications` the count carries the same recipient scope
-and preference filter as the rows, so it totals only the caller's own feed.
+through for the rest. `GET /api/complaints`, `GET /api/projects/public` and
+`GET /api/audit` sort `-createdAt` unconditionally, so their cap keeps the newest
+records. `GET /api/notifications` defaults to the same order but accepts `sortBy`
+and `order`, so a capped read there returns the first 50 of whatever ordering was
+asked for — not necessarily the newest. On `/api/notifications` the count carries
+the same recipient scope and preference filter as the rows, so it totals only the
+caller's own feed.
 
 Metadata travels in headers:
 

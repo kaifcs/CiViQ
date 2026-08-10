@@ -5,6 +5,7 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useUser, useProjects, useAuditLogs } from '../../hooks/useResources'
+import { useOwnsPageHeading } from '../../hooks/usePageHeading'
 import AsyncState from '../../components/AsyncState'
 import { usersApi, normaliseError, ROLES, roleLabel } from '../../services'
 import { useAuth } from '../../hooks/useAuth'
@@ -53,6 +54,7 @@ export default function AdminUserDetail() {
   const { data: user, loading, error, reload } = useUser(id)
   const { data: projects } = useProjects()
   const { data: auditLogs } = useAuditLogs()
+  useOwnsPageHeading(Boolean(user))
 
   // `user` is null on the first render, so seeding once would report a
   // deactivated account as Active and keep the Deactivate action live.
@@ -174,7 +176,7 @@ export default function AdminUserDetail() {
           </div>
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <h2 className="text-[20px] font-bold text-[#0F172A] dark:text-[#F8FAFC]">{user.name}</h2>
+              <h1 className="text-[20px] font-bold text-[#0F172A] dark:text-[#F8FAFC]">{user.name}</h1>
               <span className={`inline-flex items-center text-[12px] font-medium px-2.5 py-1 rounded-full ${ROLE_STYLES[currentRole] || ROLE_STYLES.officer}`}>
                 {currentRole.charAt(0).toUpperCase() + currentRole.slice(1)}
               </span>

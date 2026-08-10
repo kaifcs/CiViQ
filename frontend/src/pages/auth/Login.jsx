@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { USER_KEY } from '../../services'
+import { dashboardPathFor } from '../../router/dashboardPaths'
 import CiviqLogo from '../../components/Brand'
 import { Button, Field, Notice } from '../../components/public/ui'
 import { FOCUS_RING, inputCls } from '../../components/public/controlStyles'
@@ -85,12 +86,16 @@ export default function Login() {
     }
 
     // Read back from storage: the `user` state set by login() is not visible
-    // until the next render, so route on the persisted role instead.
+    // until the next render, so route on the persisted role instead. The path
+    // comes from the shared table rather than a second copy of the mapping.
     const stored = JSON.parse(localStorage.getItem(USER_KEY) || '{}')
-    if (stored.role === 'admin')           navigate('/admin/dashboard')
-    else if (stored.role === 'officer')    navigate('/officer/dashboard')
-    else if (stored.role === 'supervisor') navigate('/supervisor/dashboard')
-    else                                   navigate('/login')
+    const destination = dashboardPathFor(stored.role)
+
+    // No dashboard for this role: stay on the form and say so, rather than
+    // navigating to /login from /login.
+    if (destination) navigate(destination)
+    else setError('This account has no dashboard. Contact an administrator.')
+
     setLoading(false)
   }
 

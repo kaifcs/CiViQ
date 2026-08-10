@@ -5,6 +5,7 @@
 import { useCallback, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useProject } from '../../hooks/useResources'
+import { useOwnsPageHeading } from '../../hooks/usePageHeading'
 import { useAuth } from '../../hooks/useAuth'
 import { useMutation } from '../../hooks/useApi'
 import { projectsApi } from '../../services'
@@ -39,6 +40,7 @@ export default function SupervisorTaskDetail() {
   const navigate = useNavigate()
   const { deptMap } = useAuth()
   const { data: project, loading, error, reload, setData } = useProject(id)
+  useOwnsPageHeading(Boolean(project))
 
   // Re-seeded during render when a different project loads, rather than from an
   // effect that would commit an extra render each time.
@@ -103,7 +105,7 @@ export default function SupervisorTaskDetail() {
 
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h2 className="text-[22px] font-bold text-[#0F172A] dark:text-[#F8FAFC]">{project.title}</h2>
+          <h1 className="text-[22px] font-bold text-[#0F172A] dark:text-[#F8FAFC]">{project.title}</h1>
           <p className="text-[13px] text-[#6B7280] dark:text-[#9CA3AF] mt-1">
             {project.projectId} · {project.type} · {project.ward || 'No ward'}
           </p>

@@ -92,6 +92,7 @@ function IconBtn({ children, onClick, badge = false, ...rest }) {
 
 export default function Navbar({
   pageTitle = "Dashboard",
+  titleAsHeading = true,
   pageAction,
   notificationsPath,
   darkMode = false,
@@ -106,11 +107,13 @@ export default function Navbar({
   const [showNotif, setShowNotif] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
 
+  const Title = titleAsHeading ? "h1" : "p";
+
   return (
     <div className="flex items-center justify-between px-8 h-16 border-b border-[#E2E8F0] dark:border-[#1E293B] flex-shrink-0">
-      <p className="text-[18px] font-bold text-[#0F172A] dark:text-[#F8FAFC] tracking-tight leading-none">
+      <Title className="text-[18px] font-bold text-[#0F172A] dark:text-[#F8FAFC] tracking-tight leading-none">
         {pageTitle}
-      </p>
+      </Title>
 
       <div className="flex items-center gap-3">
         {pageAction && <div>{pageAction}</div>}

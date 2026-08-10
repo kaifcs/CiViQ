@@ -80,7 +80,8 @@ function RoleRoute({ children, role }) {
 
   if (loading) return null
   if (!user) return <Navigate to="/login" replace />
-  if (user.role !== role) return <Navigate to={getDashboardPath()} replace />
+  // A session whose role has no dashboard has nowhere to go but back to sign-in.
+  if (user.role !== role) return <Navigate to={getDashboardPath() || '/login'} replace />
 
   return children
 }
@@ -89,7 +90,11 @@ function LoginRoute() {
   const { user, loading, getDashboardPath } = useAuth()
 
   if (loading) return null
-  if (user) return <Navigate to={getDashboardPath()} replace />
+
+  // Redirect only when there is somewhere to send them. Navigating to /login
+  // from /login would be a loop, which is what the null fallback prevents.
+  const home = user ? getDashboardPath() : null
+  if (home) return <Navigate to={home} replace />
 
   return <Login />
 }

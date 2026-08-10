@@ -5,6 +5,7 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useConflict, useProjects } from '../../hooks/useResources'
+import { useOwnsPageHeading } from '../../hooks/usePageHeading'
 import AsyncState from '../../components/AsyncState'
 import { conflictsApi, normaliseError } from '../../services'
 import { useAuth } from '../../hooks/useAuth'
@@ -129,6 +130,7 @@ export default function AdminConflictDetail() {
   const { deptMap } = useAuth()
   const { data: conflict, loading, error, reload } = useConflict(id)
   const { data: projects } = useProjects()
+  useOwnsPageHeading(Boolean(conflict))
 
    // Seed local state when a different conflict loads.
   const [resolutionStatus, setResolutionStatus] = useState('unresolved')
@@ -280,9 +282,9 @@ export default function AdminConflictDetail() {
             <StatusBadge   status={resolutionStatus} />
             <span className="text-[12px] text-[#9CA3AF] dark:text-[#6B7280]">Detected {days}d ago</span>
           </div>
-          <h2 className="text-[20px] font-bold text-[#0F172A] dark:text-[#F8FAFC]">
+          <h1 className="text-[20px] font-bold text-[#0F172A] dark:text-[#F8FAFC]">
             {conflict.projectADept} ↔ {conflict.projectBDept} Clash
-          </h2>
+          </h1>
           <p className="text-[13px] text-[#6B7280] dark:text-[#9CA3AF] mt-1">{conflict.overlapDescription}</p>
         </div>
       </div>

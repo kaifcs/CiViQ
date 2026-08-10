@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useProject, useConflicts, useAssignableSupervisors } from '../../hooks/useResources'
+import { useOwnsPageHeading } from '../../hooks/usePageHeading'
 import AsyncState from '../../components/AsyncState'
 import { projectsApi, normaliseError } from '../../services'
 import { formatDateLong, MCDM_CRITERIA, criterionWidth, isTerminalProject, UNMEASURED_CRITERION_NOTE } from '../../components/dashboard'
@@ -39,6 +40,7 @@ export default function OfficerProjectDetail() {
   const navigate = useNavigate()
   const { data: project, loading, error, reload } = useProject(id)
   const { data: conflicts } = useConflicts()
+  useOwnsPageHeading(Boolean(project))
   const { supervisors } = useAssignableSupervisors()
   const [supervisorId, setSupervisorId] = useState('')
   const [seededFor, setSeededFor] = useState(null)
@@ -98,7 +100,7 @@ export default function OfficerProjectDetail() {
               </span>
             )}
           </div>
-          <h2 className="text-[22px] font-bold text-[#0F172A] dark:text-[#F8FAFC] leading-snug">{project.title}</h2>
+          <h1 className="text-[22px] font-bold text-[#0F172A] dark:text-[#F8FAFC] leading-snug">{project.title}</h1>
           <p className="text-[13px] text-[#6B7280] dark:text-[#9CA3AF] mt-1">{project.departmentFull}</p>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0 mt-1">

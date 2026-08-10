@@ -5,6 +5,7 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useProject, useConflicts, useAuditLogs } from '../../hooks/useResources'
+import { useOwnsPageHeading } from '../../hooks/usePageHeading'
 import AsyncState from '../../components/AsyncState'
 import { projectsApi, normaliseError } from '../../services'
 import { formatDateLong, relativeDay, auditActionLabel, MCDM_CRITERIA, criterionWidth, UNMEASURED_CRITERION_NOTE } from '../../components/dashboard'
@@ -121,6 +122,7 @@ export default function AdminProjectDetail() {
   const { data: project, loading, error, reload } = useProject(id)
   const { data: conflicts } = useConflicts()
   const { data: auditLogs } = useAuditLogs()
+  useOwnsPageHeading(Boolean(project))
 
   // `project` is null on the first render, so seeding once would leave this at
   // 'pending' and keep Approve/Reject live on an already-decided project.
@@ -243,9 +245,9 @@ export default function AdminProjectDetail() {
               </span>
             )}
           </div>
-          <h2 className="text-[22px] font-bold text-[#0F172A] dark:text-[#F8FAFC] leading-snug">
+          <h1 className="text-[22px] font-bold text-[#0F172A] dark:text-[#F8FAFC] leading-snug">
             {project.title}
-          </h2>
+          </h1>
           <p className="text-[13px] text-[#6B7280] dark:text-[#9CA3AF] mt-1">{project.departmentFull}</p>
         </div>
 

@@ -11,7 +11,7 @@
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind%20CSS-3-06B6D4?logo=tailwindcss&logoColor=white)
 ![Leaflet](https://img.shields.io/badge/Leaflet-1.9-199900?logo=leaflet&logoColor=white)
 ![OpenAPI](https://img.shields.io/badge/OpenAPI-3.0.3-6BA539?logo=openapiinitiative&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-294%20backend%20%7C%2059%20frontend-brightgreen)
+![Tests](https://img.shields.io/badge/tests-304%20backend%20%7C%2066%20frontend-brightgreen)
 
 </div>
 
@@ -626,7 +626,7 @@ Both halves expose the same scripts, and `check` is what CI runs.
 | --- | --- | --- |
 | `npm run lint` | ESLint — **clean, 0 problems** | ESLint — **clean, 0 problems** |
 | `npm run build` | `node --check server.js` (syntax) — **passing** | Vite production build — **passing** |
-| `npm test` | **302 tests** | **63 tests** |
+| `npm test` | **304 tests** | **66 tests** |
 | `npm run check` | lint + build + test | lint + build + test |
 | `npm run test:coverage` | with coverage report | with coverage report |
 
@@ -636,8 +636,8 @@ Last run against this repository, with a local MongoDB reachable:
 
 | Suite | Tests | Pass | Fail | Skipped |
 | --- | --- | --- | --- | --- |
-| Backend (`backend/`) | 302 | 302 | 0 | 0 |
-| Frontend (`frontend/`) | 63 | 63 | 0 | 0 |
+| Backend (`backend/`) | 304 | 304 | 0 | 0 |
+| Frontend (`frontend/`) | 66 | 66 | 0 | 0 |
 
 Backend coverage spans 13 unit files (response envelope, error middleware, logger,
 notification links, preferences and stream, ownership, pagination, seed audit

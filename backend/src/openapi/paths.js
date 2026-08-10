@@ -671,7 +671,7 @@ module.exports = {
         { name: "sortBy", in: "query", schema: { type: "string", enum: ["createdAt", "priority", "read"] } },
         { name: "order", in: "query", schema: { type: "string", enum: ["asc", "desc"] } },
       ],
-      responses: { 200: { description: "Notifications, newest first. X-Total-* headers are set when paginated.", ...json(arrayOf("Notification")) }, ...PLAIN_GUARDS },
+      responses: { 200: { description: "Notifications in the requested order, newest first by default. X-Total-* headers are set when paginated; X-Total-Count is sent on every response. An unpaginated read is capped at 50 records of whichever ordering was asked for.", ...json(arrayOf("Notification")) }, ...PLAIN_GUARDS },
     },
   },
   "/api/notifications/stream-ticket": {
