@@ -626,7 +626,7 @@ Both halves expose the same scripts, and `check` is what CI runs.
 | --- | --- | --- |
 | `npm run lint` | ESLint — **clean, 0 problems** | ESLint — **clean, 0 problems** |
 | `npm run build` | `node --check server.js` (syntax) — **passing** | Vite production build — **passing** |
-| `npm test` | **294 tests** | **59 tests** |
+| `npm test` | **302 tests** | **63 tests** |
 | `npm run check` | lint + build + test | lint + build + test |
 | `npm run test:coverage` | with coverage report | with coverage report |
 
@@ -636,8 +636,8 @@ Last run against this repository, with a local MongoDB reachable:
 
 | Suite | Tests | Pass | Fail | Skipped |
 | --- | --- | --- | --- | --- |
-| Backend (`backend/`) | 294 | 294 | 0 | 0 |
-| Frontend (`frontend/`) | 59 | 59 | 0 | 0 |
+| Backend (`backend/`) | 302 | 302 | 0 | 0 |
+| Frontend (`frontend/`) | 63 | 63 | 0 | 0 |
 
 Backend coverage spans 13 unit files (response envelope, error middleware, logger,
 notification links, preferences and stream, ownership, pagination, seed audit

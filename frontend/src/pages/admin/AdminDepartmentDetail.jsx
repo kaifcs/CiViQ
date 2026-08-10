@@ -110,7 +110,7 @@ export default function AdminDepartmentDetail() {
             style={{ backgroundColor: department.color || '#5E6AD2' }} />
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <h1 className="text-[20px] font-bold text-[#0F172A] dark:text-[#F8FAFC]">{department.name}</h1>
+              <h2 className="text-[20px] font-bold text-[#0F172A] dark:text-[#F8FAFC]">{department.name}</h2>
               <span className={`inline-flex items-center text-[12px] font-medium px-2.5 py-1 rounded-full ${
                 department.isActive
                   ? 'bg-[#F0FDF4] text-[#15803D] dark:bg-[#0D1F14] dark:text-[#4ADE80]'

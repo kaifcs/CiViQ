@@ -174,7 +174,7 @@ export default function AdminUserDetail() {
           </div>
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <h1 className="text-[20px] font-bold text-[#0F172A] dark:text-[#F8FAFC]">{user.name}</h1>
+              <h2 className="text-[20px] font-bold text-[#0F172A] dark:text-[#F8FAFC]">{user.name}</h2>
               <span className={`inline-flex items-center text-[12px] font-medium px-2.5 py-1 rounded-full ${ROLE_STYLES[currentRole] || ROLE_STYLES.officer}`}>
                 {currentRole.charAt(0).toUpperCase() + currentRole.slice(1)}
               </span>

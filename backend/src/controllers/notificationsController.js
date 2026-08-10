@@ -17,6 +17,8 @@ exports.getNotifications = async (req, res) => {
     const notifications = await service.listNotifications(req.user._id, req.query, page, prefs)
     if (page.enabled) {
       setPaginationHeaders(res, await service.countNotifications(req.user._id, req.query, prefs), page)
+    } else {
+      res.set("X-Total-Count", String(await service.countNotifications(req.user._id, req.query, prefs)))
     }
     res.json(notifications)
   } catch (err) { serverError(res, err, "notificationsController:") }

@@ -216,9 +216,9 @@ export default function AdminComplaintDetail() {
               {status.text}
             </span>
           </div>
-          <h1 className="text-[20px] font-bold text-[#0F172A] dark:text-[#F8FAFC]">
+          <h2 className="text-[20px] font-bold text-[#0F172A] dark:text-[#F8FAFC]">
             {complaint.issueType}
-          </h1>
+          </h2>
           <p className="text-[13px] text-[#6B7280] dark:text-[#9CA3AF] mt-1">{complaint.address}</p>
         </div>
 
@@ -292,7 +292,10 @@ export default function AdminComplaintDetail() {
           <InfoRow label="Ward"         value={complaint.ward} />
           <InfoRow label="Filed on"     value={formatDateTime(complaint.filedAt)} />
           <InfoRow label="Acknowledged" value={hasAcknowledged ? 'Yes' : 'Not yet'} />
-          <InfoRow label="Resolved on"  value={complaint.resolvedAt ? formatDateLong(complaint.resolvedAt) : 'Not yet'} />
+          {/* `updatedAt` under its own name rather than "Resolved on": the
+              adapter's resolvedAt is only a proxy for it, so labelling it as a
+              resolution time would overstate what the schema stores. */}
+          <InfoRow label="Last updated" value={formatDateLong(complaint.updatedAt)} />
           {complaint.resolutionNote && (
             <div className="pt-3 mt-1">
               <p className="text-[11px] font-semibold text-[#6B7280] dark:text-[#9CA3AF] uppercase tracking-[0.06em] mb-1.5">Resolution note</p>

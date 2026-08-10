@@ -118,7 +118,7 @@ export default function OfficerClashRespond() {
       </button>
 
       <div>
-        <h1 className="text-[22px] font-bold text-[#0F172A] dark:text-[#F8FAFC]">Respond to rejection</h1>
+        <h2 className="text-[22px] font-bold text-[#0F172A] dark:text-[#F8FAFC]">Respond to rejection</h2>
         <p className="text-[13px] text-[#6B7280] dark:text-[#9CA3AF] mt-1">Choose a new start date for your project to resolve the clash.</p>
       </div>
 

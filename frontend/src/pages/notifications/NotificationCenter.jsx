@@ -131,7 +131,7 @@ export default function NotificationCenter() {
     <div className="flex flex-col gap-4" style={{ fontFamily: "'Inter', sans-serif" }}>
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-[20px] font-bold text-[#0F172A] dark:text-[#F8FAFC]">Notifications</h1>
+          <h2 className="text-[20px] font-bold text-[#0F172A] dark:text-[#F8FAFC]">Notifications</h2>
           <p className="text-[13px] text-[#6B7280] dark:text-[#9CA3AF] mt-1">
             {showArchived
               ? 'Archived notifications. Restoring one returns it to your inbox.'

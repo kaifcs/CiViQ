@@ -83,8 +83,15 @@ except where an endpoint caps an unpaginated read:
 | Endpoint | Cap without `?page`/`?limit` |
 |---|---|
 | `GET /api/complaints` | 200 — it is public, so it cannot be left unbounded |
+| `GET /api/projects/public` | 200 — unauthenticated, for the same reason |
 | `GET /api/audit` | 200 — the trail grows without bound |
 | `GET /api/notifications` | 50 — the default feed |
+
+Each of those four sends `X-Total-Count` on **every** response, paginated or
+not, so truncation is never silent: compare it against the array length and page
+through for the rest. The cap keeps the newest records — all four sort
+`-createdAt`. On `/api/notifications` the count carries the same recipient scope
+and preference filter as the rows, so it totals only the caller's own feed.
 
 Metadata travels in headers:
 
@@ -688,7 +695,11 @@ the query filter itself, so another user's notification is reported as missing.
 ### GET /api/notifications
 **auth**
 
-Returns a bare array. Without pagination the feed is capped at 50 records.
+Returns a bare array. Without pagination the feed is capped at 50 records, and
+`X-Total-Count` reports the true size on every response so a truncated feed
+cannot be read as a complete one. The count applies the same recipient scope and
+muted-category filter as the rows, so it never totals anything the caller could
+not already list.
 
 | Query | Effect |
 |---|---|
@@ -804,7 +815,9 @@ non-boolean `isOverride` returns 400. When paginated, the reported total counts
 the filtered set.
 
 Returns a bare array, newest first, with `performedBy` populated (`fullName`,
-`role`, `department`). Without pagination the response is capped at 200 records.
+`role`, `department`). Without pagination the response is capped at 200 records,
+and `X-Total-Count` reports the true size of the filtered set on every response
+so a truncated trail cannot be read as a complete one.
 
 ### GET /api/audit/:id
 **admin**

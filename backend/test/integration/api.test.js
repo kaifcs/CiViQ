@@ -1136,6 +1136,106 @@ test("API regression", async (t) => {
     })
     assert.equal(anonymous.status, 401, "assignment must stay authenticated")
   })
+  
+  await t.test("regression: a resolved complaint cannot be reopened (AUD-02)", async (t2) => {
+    const Complaint = require("../../src/models/Complaint")
+    const scratch = []
+
+    const resolvedComplaint = async () => {
+      const doc = await Complaint.create({
+        issueType: "drainage",
+        description: "Blocked drain outside the market",
+        location: { ward: "Ward 12", coords: { lat: 28.67, lng: 77.45 } },
+        status: "resolved",
+        resolutionNote: "Drain cleared",
+      })
+      scratch.push(doc._id)
+      return String(doc._id)
+    }
+
+    const REOPENING_STATUSES = ["submitted", "acknowledged", "in_progress"]
+
+    await t2.test("PATCH /:id/status refuses every backwards transition", async () => {
+      for (const status of REOPENING_STATUSES) {
+        const id = await resolvedComplaint()
+
+        const res = await call(`/complaints/${id}/status`, {
+          token: tokens.admin, method: "PATCH", body: { status },
+        })
+        assert.equal(res.status, 409, `resolved -> ${status} was accepted`)
+        assert.equal(res.body.error.code, "CONFLICT")
+        assert.match(res.body.message, /cannot be moved back/,
+          "the refusal must say why, not just that it failed")
+
+        assert.equal((await Complaint.findById(id).lean()).status, "resolved",
+          `resolved -> ${status} was written despite the refusal`)
+      }
+    })
+
+    await t2.test("PUT /:id refuses the same transitions, so neither path is a way round", async () => {
+      for (const status of REOPENING_STATUSES) {
+        const id = await resolvedComplaint()
+
+        const res = await call(`/complaints/${id}`, {
+          token: tokens.admin, method: "PUT", body: { status },
+        })
+        assert.equal(res.status, 409, `PUT resolved -> ${status} was accepted`)
+        assert.equal(res.body.error.code, "CONFLICT")
+
+        assert.equal((await Complaint.findById(id).lean()).status, "resolved",
+          `PUT resolved -> ${status} was written despite the refusal`)
+      }
+    })
+
+    // The one case that walks the workflow through the API end to end, so the
+    // guard cannot pass by refusing everything.
+    await t2.test("the whole forward workflow still works", async () => {
+      const created = await call("/complaints", {
+        method: "POST",
+        body: {
+          issueType: "streetlight",
+          description: "Street light out on the service road",
+          location: { ward: "Ward 12", coords: { lat: 28.67, lng: 77.45 } },
+        },
+      })
+      assert.equal(created.status, 201)
+      const id = created.body._id
+      scratch.push(id)
+
+      for (const status of ["acknowledged", "in_progress", "resolved"]) {
+        const res = await call(`/complaints/${id}/status`, {
+          token: tokens.admin, method: "PATCH", body: { status },
+        })
+        assert.equal(res.status, 200, `the forward transition to ${status} was refused`)
+        assert.equal((await Complaint.findById(id).lean()).status, status)
+      }
+    })
+
+    await t2.test("only the status is frozen — a resolved complaint stays editable", async () => {
+      const id = await resolvedComplaint()
+
+      // Correcting the record of what was done must still be possible.
+      const note = await call(`/complaints/${id}/status`, {
+        token: tokens.admin, method: "PATCH", body: { status: "resolved", note: "Drain cleared and re-levelled" },
+      })
+      assert.equal(note.status, 200, "re-sending the same status must stay idempotent")
+      assert.equal((await Complaint.findById(id).lean()).resolutionNote, "Drain cleared and re-levelled")
+
+      // So must routing it to the right department after the fact.
+      const assigned = await call(`/complaints/${id}/assign`, {
+        token: tokens.admin, method: "PATCH", body: { assignedOfficer: String(officerA._id) },
+      })
+      assert.equal(assigned.status, 200, "assignment must not be blocked by the status guard")
+
+      const stored = await Complaint.findById(id).lean()
+      assert.equal(String(stored.assignedOfficer), String(officerA._id))
+      assert.equal(stored.status, "resolved", "the status must be unchanged by an assignment")
+    })
+
+    // Scoped to the ids this case created, so nothing another test relies on
+    // is swept up.
+    t2.after(() => Complaint.deleteMany({ _id: { $in: scratch } }))
+  })
 
   // The one public list in the API, so an unpaginated read must be bounded —
   // otherwise the payload grows with the collection for ever.
@@ -1273,6 +1373,78 @@ test("API regression", async (t) => {
     assert.equal(paged.headers.get("x-total-pages"), "2")
     assert.equal(paged.headers.get("x-has-next"), "true")
     assert.equal(paged.headers.get("x-has-previous"), "false")
+  })
+
+  await t.test("regression: a capped unpaginated read reports its true total (AUD-09)", async (t2) => {
+    await t2.test("GET /api/audit — capped at 200", async (st) => {
+      const AuditLog = require("../../src/models/AuditLog")
+      const bulk = []
+      for (let i = 0; i < 210; i++) {
+        bulk.push({
+          action: "aud09_probe",
+          performedBy: admin._id,
+          targetType: "Project",
+          createdAt: new Date(Date.UTC(2026, 0, 1) + i * 60_000),
+          updatedAt: new Date(Date.UTC(2026, 0, 1) + i * 60_000),
+        })
+      }
+      await AuditLog.collection.insertMany(bulk)
+      st.after(() => AuditLog.deleteMany({ action: "aud09_probe" }))
+
+      const total = await AuditLog.countDocuments({ action: "aud09_probe" })
+      assert.equal(total, 210, "precondition: more entries than the cap")
+
+      const res = await call("/audit?action=aud09_probe", { token: tokens.admin })
+      assert.equal(res.status, 200)
+      assert.equal(res.body.length, 200, "the cap must still apply")
+      assert.equal(res.headers.get("x-total-count"), "210",
+        "a truncated trail was indistinguishable from a complete one")
+
+      // The reported total must track the filter, not the whole collection.
+      const paged = await call("/audit?action=aud09_probe&page=2&limit=200", { token: tokens.admin })
+      assert.equal(paged.headers.get("x-total-count"), "210")
+      assert.equal(paged.body.length, 10, "paging must still reach past the cap")
+    })
+
+    await t2.test("GET /api/notifications — capped at 50, and only the caller's own", async (st) => {
+      const Notification = require("../../src/models/Notification")
+      const row = (recipient, i) => ({
+        recipient,
+        type: "project_approved",
+        title: `AUD-09 probe ${i}`,
+        message: "capped feed probe",
+        category: "project",
+        priority: "normal",
+        read: false,
+        archived: false,
+        deliveryStatus: "skipped",
+        createdAt: new Date(Date.UTC(2026, 0, 1) + i * 60_000),
+        updatedAt: new Date(Date.UTC(2026, 0, 1) + i * 60_000),
+      })
+
+      const baseline = async (token) =>
+        Number((await call("/notifications", { token })).headers.get("x-total-count"))
+
+      const mineBefore = await baseline(tokens.officerA)
+      const theirsBefore = await baseline(tokens.officerB)
+
+      const mine = Array.from({ length: 60 }, (_, i) => row(officerA._id, i))
+      // A second recipient's rows must not leak into either the feed or the total.
+      const theirs = Array.from({ length: 7 }, (_, i) => row(officerB._id, i))
+      await Notification.collection.insertMany([...mine, ...theirs])
+      st.after(() => Notification.deleteMany({ message: "capped feed probe" }))
+
+      const res = await call("/notifications", { token: tokens.officerA })
+      assert.equal(res.status, 200)
+      assert.equal(res.body.length, 50, "the feed cap must still apply")
+      assert.ok(mineBefore + 60 > 50, "precondition: more notifications than the cap")
+      assert.equal(res.headers.get("x-total-count"), String(mineBefore + 60),
+        "a truncated feed was indistinguishable from a complete one")
+
+      const other = await call("/notifications", { token: tokens.officerB })
+      assert.equal(other.headers.get("x-total-count"), String(theirsBefore + 7),
+        "the total must carry the same recipient scope as the rows")
+    })
   })
 
   // Pagination metadata must respect the caller's scope.

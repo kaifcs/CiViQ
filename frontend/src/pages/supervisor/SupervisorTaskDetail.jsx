@@ -103,7 +103,7 @@ export default function SupervisorTaskDetail() {
 
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-[22px] font-bold text-[#0F172A] dark:text-[#F8FAFC]">{project.title}</h1>
+          <h2 className="text-[22px] font-bold text-[#0F172A] dark:text-[#F8FAFC]">{project.title}</h2>
           <p className="text-[13px] text-[#6B7280] dark:text-[#9CA3AF] mt-1">
             {project.projectId} · {project.type} · {project.ward || 'No ward'}
           </p>

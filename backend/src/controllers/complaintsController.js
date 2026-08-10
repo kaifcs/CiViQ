@@ -11,7 +11,7 @@ const { notifyComplaintAssigned, notifyComplaintStatusChanged } = require("../se
 const { parsePagination, setPaginationHeaders } = require("../utils/pagination")
 const { pickWritable: pickFields } = require("../utils/writableFields")
 const { serialiseComplaint, serialiseComplaints } = require("../utils/serializers")
-const { ERROR_CODES, badRequest, forbidden, notFound, sendWriteError, serverError } = require("../utils/apiResponse")
+const { ERROR_CODES, badRequest, conflictError, forbidden, notFound, sendWriteError, serverError } = require("../utils/apiResponse")
 
 const COMPLAINT_STATUSES = Complaint.schema.path("status").enumValues
 const ISSUE_TYPES = Complaint.schema.path("issueType").enumValues
@@ -32,6 +32,16 @@ const CREATE_WRITABLE_FIELDS = [
   "location",
   "photoUrl",
 ]
+
+const TERMINAL_STATUS = "resolved"
+
+function blocksStatusChange(currentStatus, nextStatus) {
+  if (nextStatus === undefined) return null
+  if (currentStatus !== TERMINAL_STATUS) return null
+  // Re-sending the same status is idempotent, so it is not a transition.
+  if (nextStatus === TERMINAL_STATUS) return null
+  return `A ${TERMINAL_STATUS} complaint cannot be moved back to ${nextStatus}`
+}
 
 // Assignment is restricted to authorized roles and shared across both routes.
 const ASSIGNMENT_ROLES = ["admin", "officer"]
@@ -227,11 +237,15 @@ exports.updateComplaint = async (req, res) => {
     const refError = await validateAssignmentRefs(updates)
     if (refError) return badRequest(res, refError)
 
-    // Read the previous assignment to detect an actual change.
-    const before = touchesAssignment
-      ? await Complaint.findById(req.params.id).select("assignedOfficer")
-      : null
-    const previousOfficer = before?.assignedOfficer ? String(before.assignedOfficer) : null
+    // Read before write: the terminal-status guard needs the stored status, and
+    // the notification below needs the previous assignment to detect a change.
+    const before = await Complaint.findById(req.params.id).select("status assignedOfficer")
+    if (!before) return notFound(res, "Complaint not found", ERROR_CODES.COMPLAINT_NOT_FOUND)
+
+    const refusal = blocksStatusChange(before.status, updates.status)
+    if (refusal) return conflictError(res, refusal)
+
+    const previousOfficer = before.assignedOfficer ? String(before.assignedOfficer) : null
 
     const complaint = await Complaint.findByIdAndUpdate(req.params.id, updates, {
       new: true,
@@ -268,6 +282,12 @@ exports.updateStatus = async (req, res) => {
     if (!COMPLAINT_STATUSES.includes(status)) {
       return badRequest(res, `status must be one of: ${COMPLAINT_STATUSES.join(", ")}`)
     }
+
+    const before = await Complaint.findById(req.params.id).select("status")
+    if (!before) return notFound(res, "Complaint not found", ERROR_CODES.COMPLAINT_NOT_FOUND)
+
+    const refusal = blocksStatusChange(before.status, status)
+    if (refusal) return conflictError(res, refusal)
 
     const updates = { status }
     const note = req.body.note !== undefined ? req.body.note : req.body.resolutionNote

@@ -3,7 +3,8 @@
 
 import test from "node:test"
 import assert from "node:assert/strict"
-import { readFileSync } from "node:fs"
+import { readdirSync, readFileSync } from "node:fs"
+import { basename, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { deptStyle, PROJECT_STATUS_OPTIONS, COMPLAINT_STATUS_CONFIG } from "../src/components/uiStyles.js"
 import { MCDM_CRITERIA, criterionWidth } from "../src/components/dashboard/constants.js"
@@ -16,6 +17,23 @@ import {
 // Reads backend schemas directly so frontend vocabulary stays in sync with API enums.
 const backendSource = (path) =>
   readFileSync(fileURLToPath(new URL(`../../backend/src/${path}`, import.meta.url)), "utf8")
+
+// Screens are read as text for the same reason: no JSX transform is available.
+const frontendSource = (path) =>
+  readFileSync(fileURLToPath(new URL(`../src/${path}`, import.meta.url)), "utf8")
+
+// Every screen rendered inside DashboardLayout — the role sections plus the
+// shared notification centre. Enumerated from disk so a page added later is
+// covered without anyone remembering to list it.
+const AUTHENTICATED_PAGE_DIRS = ["admin", "officer", "supervisor", "notifications"]
+
+const authenticatedPages = () =>
+  AUTHENTICATED_PAGE_DIRS.flatMap((dir) => {
+    const root = fileURLToPath(new URL(`../src/pages/${dir}`, import.meta.url))
+    return readdirSync(root)
+      .filter((name) => name.endsWith(".jsx"))
+      .map((name) => join(root, name))
+  })
 
 // --- Department badge styles ------------------------------------------------
 test("every department code gets a style, including codes no dictionary listed", () => {
@@ -192,4 +210,105 @@ test("resolvedAt is derived only for a resolved complaint", () => {
     adaptComplaint({ _id: "c", status: "in_progress", updatedAt }, new Map()).resolvedAt,
     null
   )
+})
+
+test("resolvedAt is a proxy for updatedAt, and updatedAt is available unaliased", () => {
+  const complaint = adaptComplaint(
+    { _id: "c", status: "resolved", updatedAt: "2026-03-01T00:00:00.000Z" },
+    new Map()
+  )
+  assert.equal(complaint.updatedAt, "2026-03-01T00:00:00.000Z")
+  assert.equal(complaint.resolvedAt, complaint.updatedAt, "resolvedAt must be nothing more than updatedAt")
+
+  // Editing a resolved complaint moves both, which is exactly why the screens
+  // must not label this as an authoritative resolution time.
+  const edited = adaptComplaint(
+    { _id: "c", status: "resolved", updatedAt: "2026-04-09T00:00:00.000Z" },
+    new Map()
+  )
+  assert.notEqual(edited.resolvedAt, complaint.resolvedAt)
+
+  // The complaint detail screen must not present it as one.
+  const detail = frontendSource("pages/admin/AdminComplaintDetail.jsx")
+  assert.ok(
+    !/label="Resolved on"/.test(detail),
+    'the "Resolved on" label overstates a timestamp the schema does not store'
+  )
+  assert.ok(/label="Last updated"/.test(detail), "the row must name the value it actually shows")
+
+  // And it is still not invented anywhere: acknowledgement has no source at all.
+  assert.equal(complaint.acknowledgedAt, null)
+  assert.ok(UNAVAILABLE_FIELDS.complaint.includes("acknowledgedAt"))
+})
+
+test("every authenticated screen has exactly one h1, supplied by the shell", () => {
+  const shell = frontendSource("components/DashboardLayout.jsx")
+  assert.equal(
+    (shell.match(/<h1[\s>]/g) || []).length,
+    1,
+    "the shell must contribute exactly one h1"
+  )
+  assert.ok(
+    /<h1 className="sr-only">\{pageTitle\}<\/h1>/.test(shell),
+    "the shell's h1 must carry the page title"
+  )
+
+  const navbar = frontendSource("components/Navbar.jsx")
+  assert.ok(
+    !/<h1[\s>]/.test(navbar),
+    "the Navbar title repeats across a whole section, so it is chrome and not the page heading"
+  )
+
+  // No authenticated page may add a second one.
+  for (const file of authenticatedPages()) {
+    const source = readFileSync(file, "utf8")
+    assert.equal(
+      (source.match(/<h1[\s>]/g) || []).length,
+      0,
+      `${basename(file)} adds a second h1 on top of the shell's`
+    )
+  }
+})
+
+test("the authenticated shell stacks its navbar above Leaflet", () => {
+  const LEAFLET_CEILING = 1000
+  const shell = frontendSource("components/DashboardLayout.jsx")
+
+  const declared = [...shell.matchAll(/z-\[(\d+)\]/g)].map((m) => Number(m[1]))
+  assert.ok(declared.length > 0, "the shell declares no z-index at all, so Leaflet would paint over it")
+  assert.ok(
+    declared.some((z) => z > LEAFLET_CEILING),
+    `the navbar wrapper must sit above Leaflet's ${LEAFLET_CEILING}; found ${declared.join(", ")}`
+  )
+
+  // It has to be a stacking context, or the z-index would not contain the
+  // absolutely-positioned dropdowns and the fixed backdrops inside it.
+  assert.ok(
+    /className="relative z-\[\d+\][^"]*"/.test(shell),
+    "the raised wrapper must be positioned, otherwise z-index does not apply"
+  )
+
+  // The public portal solved this first; the two must not drift apart.
+  const citizenCeiling = [...frontendSource("pages/citizen/CitizenNav.jsx").matchAll(/z-\[(\d+)\]/g)]
+    .map((m) => Number(m[1]))
+  assert.ok(
+    citizenCeiling.some((z) => z > LEAFLET_CEILING),
+    "CitizenNav is the reference implementation and must stay above Leaflet too"
+  )
+})
+
+// --- /login is not reachable with a live session ---------------------------
+test("the sign-in route redirects an authenticated visitor to their own dashboard", () => {
+  const router = frontendSource("router/AppRouter.jsx")
+
+  assert.ok(/<Route path="\/login" element={<LoginRoute \/>} \/>/.test(router),
+    "/login must go through the guard, not straight to the form")
+
+  const guard = router.slice(router.indexOf("function LoginRoute"))
+  assert.ok(/if \(loading\) return null/.test(guard),
+    "deciding before the session restore finishes would bounce a signed-in user on every refresh")
+  assert.ok(/if \(user\) return <Navigate to={getDashboardPath\(\)} replace \/>/.test(guard),
+    "the redirect must reuse getDashboardPath rather than repeating the role-to-route mapping")
+  assert.ok(/return <Login \/>/.test(guard),
+    "an unauthenticated visitor must still reach the form")
 })

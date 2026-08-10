@@ -204,11 +204,33 @@ the rejected path name, anything else becomes 500.
 ## Pagination
 
 Opt-in through `?page` and/or `?limit`. The default limit is 25 and the maximum
-is 200. When neither parameter is supplied the full list is returned.
+is 200.
+
+When neither parameter is supplied, most list endpoints return the full list —
+but four cap the read rather than growing without bound:
+
+| Endpoint | Cap without `?page`/`?limit` | Why |
+|---|---|---|
+| `GET /api/complaints` | 200 | The one public list in the API |
+| `GET /api/projects/public` | 200 | Unauthenticated, so it cannot be unbounded |
+| `GET /api/audit` | 200 | The trail grows without bound |
+| `GET /api/notifications` | 50 | The default feed |
+
+Every other list endpoint — `GET /api/projects`, `/api/conflicts`,
+`/api/departments`, `/api/users` — is authenticated, scoped to the caller, and
+genuinely returns everything in scope when unpaginated. See
+[`API_REFERENCE.md`](../api/API_REFERENCE.md) for the per-endpoint detail.
+
+All four capped endpoints send `X-Total-Count` on **every** response, paginated
+or not, so a truncated read is never mistaken for a complete one: compare the
+header against the array length. Truncation keeps the newest records, since
+every capped list sorts `-createdAt`.
 
 Metadata travels in headers because several list endpoints return a bare array,
 and moving it into the body would be a breaking change: `X-Total-Count`,
-`X-Page`, `X-Limit`, `X-Total-Pages`, `X-Has-Next`, `X-Has-Previous`.
+`X-Page`, `X-Limit`, `X-Total-Pages`, `X-Has-Next`, `X-Has-Previous`. The full
+set is sent only when pagination is on; a capped unpaginated read sends
+`X-Total-Count` alone, there being no page to describe.
 
 In `projectsController.getProjects` the count runs concurrently with the read
 under `Promise.all`, so pagination costs one round trip rather than two.

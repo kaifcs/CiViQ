@@ -272,6 +272,7 @@ export function adaptComplaint(c, deptMap) {
     filedAt: c.createdAt,
     acknowledgedAt: null,
     // No deadline exists in the complaint schema.
+    updatedAt: c.updatedAt,
     resolvedAt: c.status === "resolved" ? c.updatedAt : null,
     resolutionNote: c.resolutionNote || null,
     _raw: c,

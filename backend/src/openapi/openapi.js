@@ -52,9 +52,13 @@ module.exports = {
       "`complaints`, `notifications` and `audit` return the raw document or array, " +
       "with errors as `{ message }`. Each operation below documents its actual shape.\n\n" +
       "**Pagination is opt-in.** List endpoints accept `page` and `limit`. When " +
-      "neither is supplied the endpoint behaves exactly as before (unpaginated). " +
-      "When supplied, the response **body is unchanged** and totals are returned in " +
-      "`X-Total-Count`, `X-Page`, `X-Limit` and `X-Total-Pages` headers.",
+      "neither is supplied the endpoint is unpaginated, except that four lists cap " +
+      "the read rather than growing without bound: `GET /complaints`, " +
+      "`GET /projects/public` and `GET /audit` at 200 records, `GET /notifications` " +
+      "at 50. Those four send `X-Total-Count` on **every** response, so a truncated " +
+      "read is never silent — compare it against the array length. " +
+      "When pagination is supplied, the response **body is unchanged** and totals " +
+      "are returned in `X-Total-Count`, `X-Page`, `X-Limit` and `X-Total-Pages` headers.",
   },
   servers: [{ url: "/", description: "Current host" }],
   tags: [

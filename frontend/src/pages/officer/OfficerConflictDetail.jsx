@@ -123,7 +123,7 @@ export default function OfficerConflictDetail() {
           </span>
           <span className="text-[12px] text-[#9CA3AF] dark:text-[#6B7280]">Detected {days}d ago</span>
         </div>
-        <h1 className="text-[20px] font-bold text-[#0F172A] dark:text-[#F8FAFC]">{conflict.projectADept} ↔ {conflict.projectBDept} Clash</h1>
+        <h2 className="text-[20px] font-bold text-[#0F172A] dark:text-[#F8FAFC]">{conflict.projectADept} ↔ {conflict.projectBDept} Clash</h2>
         <p className="text-[13px] text-[#6B7280] dark:text-[#9CA3AF] mt-1">{conflict.overlapDescription}</p>
       </div>
 

@@ -54,6 +54,7 @@ exports.getLogs = async (req, res) => {
 
     const logs = await q.lean()
     if (page.enabled) setPaginationHeaders(res, await AuditLog.countDocuments(filter), page)
+    else res.set("X-Total-Count", String(await AuditLog.countDocuments(filter)))
     res.json(logs)
   } catch (err) { serverError(res, err, "auditController:") }
 }

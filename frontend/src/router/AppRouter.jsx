@@ -85,6 +85,15 @@ function RoleRoute({ children, role }) {
   return children
 }
 
+function LoginRoute() {
+  const { user, loading, getDashboardPath } = useAuth()
+
+  if (loading) return null
+  if (user) return <Navigate to={getDashboardPath()} replace />
+
+  return <Login />
+}
+
 function AdminLayout({ children, activeItem }) {
   const navigate = useNavigate()
   const { user } = useAuth()
@@ -173,7 +182,7 @@ export default function AppRouter() {
       <Suspense fallback={<LoadingState label="Loading..." />}>
       <Routes>
         <Route path="/" element={<CitizenHome />} />
-        <Route path="/login" element={<Login />} />
+        <Route path="/login" element={<LoginRoute />} />
 
         <Route path="/admin/dashboard" element={<RoleRoute role="admin"><AdminLayout activeItem="dashboard"><AdminDashboard /></AdminLayout></RoleRoute>} />
         <Route path="/admin/projects" element={<RoleRoute role="admin"><AdminLayout activeItem="projects"><AdminProjects /></AdminLayout></RoleRoute>} />

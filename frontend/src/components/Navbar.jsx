@@ -108,9 +108,9 @@ export default function Navbar({
 
   return (
     <div className="flex items-center justify-between px-8 h-16 border-b border-[#E2E8F0] dark:border-[#1E293B] flex-shrink-0">
-      <h1 className="text-[18px] font-bold text-[#0F172A] dark:text-[#F8FAFC] tracking-tight leading-none">
+      <p className="text-[18px] font-bold text-[#0F172A] dark:text-[#F8FAFC] tracking-tight leading-none">
         {pageTitle}
-      </h1>
+      </p>
 
       <div className="flex items-center gap-3">
         {pageAction && <div>{pageAction}</div>}

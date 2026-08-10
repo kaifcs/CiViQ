@@ -121,6 +121,10 @@ Without pagination the response is capped at 200 records, because the trail
 grows without bound and the default view shows only recent activity. `?page` and
 `?limit` enable full pagination with the standard `X-Total-*` headers.
 
+`X-Total-Count` is sent on **every** response, paginated or not, and reports the
+size of the filtered set — so a capped read cannot be mistaken for the whole
+trail. Compare it against the array length, and page through for the rest.
+
 Filters are applied by the server, so they narrow the whole trail rather than
 only the rows already returned: `action`, `performedBy` (a User ObjectId),
 `targetType`, `isOverride` (`true`/`false`) and the `from`/`to` `createdAt`

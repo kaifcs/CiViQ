@@ -243,9 +243,9 @@ export default function AdminProjectDetail() {
               </span>
             )}
           </div>
-          <h1 className="text-[22px] font-bold text-[#0F172A] dark:text-[#F8FAFC] leading-snug">
+          <h2 className="text-[22px] font-bold text-[#0F172A] dark:text-[#F8FAFC] leading-snug">
             {project.title}
-          </h1>
+          </h2>
           <p className="text-[13px] text-[#6B7280] dark:text-[#9CA3AF] mt-1">{project.departmentFull}</p>
         </div>
 

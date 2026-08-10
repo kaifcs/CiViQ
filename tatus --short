@@ -1,0 +1,129 @@
+[1mdiff --git a/backend/src/controllers/auditController.js b/backend/src/controllers/auditController.js[m
+[1mindex c90014b..b9cb771 100644[m
+[1m--- a/backend/src/controllers/auditController.js[m
+[1m+++ b/backend/src/controllers/auditController.js[m
+[36m@@ -54,6 +54,7 @@[m [mexports.getLogs = async (req, res) => {[m
+ [m
+     const logs = await q.lean()[m
+     if (page.enabled) setPaginationHeaders(res, await AuditLog.countDocuments(filter), page)[m
+[32m+[m[32m    else res.set("X-Total-Count", String(await AuditLog.countDocuments(filter)))[m
+     res.json(logs)[m
+   } catch (err) { serverError(res, err, "auditController:") }[m
+ }[m
+[1mdiff --git a/backend/src/controllers/complaintsController.js b/backend/src/controllers/complaintsController.js[m
+[1mindex 376f288..fa2518d 100644[m
+[1m--- a/backend/src/controllers/complaintsController.js[m
+[1m+++ b/backend/src/controllers/complaintsController.js[m
+[36m@@ -11,7 +11,7 @@[m [mconst { notifyComplaintAssigned, notifyComplaintStatusChanged } = require("../se[m
+ const { parsePagination, setPaginationHeaders } = require("../utils/pagination")[m
+ const { pickWritable: pickFields } = require("../utils/writableFields")[m
+ const { serialiseComplaint, serialiseComplaints } = require("../utils/serializers")[m
+[31m-const { ERROR_CODES, badRequest, forbidden, notFound, sendWriteError, serverError } = require("../utils/apiResponse")[m
+[32m+[m[32mconst { ERROR_CODES, badRequest, conflictError, forbidden, notFound, sendWriteError, serverError } = require("../utils/apiResponse")[m
+ [m
+ const COMPLAINT_STATUSES = Complaint.schema.path("status").enumValues[m
+ const ISSUE_TYPES = Complaint.schema.path("issueType").enumValues[m
+[36m@@ -33,6 +33,16 @@[m [mconst CREATE_WRITABLE_FIELDS = [[m
+   "photoUrl",[m
+ ][m
+ [m
+[32m+[m[32mconst TERMINAL_STATUS = "resolved"[m
+[32m+[m
+[32m+[m[32mfunction blocksStatusChange(currentStatus, nextStatus) {[m
+[32m+[m[32m  if (nextStatus === undefined) return null[m
+[32m+[m[32m  if (currentStatus !== TERMINAL_STATUS) return null[m
+[32m+[m[32m  // Re-sending the same status is idempotent, so it is not a transition.[m
+[32m+[m[32m  if (nextStatus === TERMINAL_STATUS) return null[m
+[32m+[m[32m  return `A ${TERMINAL_STATUS} complaint cannot be moved back to ${nextStatus}`[m
+[32m+[m[32m}[m
+[32m+[m
+ // Assignment is restricted to authorized roles and shared across both routes.[m
+ const ASSIGNMENT_ROLES = ["admin", "officer"][m
+ exports.ASSIGNMENT_ROLES = ASSIGNMENT_ROLES[m
+[36m@@ -227,11 +237,15 @@[m [mexports.updateComplaint = async (req, res) => {[m
+     const refError = await validateAssignmentRefs(updates)[m
+     if (refError) return badRequest(res, refError)[m
+ [m
+[31m-    // Read the previous assignment to detect an actual change.[m
+[31m-    const before = touchesAssignment[m
+[31m-      ? await Complaint.findById(req.params.id).select("assignedOfficer")[m
+[31m-      : null[m
+[31m-    const previousOfficer = before?.assignedOfficer ? String(before.assignedOfficer) : null[m
+[32m+[m[32m    // Read before write: the terminal-status guard needs the stored status, and[m
+[32m+[m[32m    // the notification below needs the previous assignment to detect a change.[m
+[32m+[m[32m    const before = await Complaint.findById(req.params.id).select("status assignedOfficer")[m
+[32m+[m[32m    if (!before) return notFound(res, "Complaint not found", ERROR_CODES.COMPLAINT_NOT_FOUND)[m
+[32m+[m
+[32m+[m[32m    const refusal = blocksStatusChange(before.status, updates.status)[m
+[32m+[m[32m    if (refusal) return conflictError(res, refusal)[m
+[32m+[m
+[32m+[m[32m    const previousOfficer = before.assignedOfficer ? String(before.assignedOfficer) : null[m
+ [m
+     const complaint = await Complaint.findByIdAndUpdate(req.params.id, updates, {[m
+       new: true,[m
+[36m@@ -269,6 +283,12 @@[m [mexports.updateStatus = async (req, res) => {[m
+       return badRequest(res, `status must be one of: ${COMPLAINT_STATUSES.join(", ")}`)[m
+     }[m
+ [m
+[32m+[m[32m    const before = await Complaint.findById(req.params.id).select("status")[m
+[32m+[m[32m    if (!before) return notFound(res, "Complaint not found", ERROR_CODES.COMPLAINT_NOT_FOUND)[m
+[32m+[m
+[32m+[m[32m    const refusal = blocksStatusChange(before.status, status)[m
+[32m+[m[32m    if (refusal) return conflictError(res, refusal)[m
+[32m+[m
+     const updates = { status }[m
+     const note = req.body.note !== undefined ? req.body.note : req.body.resolutionNote[m
+     if (note !== undefined) updates.resolutionNote = note[m
+[1mdiff --git a/backend/src/controllers/notificationsController.js b/backend/src/controllers/notificationsController.js[m
+[1mindex f31512c..c4bd957 100644[m
+[1m--- a/backend/src/controllers/notificationsController.js[m
+[1m+++ b/backend/src/controllers/notificationsController.js[m
+[36m@@ -17,6 +17,8 @@[m [mexports.getNotifications = async (req, res) => {[m
+     const notifications = await service.listNotifications(req.user._id, req.query, page, prefs)[m
+     if (page.enabled) {[m
+       setPaginationHeaders(res, await service.countNotifications(req.user._id, req.query, prefs), page)[m
+[32m+[m[32m    } else {[m
+[32m+[m[32m      res.set("X-Total-Count", String(await service.countNotifications(req.user._id, req.query, prefs)))[m
+     }[m
+     res.json(notifications)[m
+   } catch (err) { serverError(res, err, "notificationsController:") }[m
+[1mdiff --git a/backend/src/openapi/openapi.js b/backend/src/openapi/openapi.js[m
+[1mindex 5c3f1d0..ab845a8 100644[m
+[1m--- a/backend/src/openapi/openapi.js[m
+[1m+++ b/backend/src/openapi/openapi.js[m
+[36m@@ -52,9 +52,13 @@[m [mmodule.exports = {[m
+       "`complaints`, `notifications` and `audit` return the raw document or array, " +[m
+       "with errors as `{ message }`. Each operation below documents its actual shape.\n\n" +[m
+       "**Pagination is opt-in.** List endpoints accept `page` and `limit`. When " +[m
+[31m-      "neither is supplied the endpoint behaves exactly as before (unpaginated). " +[m
+[31m-      "When supplied, the response **body is unchanged** and totals are returned in " +[m
+[31m-      "`X-Total-Count`, `X-Page`, `X-Limit` and `X-Total-Pages` headers.",[m
+[32m+[m[32m      "neither is supplied the endpoint is unpaginated, except that four lists cap " +[m
+[32m+[m[32m      "the read rather than growing without bound: `GET /complaints`, " +[m
+[32m+[m[32m      "`GET /projects/public` and `GET /audit` at 200 records, `GET /notifications` " +[m
+[32m+[m[32m      "at 50. Those four send `X-Total-Count` on **every** response, so a truncated " +[m
+[32m+[m[32m      "read is never silent — compare it against the array length. " +[m
+[32m+[m[32m      "When pagination is supplied, the response **body is unchanged** and totals " +[m
+[32m+[m[32m      "are returned in `X-Total-Count`, `X-Page`, `X-Limit` and `X-Total-Pages` headers.",[m
+   },[m
+   servers: [{ url: "/", description: "Current host" }],[m
+   tags: [[m
+[1mdiff --git a/backend/src/utils/apiResponse.js b/backend/src/utils/apiResponse.js[m
+[1mindex 4329e10..3045a32 100644[m
+[1m--- a/backend/src/utils/apiResponse.js[m
+[1m+++ b/backend/src/utils/apiResponse.js[m
+[36m@@ -88,7 +88,6 @@[m [mfunction sendWriteError(res, err, { resource = "record", context } = {}) {[m
+     const messages = Object.values(err.errors).map((e) => e.message)[m
+     return badRequest(res, messages.join(", "), ERROR_CODES.VALIDATION_ERROR, messages)[m
+   }[m
+[31m-  // Validate coordinates at the schema level so all write paths share the same bounds.[m
+   if (err?.name === "CastError") {[m
+     return badRequest(res, `Invalid value for ${err.path}`, ERROR_CODES.VALIDATION_ERROR)[m
+   }[m
+[1mdiff --git a/backend/test/integration/api.test.js b/backend/test/integration/api.test.js[m
+[1mindex 51488e9..fe8967b 100644[m
+[1m--- a/backend/test/integration/api.test.js[m
+[1m+++ b/backend/test/integration/api.test.js[m
+[36m@@ -1136,6 +1136,106 @@[m [mtest("API regression", async (t) => {[m
+     })[m
+     assert.equal(an
